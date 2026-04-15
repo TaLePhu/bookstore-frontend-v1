@@ -272,7 +272,7 @@ export function PromotionsPage() {
             <p className="text-sm text-gray-600">Nhấn để sao chép mã</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             {vouchers.map((voucher) => {
               const VoucherIcon = voucher.icon;
               return (
@@ -306,8 +306,8 @@ export function PromotionsPage() {
                   </div>
 
                   <div className="p-4 bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                         <button
                           onClick={() => copyCode(voucher.code)}
                           className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-dashed border-orange-400 rounded-lg font-mono font-bold text-orange-600 hover:bg-orange-50 transition-colors"
@@ -337,7 +337,7 @@ export function PromotionsPage() {
         {/* Flash Sale Section */}
         <div className="mb-12">
           <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-6 mb-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center animate-pulse">
                   <Zap className="w-8 h-8 text-white" />
@@ -347,7 +347,7 @@ export function PromotionsPage() {
                   <p className="opacity-90">Ưu đãi có thời hạn - Nhanh tay kẻo lỡ!</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 overflow-x-auto pb-1">
                 <div className="text-white text-center">
                   <div className="text-xs opacity-75 mb-1">Kết thúc sau</div>
                   <div className="flex items-center gap-2">
@@ -377,7 +377,7 @@ export function PromotionsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
             {flashSaleBooks.map((book) => (
               <div
                 key={book.id}
@@ -477,7 +477,7 @@ export function PromotionsPage() {
             <h2 className="text-2xl font-bold text-gray-900">Giảm giá theo mức</h2>
           </div>
 
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {discountTiers.map((tier) => (
               <button
                 key={tier.id}
@@ -514,7 +514,7 @@ export function PromotionsPage() {
             <h2 className="text-2xl font-bold text-gray-900">Combo tiết kiệm</h2>
           </div>
 
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {combos.map((combo) => (
               <div
                 key={combo.id}

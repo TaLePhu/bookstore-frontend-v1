@@ -213,7 +213,7 @@ export function BestSellersPage() {
       {/* Stats Banner */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="grid grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
             <div className="text-center">
               <div className="text-3xl font-bold text-orange-600 mb-1">
                 {books.length}+
@@ -241,8 +241,8 @@ export function BestSellersPage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Toolbar */}
         <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
@@ -267,7 +267,7 @@ export function BestSellersPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-2 rounded-lg transition-colors ${
@@ -295,7 +295,7 @@ export function BestSellersPage() {
           {(selectedCategory !== 'all' ||
             selectedPriceRange !== 'all' ||
             selectedRating !== 'all') && (
-            <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
               <span className="text-sm text-gray-600">Đang lọc:</span>
               {selectedCategory !== 'all' && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm">
@@ -331,10 +331,10 @@ export function BestSellersPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-12 gap-6">
+        <div className="grid gap-6 lg:grid-cols-12">
           {/* Sidebar Filters */}
           {showFilters && (
-            <div className="col-span-3 space-y-6">
+            <div className="space-y-6 lg:col-span-3">
               {/* Category Filter */}
               <div className="bg-white rounded-xl shadow-sm border p-6">
                 <h3 className="font-bold text-gray-900 mb-4">Thể loại</h3>
@@ -444,7 +444,7 @@ export function BestSellersPage() {
           )}
 
           {/* Books Grid/List */}
-          <div className={showFilters ? 'col-span-9' : 'col-span-12'}>
+          <div className={showFilters ? 'lg:col-span-9' : 'lg:col-span-12'}>
             <div className="mb-4 text-sm text-gray-600">
               Hiển thị <span className="font-bold text-gray-900">{books.length}</span>{' '}
               sản phẩm
@@ -453,7 +453,7 @@ export function BestSellersPage() {
             {viewMode === 'grid' ? (
               <div
                 className={`grid gap-6 ${
-                  showFilters ? 'grid-cols-3' : 'grid-cols-4'
+                  showFilters ? 'sm:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-2 xl:grid-cols-4'
                 }`}
               >
                 {books.map((book) => (
@@ -564,7 +564,7 @@ export function BestSellersPage() {
                 {books.map((book) => (
                   <div
                     key={book.id}
-                    className="bg-white rounded-xl shadow-sm border hover:shadow-lg transition-all p-4 flex gap-4"
+                    className="flex flex-col gap-4 rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-lg sm:flex-row"
                   >
                     {/* Book Image */}
                     <div className="w-32 h-44 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 relative">
@@ -586,8 +586,8 @@ export function BestSellersPage() {
                     </div>
 
                     {/* Book Info */}
-                    <div className="flex-1 flex flex-col">
-                      <div className="flex items-start justify-between mb-2">
+                    <div className="flex flex-1 flex-col">
+                      <div className="mb-2 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex-1">
                           <h3
                             className="text-xl font-bold text-gray-900 mb-1 cursor-pointer hover:text-orange-600 transition-colors"
@@ -633,7 +633,7 @@ export function BestSellersPage() {
                         </div>
                       </div>
 
-                      <div className="mt-auto flex items-center gap-3">
+                      <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center">
                         <button
                           onClick={() =>
                             addToCart({
@@ -667,7 +667,7 @@ export function BestSellersPage() {
             )}
 
             {/* Pagination */}
-            <div className="mt-8 flex items-center justify-center gap-2">
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
               <button className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium">
                 Trước
               </button>

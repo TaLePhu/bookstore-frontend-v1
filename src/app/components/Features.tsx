@@ -39,7 +39,7 @@ export function Features() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="grid grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         {features.map((feature, index) => {
           const Icon = feature.icon;
           
@@ -63,7 +63,7 @@ export function Features() {
             <button
               key={index}
               onClick={handleClick}
-              className="flex flex-col items-center gap-4 p-6 bg-white rounded-2xl shadow-md hover:shadow-xl transition-all hover:-translate-y-1"
+              className="flex min-h-[180px] flex-col items-center gap-4 rounded-2xl bg-white p-5 shadow-md transition-all hover:-translate-y-1 hover:shadow-xl sm:p-6"
             >
               <div className={`w-16 h-16 ${feature.color} rounded-2xl flex items-center justify-center`}>
                 <Icon className={`w-8 h-8 ${feature.iconColor}`} />

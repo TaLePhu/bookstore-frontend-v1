@@ -30,7 +30,7 @@ export function HeroCarousel() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <section className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
         <Slider {...settings}>
           {/* Slide 1 - From provided image */}
@@ -44,8 +44,8 @@ export function HeroCarousel() {
 
           {/* Slide 2 - Additional promotional banner */}
           <div className="outline-none">
-            <div className="relative h-[500px] bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 flex items-center justify-center">
-              <div className="text-center text-white z-10 px-8">
+            <div className="relative flex min-h-[320px] items-center justify-center bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 px-4 py-12 sm:min-h-[420px] lg:min-h-[500px]">
+              <div className="z-10 max-w-3xl px-4 text-center text-white">
                 <h2 className="text-6xl font-bold mb-4">SALE CUỐI NĂM</h2>
                 <p className="text-3xl mb-6">Giảm đến 60% toàn bộ kho sách</p>
                 <button className="bg-white text-purple-600 px-8 py-4 rounded-full text-xl font-bold hover:bg-gray-100 transition-colors">
@@ -57,8 +57,8 @@ export function HeroCarousel() {
 
           {/* Slide 3 */}
           <div className="outline-none">
-            <div className="relative h-[500px] bg-gradient-to-br from-green-400 via-teal-400 to-blue-400 flex items-center justify-center">
-              <div className="text-center text-white z-10 px-8">
+            <div className="relative flex min-h-[320px] items-center justify-center bg-gradient-to-br from-green-400 via-teal-400 to-blue-400 px-4 py-12 sm:min-h-[420px] lg:min-h-[500px]">
+              <div className="z-10 max-w-3xl px-4 text-center text-white">
                 <h2 className="text-6xl font-bold mb-4">SÁCH MỚI 2026</h2>
                 <p className="text-3xl mb-6">Cập nhật những đầu sách mới nhất</p>
                 <button className="bg-white text-teal-600 px-8 py-4 rounded-full text-xl font-bold hover:bg-gray-100 transition-colors">
@@ -69,6 +69,6 @@ export function HeroCarousel() {
           </div>
         </Slider>
       </div>
-    </div>
+    </section>
   );
 }

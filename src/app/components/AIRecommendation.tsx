@@ -103,7 +103,7 @@ export function AIRecommendation() {
         {/* Search Box */}
         <div className="max-w-4xl mx-auto mb-8">
           <div className="bg-white rounded-2xl shadow-xl p-6">
-            <div className="flex gap-3 mb-4">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row">
               <div className="flex-1 relative">
                 <input
                   type="text"
@@ -167,7 +167,7 @@ export function AIRecommendation() {
                 </h3>
               </div>
 
-              <div className="grid grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
                 {recommendedBooks.map((book) => (
                   <div
                     key={book.id}
@@ -256,7 +256,7 @@ export function AIRecommendation() {
 
               {/* AI Stats */}
               <div className="mt-8 pt-6 border-t border-gray-200">
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
                       <Bot className="w-6 h-6 text-indigo-600" />
@@ -292,7 +292,7 @@ export function AIRecommendation() {
 
         {/* Feature Cards */}
         {!showResults && (
-          <div className="grid grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mb-4">
                 <Bot className="w-6 h-6 text-white" />

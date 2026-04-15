@@ -81,7 +81,7 @@ export function NewBooks() {
 
   return (
     <section className="max-w-7xl mx-auto px-4 py-12">
-      <div className="flex items-center justify-between mb-8">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
             <Sparkles className="w-6 h-6 text-white" />
@@ -93,7 +93,7 @@ export function NewBooks() {
         </a>
       </div>
 
-      <div className="grid grid-cols-6 gap-5">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
         {books.map((book) => (
           <div
             key={book.id}
@@ -190,8 +190,8 @@ export function NewBooks() {
       </div>
 
       {/* Info Banner */}
-      <div className="mt-8 bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl p-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="mt-8 flex flex-col gap-5 rounded-2xl bg-gradient-to-r from-purple-100 to-pink-100 p-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-4">
           <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
             <Sparkles className="w-8 h-8 text-purple-600" />
           </div>
@@ -204,7 +204,7 @@ export function NewBooks() {
             </p>
           </div>
         </div>
-        <button className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-full font-bold hover:shadow-lg transition-all hover:-translate-y-1">
+        <button className="w-full rounded-full bg-gradient-to-r from-purple-600 to-pink-600 px-8 py-3 font-bold text-white transition-all hover:-translate-y-1 hover:shadow-lg sm:w-fit">
           Xem thêm sách mới
         </button>
       </div>

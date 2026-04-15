@@ -213,7 +213,7 @@ export function NewBooksPage() {
       {/* Stats Banner */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="grid grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
             <div className="text-center">
               <div className="text-3xl font-bold text-purple-600 mb-1">
                 {books.length}+
@@ -241,8 +241,8 @@ export function NewBooksPage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Toolbar */}
         <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
@@ -260,7 +260,7 @@ export function NewBooksPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-2 rounded-lg transition-colors ${
@@ -286,7 +286,7 @@ export function NewBooksPage() {
 
           {/* Filters Panel */}
           {showFilters && (
-            <div className="mt-4 pt-4 border-t grid grid-cols-3 gap-4">
+            <div className="mt-4 grid gap-4 border-t pt-4 md:grid-cols-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Danh mục
@@ -362,7 +362,7 @@ export function NewBooksPage() {
 
         {/* Books Grid/List */}
         {viewMode === 'grid' ? (
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
             {books.map((book) => (
               <div
                 key={book.id}
@@ -455,7 +455,7 @@ export function NewBooksPage() {
             {books.map((book) => (
               <div
                 key={book.id}
-                className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all p-4 flex gap-4"
+                className="flex flex-col gap-4 rounded-xl bg-white p-4 shadow-sm transition-all hover:shadow-xl sm:flex-row"
               >
                 <div className="relative flex-shrink-0">
                   <img

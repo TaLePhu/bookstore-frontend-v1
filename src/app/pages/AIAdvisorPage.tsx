@@ -282,13 +282,13 @@ export function AIAdvisorPage() {
           </div>
 
           {/* Messages */}
-          <div className="h-[500px] overflow-y-auto p-6 space-y-4 bg-gray-50">
+          <div className="h-[500px] overflow-y-auto bg-gray-50 p-4 space-y-4 sm:p-6">
             {messages.map((message) => (
               <div
                 key={message.id}
                 className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`flex gap-3 max-w-[80%] ${message.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <div className={`flex max-w-full gap-3 sm:max-w-[80%] ${message.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                       message.type === 'user'
@@ -317,7 +317,7 @@ export function AIAdvisorPage() {
                             key={book.id}
                             className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-shadow"
                           >
-                            <div className="flex gap-4">
+                            <div className="flex flex-col gap-4 sm:flex-row">
                               <img
                                 src={book.image}
                                 alt={book.title}
@@ -342,9 +342,9 @@ export function AIAdvisorPage() {
                                 <p className="text-sm text-gray-600 mb-3 italic">
                                   💡 {book.reason}
                                 </p>
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                   <span className="text-lg font-bold text-blue-600">{book.price}</span>
-                                  <div className="flex gap-2">
+                                  <div className="flex flex-col gap-2 sm:flex-row">
                                     <button
                                       onClick={() => navigate(`/book/${book.id}`)}
                                       className="px-3 py-1 text-sm border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
@@ -401,7 +401,7 @@ export function AIAdvisorPage() {
           {messages.length <= 2 && (
             <div className="px-6 py-4 bg-white border-t">
               <p className="text-sm text-gray-600 mb-3">Câu hỏi gợi ý:</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {quickQuestions.map((question, index) => {
                   const Icon = question.icon;
                   return (
@@ -421,7 +421,7 @@ export function AIAdvisorPage() {
 
           {/* Input Area */}
           <div className="p-6 bg-white border-t">
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <input
                 type="text"
                 value={inputValue}
@@ -443,7 +443,7 @@ export function AIAdvisorPage() {
         </div>
 
         {/* Info Cards */}
-        <div className="grid grid-cols-3 gap-6 mt-8">
+        <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
           <div className="bg-white rounded-xl p-6 shadow-sm text-center">
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <Sparkles className="w-6 h-6 text-blue-600" />

@@ -148,7 +148,7 @@ export function CheckoutPage() {
       {/* Progress Steps */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white font-bold">
                 <CheckCircle2 className="w-6 h-6" />
@@ -174,9 +174,9 @@ export function CheckoutPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-12 gap-8">
+        <div className="grid gap-8 xl:grid-cols-12">
           {/* Left Column - Forms */}
-          <div className="col-span-8 space-y-6">
+          <div className="space-y-6 xl:col-span-8">
             {/* Shipping Information */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -188,8 +188,8 @@ export function CheckoutPage() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Họ và tên <span className="text-red-500">*</span>
                   </label>
@@ -242,7 +242,7 @@ export function CheckoutPage() {
                   </div>
                 </div>
 
-                <div className="col-span-2">
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Địa chỉ <span className="text-red-500">*</span>
                   </label>
@@ -296,7 +296,7 @@ export function CheckoutPage() {
                   </select>
                 </div>
 
-                <div className="col-span-2">
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Ghi chú đơn hàng
                   </label>
@@ -451,7 +451,7 @@ export function CheckoutPage() {
           </div>
 
           {/* Right Column - Order Summary */}
-          <div className="col-span-4">
+          <div className="xl:col-span-4">
             <div className="sticky top-4 space-y-6">
               {/* Order Items */}
               <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -493,7 +493,7 @@ export function CheckoutPage() {
                   <h3 className="font-bold text-gray-900">Mã giảm giá</h3>
                 </div>
 
-                <div className="flex gap-2 mb-3">
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row">
                   <input
                     type="text"
                     value={couponCode}

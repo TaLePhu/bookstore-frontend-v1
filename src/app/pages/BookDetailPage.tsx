@@ -165,9 +165,9 @@ Paulo Coelho đã khéo léo kết hợp triết lý phương Đông và phươn
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-12 gap-8">
+        <div className="grid gap-8 xl:grid-cols-12">
           {/* Left Column - Images */}
-          <div className="col-span-5">
+          <div className="xl:col-span-5">
             <div className="bg-white rounded-2xl p-6 shadow-lg sticky top-4">
               {/* Main Image */}
               <div className="relative aspect-[3/4] mb-4 rounded-xl overflow-hidden bg-gray-100">
@@ -228,13 +228,13 @@ Paulo Coelho đã khéo léo kết hợp triết lý phương Đông và phươn
           </div>
 
           {/* Right Column - Details */}
-          <div className="col-span-7">
+          <div className="xl:col-span-7">
             <div className="bg-white rounded-2xl p-8 shadow-lg mb-6">
               {/* Title & Author */}
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {book.title}
               </h1>
-              <div className="flex items-center gap-4 mb-4">
+              <div className="mb-4 flex flex-wrap items-center gap-3 sm:gap-4">
                 <span className="text-gray-600">
                   Tác giả:{' '}
                   <span className="text-orange-600 font-medium hover:underline cursor-pointer">
@@ -248,7 +248,7 @@ Paulo Coelho đã khéo léo kết hợp triết lý phương Đông và phươn
               </div>
 
               {/* Rating & Stats */}
-              <div className="flex items-center gap-6 pb-6 border-b">
+              <div className="flex flex-wrap items-center gap-4 border-b pb-6 sm:gap-6">
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1">
                     {[...Array(5)].map((_, i) => (
@@ -280,7 +280,7 @@ Paulo Coelho đã khéo léo kết hợp triết lý phương Đông và phươn
 
               {/* Price */}
               <div className="py-6 border-b">
-                <div className="flex items-baseline gap-4 mb-2">
+                <div className="mb-2 flex flex-wrap items-baseline gap-3 sm:gap-4">
                   <span className="text-4xl font-bold text-red-600">
                     {book.price}
                   </span>
@@ -301,7 +301,7 @@ Paulo Coelho đã khéo léo kết hợp triết lý phương Đông và phươn
 
               {/* Quantity & Add to Cart */}
               <div className="py-6 border-b">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center">
                   <span className="text-gray-700 font-medium">Số lượng:</span>
                   <div className="flex items-center gap-3">
                     <button
@@ -325,7 +325,7 @@ Paulo Coelho đã khéo léo kết hợp triết lý phương Đông và phươn
                   </span>
                 </div>
 
-                <div className="flex gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row">
                   <button className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2"
                   onClick={() => addToCart(book)}
                 
@@ -347,7 +347,7 @@ Paulo Coelho đã khéo léo kết hợp triết lý phương Đông và phươn
 
               {/* Features */}
               <div className="py-6">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl">
                     <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
                       <Truck className="w-5 h-5 text-white" />
@@ -387,7 +387,7 @@ Paulo Coelho đã khéo léo kết hợp triết lý phương Đông và phươn
 
             {/* Tabs */}
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-              <div className="flex border-b">
+              <div className="flex flex-col border-b sm:flex-row">
                 <button
                   onClick={() => setSelectedTab('description')}
                   className={`flex-1 py-4 font-medium transition-all ${
@@ -420,7 +420,7 @@ Paulo Coelho đã khéo léo kết hợp triết lý phương Đông và phươn
                 </button>
               </div>
 
-              <div className="p-8">
+              <div className="p-5 sm:p-8">
                 {/* Description Tab */}
                 {selectedTab === 'description' && (
                   <div>
@@ -602,7 +602,7 @@ Paulo Coelho đã khéo léo kết hợp triết lý phương Đông và phươn
           <h2 className="text-2xl font-bold text-gray-900 mb-6">
             Sách liên quan
           </h2>
-          <div className="grid grid-cols-5 gap-6">
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-3 xl:grid-cols-5">
             {relatedBooks.map((relatedBook) => (
               <div
                 key={relatedBook.id}

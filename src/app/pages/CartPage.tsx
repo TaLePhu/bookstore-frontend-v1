@@ -127,7 +127,7 @@ export function CartPage() {
             <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
               Có thể bạn sẽ thích
             </h3>
-            <div className="grid grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
               {suggestedBooks.map((book) => (
                 <div
                   key={book.id}
@@ -200,12 +200,12 @@ export function CartPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-12 gap-8">
+        <div className="grid gap-8 xl:grid-cols-12">
           {/* Left Column - Cart Items */}
-          <div className="col-span-8">
+          <div className="xl:col-span-8">
             {/* Benefits Banner */}
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-6">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
                     <Truck className="w-6 h-6 text-white" />
@@ -239,7 +239,7 @@ export function CartPage() {
             {/* Cart Items List */}
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
               <div className="p-6 border-b bg-gray-50">
-                <div className="grid grid-cols-12 gap-4 font-bold text-gray-700 text-sm">
+                <div className="hidden grid-cols-12 gap-4 text-sm font-bold text-gray-700 md:grid">
                   <div className="col-span-6">SẢN PHẨM</div>
                   <div className="col-span-2 text-center">ĐƠN GIÁ</div>
                   <div className="col-span-2 text-center">SỐ LƯỢNG</div>
@@ -255,10 +255,10 @@ export function CartPage() {
                   const itemTotal = itemPrice * item.quantity;
 
                   return (
-                    <div key={item.id} className="p-6 hover:bg-gray-50 transition-colors">
-                      <div className="grid grid-cols-12 gap-4 items-center">
+                    <div key={item.id} className="p-5 transition-colors hover:bg-gray-50 sm:p-6">
+                      <div className="grid gap-4 md:grid-cols-12 md:items-center">
                         {/* Product Info */}
-                        <div className="col-span-6 flex gap-4">
+                        <div className="flex gap-4 md:col-span-6">
                           <div className="w-24 h-32 rounded-lg overflow-hidden flex-shrink-0 shadow-md">
                             <img
                               src={item.image}
@@ -284,14 +284,14 @@ export function CartPage() {
                         </div>
 
                         {/* Price */}
-                        <div className="col-span-2 text-center">
+                        <div className="md:col-span-2 md:text-center">
                           <span className="font-bold text-gray-900">
                             {item.price}
                           </span>
                         </div>
 
                         {/* Quantity */}
-                        <div className="col-span-2 flex justify-center">
+                        <div className="md:col-span-2 md:flex md:justify-center">
                           <div className="flex items-center gap-3 bg-gray-100 rounded-lg p-1">
                             <button
                               onClick={() =>
@@ -316,7 +316,7 @@ export function CartPage() {
                         </div>
 
                         {/* Total */}
-                        <div className="col-span-2 text-right">
+                        <div className="md:col-span-2 md:text-right">
                           <span className="font-bold text-orange-600 text-lg">
                             {itemTotal.toLocaleString('vi-VN')}đ
                           </span>
@@ -339,7 +339,7 @@ export function CartPage() {
           </div>
 
           {/* Right Column - Order Summary */}
-          <div className="col-span-4">
+          <div className="xl:col-span-4">
             <div className="sticky top-4">
               {/* Coupon Card */}
               <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
@@ -507,7 +507,7 @@ export function CartPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">
             Có thể bạn cũng thích
           </h2>
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
             {suggestedBooks.map((book) => (
               <div
                 key={book.id}

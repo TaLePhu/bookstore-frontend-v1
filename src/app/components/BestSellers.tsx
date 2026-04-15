@@ -51,14 +51,14 @@ export function BestSellers() {
 
   return (
     <section className="max-w-7xl mx-auto px-4 py-12">
-      <div className="flex items-center justify-between mb-8">
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-3xl font-bold text-gray-900">Sách bán chạy</h2>
         <a href="#" className="text-orange-500 hover:text-orange-600 font-medium">
           Xem tất cả →
         </a>
       </div>
 
-      <div className="grid grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
         {books.map((book) => (
           <div
             key={book.id}

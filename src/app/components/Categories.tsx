@@ -44,13 +44,13 @@ export function Categories() {
     <section className="max-w-7xl mx-auto px-4 py-12">
       <h2 className="text-3xl font-bold text-gray-900 mb-8">Danh mục nổi bật</h2>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         {categories.map((category, index) => {
           const Icon = category.icon;
           return (
             <div
               key={index}
-              className={`bg-gradient-to-br ${category.color} rounded-2xl p-8 text-white hover:shadow-2xl transition-all cursor-pointer hover:-translate-y-2`}
+              className={`bg-gradient-to-br ${category.color} cursor-pointer rounded-2xl p-6 text-white transition-all hover:-translate-y-2 hover:shadow-2xl sm:p-8`}
             >
               <Icon className="w-12 h-12 mb-4" />
               <h3 className="text-2xl font-bold mb-2">{category.title}</h3>

@@ -145,7 +145,7 @@ export function TrackOrderPage() {
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Mã đơn hàng
               </label>
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="flex-1 relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
                   <input
@@ -171,7 +171,7 @@ export function TrackOrderPage() {
           </form>
 
           {/* Info Cards */}
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="bg-white rounded-2xl shadow-lg p-6 text-center hover:shadow-xl transition-shadow">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Truck className="w-8 h-8 text-blue-600" />
@@ -243,7 +243,7 @@ export function TrackOrderPage() {
       {/* Header with search */}
       <div className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <button
               onClick={() => setShowTracking(false)}
               className="text-gray-600 hover:text-orange-500 transition-colors"
@@ -269,7 +269,7 @@ export function TrackOrderPage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Order Header */}
         <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl shadow-lg p-8 mb-8 text-white">
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-sm opacity-90 mb-2">Mã đơn hàng</div>
               <div className="text-3xl font-bold">{orderData.id}</div>
@@ -279,7 +279,7 @@ export function TrackOrderPage() {
               <div className="text-xl font-bold">{orderData.date}</div>
             </div>
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                 <Truck className="w-6 h-6" />
@@ -296,9 +296,9 @@ export function TrackOrderPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-8">
+        <div className="grid gap-8 xl:grid-cols-12">
           {/* Left Column */}
-          <div className="col-span-8 space-y-8">
+          <div className="space-y-8 xl:col-span-8">
             {/* Tracking Timeline */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-8">
@@ -437,7 +437,7 @@ export function TrackOrderPage() {
           </div>
 
           {/* Right Column */}
-          <div className="col-span-4 space-y-6">
+          <div className="space-y-6 xl:col-span-4">
             {/* Courier Info */}
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <div className="flex items-center gap-3 mb-6">

@@ -31,14 +31,14 @@ export function Header({ onCartClick }: HeaderProps) {
 
   return (
     <header className="bg-white border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex items-center justify-between gap-6">
+      <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4">
+        <div className="flex flex-wrap items-center gap-3 lg:flex-nowrap lg:gap-6">
           {/* Logo */}
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-3 border border-dashed border-orange-400 px-6 py-2 rounded-lg min-w-fit hover:bg-orange-50 transition-colors"
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-dashed border-orange-400 px-4 py-2.5 transition-colors hover:bg-orange-50 sm:px-6 lg:w-auto lg:flex-none"
           >
-            <div className="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-orange-500 sm:h-12 sm:w-12">
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M16 4C16 4 12 6 12 10V12C12 12 12 16 8 16C8 16 12 16 12 20V22C12 26 16 28 16 28C16 28 20 26 20 22V20C20 16 24 16 24 16C20 16 20 12 20 12V10C20 6 16 4 16 4Z" fill="white"/>
               </svg>
@@ -47,12 +47,12 @@ export function Header({ onCartClick }: HeaderProps) {
           </button>
 
           {/* Search Bar */}
-          <div className="flex-1 max-w-2xl">
+          <div className="order-3 w-full basis-full lg:order-none lg:basis-auto lg:flex-1 lg:max-w-2xl">
             <div className="relative">
               <input
                 type="text"
-                placeholder="Value"
-                className="w-full px-4 py-3 pr-12 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder="TĂ¬m sĂ¡ch, tĂ¡c giáº£, thá»ƒ loáº¡i..."
+                className="w-full rounded-xl border border-blue-200 px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 sm:text-base"
               />
               <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-900">
                 <Search className="w-5 h-5" />
@@ -61,14 +61,14 @@ export function Header({ onCartClick }: HeaderProps) {
           </div>
 
           {/* Utility Navigation */}
-          <div className="flex items-center gap-8 border border-blue-300 px-6 py-3 rounded-lg">
-            <button className="flex flex-col items-center gap-1 text-gray-700 hover:text-orange-500 transition-colors">
+          <div className="grid w-auto shrink-0 grid-cols-3 gap-1 rounded-xl border border-blue-200 p-1.5 sm:gap-2 sm:p-2 lg:flex lg:w-auto lg:flex-nowrap lg:items-center lg:justify-end lg:gap-6 lg:px-4 lg:py-2">
+            <button className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14">
               <Bell className="w-5 h-5" />
               <span className="text-xs">Thông báo</span>
             </button>
             <button 
               onClick={() => navigate('/cart')}
-              className="flex flex-col items-center gap-1 text-gray-700 hover:text-orange-500 transition-colors relative"
+              className="relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14"
             >
               <div className="relative">
                 <ShoppingCart className="w-5 h-5" />
@@ -86,18 +86,18 @@ export function Header({ onCartClick }: HeaderProps) {
               <div className="relative">
                 <button 
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-2 text-gray-700 hover:text-orange-500 transition-colors"
+                  className="flex min-h-12 w-full flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14 lg:flex-row lg:justify-start lg:gap-2"
                 >
                   <img
                     src={user?.avatar}
                     alt={user?.name}
                     className="w-8 h-8 rounded-full object-cover"
                   />
-                  <div className="flex flex-col items-start">
+                  <div className="hidden flex-col items-start lg:flex">
                     <span className="text-xs font-medium">{user?.name}</span>
                     <span className="text-xs text-gray-500">Tài khoản</span>
                   </div>
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="hidden w-4 h-4 lg:block" />
                 </button>
                 
                 {/* User Dropdown Menu */}
@@ -127,7 +127,7 @@ export function Header({ onCartClick }: HeaderProps) {
             ) : (
               <button 
                 onClick={handleAccountClick}
-                className="flex flex-col items-center gap-1 text-gray-700 hover:text-orange-500 transition-colors"
+                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14"
               >
                 <User className="w-5 h-5" />
                 <span className="text-xs">Tài khoản</span>

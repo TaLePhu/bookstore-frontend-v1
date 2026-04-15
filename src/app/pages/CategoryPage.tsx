@@ -291,8 +291,8 @@ export function CategoryPage() {
       {/* Category Hero */}
       <div className={`bg-gradient-to-r ${currentCategory.color} text-white`}>
         <div className="max-w-7xl mx-auto px-4 py-12">
-          <div className="grid grid-cols-12 gap-8 items-center">
-            <div className="col-span-8">
+          <div className="grid gap-8 lg:grid-cols-12 lg:items-center">
+            <div className="lg:col-span-8">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
                   <CategoryIcon className="w-9 h-9" />
@@ -302,7 +302,7 @@ export function CategoryPage() {
                   <p className="text-lg opacity-90">{currentCategory.description}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-6 mt-6">
+              <div className="mt-6 flex flex-wrap items-center gap-4 sm:gap-6">
                 <div className="flex items-center gap-2">
                   <BookOpen className="w-5 h-5" />
                   <span>{currentCategory.bookCount.toLocaleString()} sách</span>
@@ -317,7 +317,7 @@ export function CategoryPage() {
                 </div>
               </div>
             </div>
-            <div className="col-span-4">
+            <div className="lg:col-span-4">
               <div className="relative">
                 <img
                   src={currentCategory.image}
@@ -359,8 +359,8 @@ export function CategoryPage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Toolbar */}
         <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <button
                 onClick={() => setShowMobileFilters(!showMobileFilters)}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors lg:hidden"
@@ -385,7 +385,7 @@ export function CategoryPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between gap-4">
               <div className="text-sm text-gray-600">
                 <span className="font-bold text-gray-900">{books.length}</span> sản phẩm
               </div>
@@ -418,7 +418,7 @@ export function CategoryPage() {
           {(selectedSubCategory !== 'all' ||
             selectedPriceRange !== 'all' ||
             selectedRating !== 'all') && (
-            <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
               <span className="text-sm text-gray-600">Đang lọc:</span>
               {selectedSubCategory !== 'all' && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm">
@@ -454,9 +454,9 @@ export function CategoryPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-12 gap-6">
+        <div className="grid gap-6 lg:grid-cols-12">
           {/* Sidebar */}
-          <div className="col-span-3 space-y-6">
+          <div className={`${showMobileFilters ? 'block' : 'hidden'} space-y-6 lg:col-span-3 lg:block`}>
             {/* Subcategory Filter */}
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -573,9 +573,9 @@ export function CategoryPage() {
           </div>
 
           {/* Books Grid/List */}
-          <div className="col-span-9">
+          <div className="lg:col-span-9">
             {viewMode === 'grid' ? (
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                 {books.map((book) => (
                   <div
                     key={book.id}
@@ -684,7 +684,7 @@ export function CategoryPage() {
                 {books.map((book) => (
                   <div
                     key={book.id}
-                    className="bg-white rounded-xl shadow-sm border hover:shadow-lg transition-all p-4 flex gap-4"
+                    className="flex flex-col gap-4 rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-lg sm:flex-row"
                   >
                     <div className="w-32 h-44 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 relative">
                       <img
@@ -704,8 +704,8 @@ export function CategoryPage() {
                       )}
                     </div>
 
-                    <div className="flex-1 flex flex-col">
-                      <div className="flex items-start justify-between mb-2">
+                    <div className="flex flex-1 flex-col">
+                      <div className="mb-2 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex-1">
                           <h3
                             className="text-xl font-bold text-gray-900 mb-1 cursor-pointer hover:text-orange-600 transition-colors"
@@ -750,7 +750,7 @@ export function CategoryPage() {
                         </div>
                       </div>
 
-                      <div className="mt-auto flex items-center gap-3">
+                      <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center">
                         <button
                           onClick={() =>
                             addToCart({
@@ -784,7 +784,7 @@ export function CategoryPage() {
             )}
 
             {/* Pagination */}
-            <div className="mt-8 flex items-center justify-center gap-2">
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
               <button className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium">
                 Trước
               </button>

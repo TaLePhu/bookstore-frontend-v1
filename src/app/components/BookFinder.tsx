@@ -77,16 +77,16 @@ export function BookFinder() {
     <section className="bg-gradient-to-br from-orange-50 to-pink-50 py-12">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header with Tabs */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <h2 className="text-2xl font-bold text-red-600 uppercase">
             Bạn đang tìm sách gì?
           </h2>
-          <div className="flex gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-6 py-2 rounded-full border-2 font-medium transition-all ${
+                className={`whitespace-nowrap rounded-full border-2 px-4 py-2 text-sm font-medium transition-all sm:px-6 sm:text-base ${
                   activeTab === tab.id
                     ? 'bg-red-600 text-white border-red-600'
                     : 'bg-white text-gray-700 border-gray-300 hover:border-red-400'
@@ -99,7 +99,7 @@ export function BookFinder() {
         </div>
 
         {/* Books Grid */}
-        <div className="grid grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {books[activeTab as keyof typeof books].map((book) => (
             <div
               key={book.id}
