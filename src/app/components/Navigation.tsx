@@ -23,7 +23,7 @@ export function Navigation() {
 const mappedCategories = categories.map((c) => ({
   ...c,
   icon: iconMap[c.name] || Book,
-  link: '/category/van-hoc',  //sửa cái này lại sau khi cập nhật api
+  link: `/category/${c.id}`,  //sửa cái này lại sau khi cập nhật api
 }));
 
 
