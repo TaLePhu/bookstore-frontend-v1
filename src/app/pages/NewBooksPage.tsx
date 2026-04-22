@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Sparkles,
@@ -6,8 +6,6 @@ import {
   SlidersHorizontal,
   Star,
   Calendar,
-  TrendingUp,
-  ChevronDown,
   X,
   Grid3x3,
   List,
@@ -16,6 +14,15 @@ import {
   Eye,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { getCategories } from '../services/category.service';
+import { getLatestBooks } from '../services/book.service';
+import {
+  formatCurrency,
+  formatReleaseDate,
+  toDisplayBook,
+  type DisplayBook,
+} from '../utils/book-display';
+import { type ApiCategory } from '../utils/category-display';
 
 export function NewBooksPage() {
   const navigate = useNavigate();
@@ -26,131 +33,42 @@ export function NewBooksPage() {
   const [selectedRating, setSelectedRating] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [showFilters, setShowFilters] = useState(false);
+  const [books, setBooks] = useState<DisplayBook[]>([]);
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data for new books
-  const books = [
-    {
-      id: 1,
-      title: 'Tomorrow, and Tomorrow, and Tomorrow',
-      author: 'Gabrielle Zevin',
-      price: '189.000đ',
-      originalPrice: '249.000đ',
-      discount: 24,
-      rating: 4.9,
-      reviews: 1234,
-      releaseDate: '2024-03-15',
-      image: 'https://images.unsplash.com/photo-1765375382583-1344a5273849?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxuZXclMjBib29rcyUyMHJlbGVhc2UlMjBkaXNwbGF5fGVufDF8fHx8MTc3Mzg1MDYzM3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'fiction',
-      badge: 'MỚI',
-    },
-    {
-      id: 2,
-      title: 'The Wager',
-      author: 'David Grann',
-      price: '169.000đ',
-      originalPrice: '219.000đ',
-      discount: 23,
-      rating: 4.8,
-      reviews: 876,
-      releaseDate: '2024-03-10',
-      image: 'https://images.unsplash.com/photo-1755545730104-3cb4545282b1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmcmVzaCUyMGJvb2slMjBjb3ZlciUyMG1vZGVybnxlbnwxfHx8fDE3NzM4NTA2MzN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'history',
-      badge: 'MỚI',
-    },
-    {
-      id: 3,
-      title: 'Holly',
-      author: 'Stephen King',
-      price: '199.000đ',
-      originalPrice: '259.000đ',
-      discount: 23,
-      rating: 4.7,
-      reviews: 2341,
-      releaseDate: '2024-03-08',
-      image: 'https://images.unsplash.com/photo-1610882648335-ced8fc8fa6b6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb250ZW1wb3JhcnklMjBub3ZlbCUyMGhhcmRjb3ZlcnxlbnwxfHx8fDE3NzM4NTA2MzR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'fiction',
-      badge: 'MỚI',
-    },
-    {
-      id: 4,
-      title: 'The Woman in Me',
-      author: 'Britney Spears',
-      price: '179.000đ',
-      originalPrice: '229.000đ',
-      discount: 22,
-      rating: 4.6,
-      reviews: 1543,
-      releaseDate: '2024-03-05',
-      image: 'https://images.unsplash.com/photo-1596194807861-58bff2495a7a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxuZXclMjBwdWJsaXNoZWQlMjBib29rJTIwc2hlbGZ8ZW58MXx8fHwxNzczODUwNjM1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'biography',
-      badge: 'MỚI',
-    },
-    {
-      id: 5,
-      title: 'The Creative Act',
-      author: 'Rick Rubin',
-      price: '159.000đ',
-      originalPrice: '209.000đ',
-      discount: 24,
-      rating: 4.9,
-      reviews: 987,
-      releaseDate: '2024-03-01',
-      image: 'https://images.unsplash.com/photo-1633477189729-9290b3261d0a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsYXRlc3QlMjBib29rJTIwZWRpdGlvbiUyMGNvdmVyfGVufDF8fHx8MTc3Mzg1MDYzNXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'self-help',
-      badge: 'MỚI',
-    },
-    {
-      id: 6,
-      title: 'Fourth Wing',
-      author: 'Rebecca Yarros',
-      price: '149.000đ',
-      originalPrice: '199.000đ',
-      discount: 25,
-      rating: 4.8,
-      reviews: 3421,
-      releaseDate: '2024-02-28',
-      image: 'https://images.unsplash.com/photo-1656513314387-f83183e4ebc7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxyZWNlbnQlMjBiZXN0c2VsbGVyJTIwZGlzcGxheXxlbnwxfHx8fDE3NzM4NTA2MzV8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'fantasy',
-      badge: 'MỚI',
-    },
-    {
-      id: 7,
-      title: 'The Heaven & Earth Grocery Store',
-      author: 'James McBride',
-      price: '169.000đ',
-      originalPrice: '219.000đ',
-      discount: 23,
-      rating: 4.7,
-      reviews: 765,
-      releaseDate: '2024-02-25',
-      image: 'https://images.unsplash.com/photo-1764923753986-c3f564e295d6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxib29rc3RvcmUlMjBuZXclMjBhcnJpdmFsc3xlbnwxfHx8fDE3NzM4NTA2MzZ8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'fiction',
-      badge: 'MỚI',
-    },
-    {
-      id: 8,
-      title: 'The Fraud',
-      author: 'Zadie Smith',
-      price: '179.000đ',
-      originalPrice: '239.000đ',
-      discount: 25,
-      rating: 4.6,
-      reviews: 654,
-      releaseDate: '2024-02-20',
-      image: 'https://images.unsplash.com/photo-1759977064094-840dfc694bee?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBmaWN0aW9uJTIwYm9va3xlbnwxfHx8fDE3NzM3ODkzMTV8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'fiction',
-      badge: 'MỚI',
-    },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [bookData, categoryData] = await Promise.all([
+          getLatestBooks(),
+          getCategories(),
+        ]);
+        setBooks(bookData.map((book, index) => toDisplayBook(book, index)));
+        setCategories(categoryData);
+      } catch (error) {
+        console.error('Fetch new books page data error:', error);
+        setBooks([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const categories = [
-    { id: 'all', name: 'Tất cả', count: books.length },
-    { id: 'fiction', name: 'Tiểu thuyết', count: 4 },
-    { id: 'self-help', name: 'Phát triển bản thân', count: 1 },
-    { id: 'biography', name: 'Tiểu sử', count: 1 },
-    { id: 'history', name: 'Lịch sử', count: 1 },
-    { id: 'fantasy', name: 'Kỳ ảo', count: 1 },
-  ];
+    fetchData();
+  }, []);
+
+  const categoryOptions = useMemo(
+    () => [
+      { id: 'all', name: 'Tất cả', count: books.length },
+      ...categories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        count: books.filter((book) => book.categoryId === category.id).length,
+      })),
+    ].filter((item, index, list) => index === list.findIndex((x) => x.id === item.id)),
+    [books, categories]
+  );
 
   const priceRanges = [
     { id: 'all', name: 'Tất cả mức giá' },
@@ -168,9 +86,44 @@ export function NewBooksPage() {
     { id: 'popular', name: 'Phổ biến nhất' },
   ];
 
+  const filteredBooks = useMemo(() => {
+    let result = [...books];
+
+    if (selectedCategory !== 'all') {
+      result = result.filter((book) => book.categoryId === selectedCategory);
+    }
+
+    if (selectedPriceRange !== 'all') {
+      result = result.filter((book) => {
+        if (selectedPriceRange === '0-150') return book.price < 150000;
+        if (selectedPriceRange === '150-180') return book.price >= 150000 && book.price <= 180000;
+        if (selectedPriceRange === '180-200') return book.price > 180000 && book.price <= 200000;
+        if (selectedPriceRange === '200+') return book.price > 200000;
+        return true;
+      });
+    }
+
+    if (selectedRating === '4+') {
+      result = result.filter((book) => book.rating >= 4);
+    }
+
+    if (selectedRating === '4.5+') {
+      result = result.filter((book) => book.rating >= 4.5);
+    }
+
+    result.sort((a, b) => {
+      if (sortBy === 'rating') return b.rating - a.rating;
+      if (sortBy === 'price-low') return a.price - b.price;
+      if (sortBy === 'price-high') return b.price - a.price;
+      if (sortBy === 'popular') return b.reviews - a.reviews;
+      return (b.releaseDate || '').localeCompare(a.releaseDate || '');
+    });
+
+    return result;
+  }, [books, selectedCategory, selectedPriceRange, selectedRating, sortBy]);
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Banner */}
       <div className="bg-gradient-to-r from-purple-500 via-purple-600 to-pink-500 text-white">
         <div className="max-w-7xl mx-auto px-4 py-12">
           <div className="flex items-center justify-between">
@@ -195,43 +148,35 @@ export function NewBooksPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Star className="w-5 h-5" />
-                  <span>Giảm giá lên đến 25%</span>
+                  <span>Giảm giá hấp dẫn</span>
                 </div>
               </div>
-            </div>
-            <div className="hidden lg:block">
-              <img
-                src="https://images.unsplash.com/photo-1765375382583-1344a5273849?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxuZXclMjBib29rcyUyMHJlbGVhc2UlMjBkaXNwbGF5fGVufDF8fHx8MTc3Mzg1MDYzM3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-                alt="New Books"
-                className="w-48 h-48 object-cover rounded-2xl shadow-2xl"
-              />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Stats Banner */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
             <div className="text-center">
-              <div className="text-3xl font-bold text-purple-600 mb-1">
-                {books.length}+
-              </div>
+              <div className="text-3xl font-bold text-purple-600 mb-1">{books.length}</div>
               <div className="text-sm text-gray-600">Sách mới</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-purple-600 mb-1">
-                Mới
-              </div>
-              <div className="text-sm text-gray-600">Tuần này</div>
+              <div className="text-3xl font-bold text-purple-600 mb-1">Mới</div>
+              <div className="text-sm text-gray-600">Cập nhật gần đây</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-purple-600 mb-1">4.7</div>
+              <div className="text-3xl font-bold text-purple-600 mb-1">
+                {(books.reduce((sum, book) => sum + book.rating, 0) / (books.length || 1)).toFixed(1)}
+              </div>
               <div className="text-sm text-gray-600">Đánh giá trung bình</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-purple-600 mb-1">-25%</div>
+              <div className="text-3xl font-bold text-purple-600 mb-1">
+                -{Math.max(...books.map((book) => book.discount), 0)}%
+              </div>
               <div className="text-sm text-gray-600">Giảm giá đến</div>
             </div>
           </div>
@@ -239,7 +184,6 @@ export function NewBooksPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Toolbar */}
         <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-3 sm:gap-4">
@@ -251,12 +195,19 @@ export function NewBooksPage() {
                 <span>Bộ lọc</span>
               </button>
 
-              <div className="relative">
-                <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-                  <SlidersHorizontal className="w-5 h-5" />
-                  <span>Sắp xếp: {sortOptions.find(s => s.id === sortBy)?.name}</span>
-                  <ChevronDown className="w-4 h-4" />
-                </button>
+              <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg">
+                <SlidersHorizontal className="w-5 h-5 text-gray-600" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="bg-transparent border-none outline-none font-medium text-gray-900 cursor-pointer"
+                >
+                  {sortOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -284,252 +235,170 @@ export function NewBooksPage() {
             </div>
           </div>
 
-          {/* Filters Panel */}
-          {showFilters && (
-            <div className="mt-4 grid gap-4 border-t pt-4 md:grid-cols-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Danh mục
-                </label>
-                <div className="space-y-2">
-                  {categories.map((cat) => (
-                    <label key={cat.id} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="category"
-                        checked={selectedCategory === cat.id}
-                        onChange={() => setSelectedCategory(cat.id)}
-                        className="text-purple-600"
-                      />
-                      <span className="text-sm">
-                        {cat.name} ({cat.count})
-                      </span>
-                    </label>
-                  ))}
+          {(selectedCategory !== 'all' || selectedPriceRange !== 'all' || selectedRating !== 'all') && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
+              <span className="text-sm text-gray-600">Đang lọc:</span>
+              {selectedCategory !== 'all' && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">
+                  <span>{categoryOptions.find((c) => c.id === selectedCategory)?.name}</span>
+                  <button onClick={() => setSelectedCategory('all')}>
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Khoảng giá
-                </label>
-                <div className="space-y-2">
-                  {priceRanges.map((range) => (
-                    <label key={range.id} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="price"
-                        checked={selectedPriceRange === range.id}
-                        onChange={() => setSelectedPriceRange(range.id)}
-                        className="text-purple-600"
-                      />
-                      <span className="text-sm">{range.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Đánh giá
-                </label>
-                <div className="space-y-2">
-                  {['all', '4.5', '4.0', '3.5'].map((rating) => (
-                    <label key={rating} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="rating"
-                        checked={selectedRating === rating}
-                        onChange={() => setSelectedRating(rating)}
-                        className="text-purple-600"
-                      />
-                      <span className="text-sm flex items-center gap-1">
-                        {rating === 'all' ? (
-                          'Tất cả'
-                        ) : (
-                          <>
-                            {rating} <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" /> trở lên
-                          </>
-                        )}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              )}
+              <button
+                onClick={() => {
+                  setSelectedCategory('all');
+                  setSelectedPriceRange('all');
+                  setSelectedRating('all');
+                }}
+                className="text-sm text-purple-600 hover:text-purple-700 font-medium ml-2"
+              >
+                Xóa tất cả
+              </button>
             </div>
           )}
         </div>
 
-        {/* Books Grid/List */}
-        {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-            {books.map((book) => (
-              <div
-                key={book.id}
-                className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all group overflow-hidden"
-              >
-                <div className="relative">
-                  <img
-                    src={book.image}
-                    alt={book.title}
-                    className="w-full h-80 object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  {book.badge && (
-                    <div className="absolute top-2 left-2 bg-purple-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-                      {book.badge}
-                    </div>
-                  )}
-                  {book.discount && (
-                    <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-bold">
-                      -{book.discount}%
-                    </div>
-                  )}
-                  <button className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="bg-white/90 backdrop-blur-sm rounded-full p-3 hover:bg-white">
-                      <Eye
-                        className="w-6 h-6 text-gray-800"
-                        onClick={() => navigate(`/book/${book.id}`)}
-                      />
-                    </div>
-                  </button>
-                </div>
-
-                <div className="p-4">
-                  <h3 className="font-bold text-gray-800 mb-1 line-clamp-2 min-h-[3rem]">
-                    {book.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3">{book.author}</p>
-
-                  <div className="flex items-center gap-1 mb-3">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-4 h-4 ${
-                          i < Math.floor(book.rating)
-                            ? 'fill-yellow-400 text-yellow-400'
-                            : 'text-gray-300'
-                        }`}
-                      />
+        {loading ? (
+          <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
+            Đang tải sách mới...
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="grid gap-6 lg:grid-cols-12">
+            {showFilters && (
+              <div className="space-y-6 lg:col-span-3">
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h3 className="font-bold text-gray-900 mb-4">Danh mục</h3>
+                  <div className="space-y-2">
+                    {categoryOptions.map((cat) => (
+                      <label key={cat.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="category"
+                            checked={selectedCategory === cat.id}
+                            onChange={() => setSelectedCategory(cat.id)}
+                            className="text-purple-600"
+                          />
+                          <span className="text-sm">{cat.name}</span>
+                        </div>
+                        <span className="text-sm text-gray-500">({cat.count})</span>
+                      </label>
                     ))}
-                    <span className="text-sm text-gray-600 ml-1">
-                      {book.rating} ({book.reviews})
-                    </span>
-                  </div>
-
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-xl font-bold text-purple-600">
-                      {book.price}
-                    </span>
-                    {book.originalPrice && (
-                      <span className="text-sm text-gray-400 line-through">
-                        {book.originalPrice}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => addToCart({
-                        id: book.id,
-                        title: book.title,
-                        author: book.author,
-                        price: book.price,
-                        image: book.image,
-                        quantity: 1
-                      })}
-                      className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <ShoppingCart className="w-4 h-4" />
-                      <span className="text-sm font-medium">Thêm vào giỏ</span>
-                    </button>
-                    <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                      <Heart className="w-5 h-5 text-gray-600" />
-                    </button>
                   </div>
                 </div>
               </div>
-            ))}
+            )}
+            <div className={showFilters ? 'lg:col-span-9' : 'lg:col-span-12'}>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+                {filteredBooks.map((book) => (
+                  <div key={book.id} className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all group overflow-hidden">
+                    <div className="relative">
+                      <img src={book.image} alt={book.title} className="w-full h-80 object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <div className="absolute top-2 left-2 bg-purple-600 text-white px-3 py-1 rounded-full text-xs font-bold">
+                        MỚI
+                      </div>
+                      {book.discount > 0 && (
+                        <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-bold">
+                          -{book.discount}%
+                        </div>
+                      )}
+                      <button className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3 hover:bg-white">
+                          <Eye className="w-6 h-6 text-gray-800" onClick={() => navigate(`/book/${book.id}`)} />
+                        </div>
+                      </button>
+                    </div>
+
+                    <div className="p-4">
+                      <h3 className="font-bold text-gray-800 mb-1 line-clamp-2 min-h-[3rem]">{book.title}</h3>
+                      <p className="text-sm text-gray-600 mb-3">{book.author}</p>
+                      <div className="flex items-center gap-1 mb-3">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className={`w-4 h-4 ${i < Math.floor(book.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
+                        ))}
+                        <span className="text-sm text-gray-600 ml-1">{book.rating.toFixed(1)} ({book.reviews})</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+                        <Calendar className="w-4 h-4" />
+                        <span>Phát hành: {formatReleaseDate(book.releaseDate)}</span>
+                      </div>
+                      <div className="flex items-baseline gap-2 mb-3">
+                        <span className="text-xl font-bold text-purple-600">{formatCurrency(book.price)}</span>
+                        {book.originalPrice && <span className="text-sm text-gray-400 line-through">{formatCurrency(book.originalPrice)}</span>}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() =>
+                            addToCart({
+                              id: book.id,
+                              title: book.title,
+                              author: book.author,
+                              price: formatCurrency(book.price),
+                              image: book.image,
+                            })
+                          }
+                          className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          <span className="text-sm font-medium">Thêm vào giỏ</span>
+                        </button>
+                        <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                          <Heart className="w-5 h-5 text-gray-600" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
-            {books.map((book) => (
-              <div
-                key={book.id}
-                className="flex flex-col gap-4 rounded-xl bg-white p-4 shadow-sm transition-all hover:shadow-xl sm:flex-row"
-              >
+            {filteredBooks.map((book) => (
+              <div key={book.id} className="flex flex-col gap-4 rounded-xl bg-white p-4 shadow-sm transition-all hover:shadow-xl sm:flex-row">
                 <div className="relative flex-shrink-0">
-                  <img
-                    src={book.image}
-                    alt={book.title}
-                    className="w-32 h-48 object-cover rounded-lg"
-                  />
-                  {book.badge && (
-                    <div className="absolute top-2 left-2 bg-purple-600 text-white px-2 py-1 rounded text-xs font-bold">
-                      {book.badge}
-                    </div>
-                  )}
-                  {book.discount && (
+                  <img src={book.image} alt={book.title} className="w-32 h-48 object-cover rounded-lg" />
+                  <div className="absolute top-2 left-2 bg-purple-600 text-white px-2 py-1 rounded text-xs font-bold">MỚI</div>
+                  {book.discount > 0 && (
                     <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs font-bold">
                       -{book.discount}%
                     </div>
                   )}
                 </div>
-
                 <div className="flex-1">
-                  <h3 className="font-bold text-lg text-gray-800 mb-1">
-                    {book.title}
-                  </h3>
+                  <h3 className="font-bold text-lg text-gray-800 mb-1">{book.title}</h3>
                   <p className="text-gray-600 mb-2">{book.author}</p>
-
                   <div className="flex items-center gap-1 mb-2">
                     {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-4 h-4 ${
-                          i < Math.floor(book.rating)
-                            ? 'fill-yellow-400 text-yellow-400'
-                            : 'text-gray-300'
-                        }`}
-                      />
+                      <Star key={i} className={`w-4 h-4 ${i < Math.floor(book.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
                     ))}
-                    <span className="text-sm text-gray-600 ml-1">
-                      {book.rating} ({book.reviews} đánh giá)
-                    </span>
+                    <span className="text-sm text-gray-600 ml-1">{book.rating.toFixed(1)} ({book.reviews} đánh giá)</span>
                   </div>
-
                   <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
                     <Calendar className="w-4 h-4" />
-                    <span>Phát hành: {new Date(book.releaseDate).toLocaleDateString('vi-VN')}</span>
+                    <span>Phát hành: {formatReleaseDate(book.releaseDate)}</span>
                   </div>
-
                   <div className="flex items-center justify-between">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold text-purple-600">
-                        {book.price}
-                      </span>
-                      {book.originalPrice && (
-                        <span className="text-gray-400 line-through">
-                          {book.originalPrice}
-                        </span>
-                      )}
+                      <span className="text-2xl font-bold text-purple-600">{formatCurrency(book.price)}</span>
+                      {book.originalPrice && <span className="text-gray-400 line-through">{formatCurrency(book.originalPrice)}</span>}
                     </div>
-
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => navigate(`/book/${book.id}`)}
-                        className="px-4 py-2 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors"
-                      >
+                      <button onClick={() => navigate(`/book/${book.id}`)} className="px-4 py-2 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors">
                         Xem chi tiết
                       </button>
                       <button
-                        onClick={() => addToCart({
-                          id: book.id,
-                          title: book.title,
-                          author: book.author,
-                          price: book.price,
-                          image: book.image,
-                          quantity: 1
-                        })}
+                        onClick={() =>
+                          addToCart({
+                            id: book.id,
+                            title: book.title,
+                            author: book.author,
+                            price: formatCurrency(book.price),
+                            image: book.image,
+                          })
+                        }
                         className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
                       >
                         <ShoppingCart className="w-4 h-4" />

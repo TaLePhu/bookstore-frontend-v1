@@ -1,20 +1,54 @@
+import { useEffect, useState } from 'react';
 import { Search, Bell, ShoppingCart, User, LogOut, ChevronDown } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
-import { useState } from 'react';
 import { LoginModal } from './LoginModal';
+import { searchBooks } from '../services/book.service';
+import { getBookImage } from '../utils/book-display';
 
-interface HeaderProps {
-  onCartClick: () => void;
+interface SearchResult {
+  id: string;
+  title: string;
+  author: string;
+  image: string;
 }
 
-export function Header({ onCartClick }: HeaderProps) {
+export function Header() {
   const { totalItems } = useCart();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        return;
+      }
+
+      try {
+        const result = await searchBooks(searchQuery, 1, 5);
+        setSearchResults(
+          result.data.map((book) => ({
+            id: book.id,
+            title: book.title,
+            author: book.author,
+            image: getBookImage(book),
+          }))
+        );
+      } catch (error) {
+        console.error('Header search error:', error);
+        setSearchResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleAccountClick = () => {
     if (isAuthenticated) {
@@ -33,7 +67,6 @@ export function Header({ onCartClick }: HeaderProps) {
     <header className="bg-white border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4">
         <div className="flex flex-wrap items-center gap-3 lg:flex-nowrap lg:gap-6">
-          {/* Logo */}
           <button
             onClick={() => navigate('/')}
             className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-dashed border-orange-400 px-4 py-2.5 transition-colors hover:bg-orange-50 sm:px-6 lg:w-auto lg:flex-none"
@@ -46,27 +79,68 @@ export function Header({ onCartClick }: HeaderProps) {
             <h1 className="text-2xl font-bold text-orange-500">Trạm Sách</h1>
           </button>
 
-          {/* Search Bar */}
           <div className="order-3 w-full basis-full lg:order-none lg:basis-auto lg:flex-1 lg:max-w-2xl">
             <div className="relative">
               <input
                 type="text"
-                placeholder="TĂ¬m sĂ¡ch, tĂ¡c giáº£, thá»ƒ loáº¡i..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSearchResults(true);
+                }}
+                onFocus={() => setShowSearchResults(true)}
+                placeholder="Tìm sách, tác giả, thể loại..."
                 className="w-full rounded-xl border border-blue-200 px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 sm:text-base"
               />
-              <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-900">
+              <button
+                onClick={() => {
+                  if (searchResults[0]) {
+                    navigate(`/book/${searchResults[0].id}`);
+                    setShowSearchResults(false);
+                    setSearchQuery('');
+                  }
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-900"
+              >
                 <Search className="w-5 h-5" />
               </button>
+
+              {showSearchResults && searchQuery.trim() && (
+                <div className="absolute z-50 mt-2 w-full rounded-xl border bg-white shadow-lg">
+                  {searchResults.length > 0 ? (
+                    <div className="max-h-80 overflow-y-auto p-2">
+                      {searchResults.map((result) => (
+                        <button
+                          key={result.id}
+                          onClick={() => {
+                            navigate(`/book/${result.id}`);
+                            setShowSearchResults(false);
+                            setSearchQuery('');
+                          }}
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-orange-50"
+                        >
+                          <img src={result.image} alt={result.title} className="h-12 w-10 rounded object-cover" />
+                          <div className="min-w-0">
+                            <div className="truncate font-medium text-gray-900">{result.title}</div>
+                            <div className="truncate text-sm text-gray-600">{result.author}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-sm text-gray-500">Không tìm thấy kết quả phù hợp.</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Utility Navigation */}
           <div className="grid w-auto shrink-0 grid-cols-3 gap-1 rounded-xl border border-blue-200 p-1.5 sm:gap-2 sm:p-2 lg:flex lg:w-auto lg:flex-nowrap lg:items-center lg:justify-end lg:gap-6 lg:px-4 lg:py-2">
             <button className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14">
               <Bell className="w-5 h-5" />
               <span className="text-xs">Thông báo</span>
             </button>
-            <button 
+            <button
               onClick={() => navigate('/cart')}
               className="relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14"
             >
@@ -80,27 +154,21 @@ export function Header({ onCartClick }: HeaderProps) {
               </div>
               <span className="text-xs">Giỏ hàng</span>
             </button>
-            
-            {/* Account Button - Updated */}
+
             {isAuthenticated ? (
               <div className="relative">
-                <button 
+                <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex min-h-12 w-full flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14 lg:flex-row lg:justify-start lg:gap-2"
                 >
-                  <img
-                    src={user?.avatar}
-                    alt={user?.name}
-                    className="w-8 h-8 rounded-full object-cover"
-                  />
+                  <img src={user?.avatar} alt={user?.name} className="w-8 h-8 rounded-full object-cover" />
                   <div className="hidden flex-col items-start lg:flex">
                     <span className="text-xs font-medium">{user?.name}</span>
                     <span className="text-xs text-gray-500">Tài khoản</span>
                   </div>
                   <ChevronDown className="hidden w-4 h-4 lg:block" />
                 </button>
-                
-                {/* User Dropdown Menu */}
+
                 {showUserMenu && (
                   <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                     <button
@@ -125,7 +193,7 @@ export function Header({ onCartClick }: HeaderProps) {
                 )}
               </div>
             ) : (
-              <button 
+              <button
                 onClick={handleAccountClick}
                 className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14"
               >
@@ -136,8 +204,7 @@ export function Header({ onCartClick }: HeaderProps) {
           </div>
         </div>
       </div>
-      
-      {/* Login Modal */}
+
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </header>
   );

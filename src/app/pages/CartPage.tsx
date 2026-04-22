@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   ShoppingCart,
@@ -15,17 +15,31 @@ import {
   Gift,
   ArrowRight,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useCart } from '../context/CartContext';
+import { getBestSellerBooks } from '../services/book.service';
+import { formatCurrency, toDisplayBook, type DisplayBook } from '../utils/book-display';
 
 export function CartPage() {
   const navigate = useNavigate();
-  const { items, removeFromCart, updateQuantity, totalItems, totalPrice } =
-    useCart();
+  const { items, removeFromCart, updateQuantity, totalItems, totalPrice, addToCart } = useCart();
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<{
-    code: string;
-    discount: number;
-  } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [suggestedBooks, setSuggestedBooks] = useState<DisplayBook[]>([]);
+
+  useEffect(() => {
+    const fetchSuggestedBooks = async () => {
+      try {
+        const data = await getBestSellerBooks();
+        setSuggestedBooks(data.map((book, index) => toDisplayBook(book, index)).slice(0, 4));
+      } catch (error) {
+        console.error('Fetch suggested books error:', error);
+        setSuggestedBooks([]);
+      }
+    };
+
+    fetchSuggestedBooks();
+  }, []);
 
   const shippingFee = totalPrice >= 200000 ? 0 : 30000;
   const discount = appliedCoupon ? appliedCoupon.discount : 0;
@@ -37,81 +51,81 @@ export function CartPage() {
     } else if (couponCode.toUpperCase() === 'FREESHIP') {
       setAppliedCoupon({ code: couponCode, discount: shippingFee });
     } else {
-      alert('Mã giảm giá không hợp lệ!');
+      toast.error('Mã giảm giá không hợp lệ');
     }
   };
 
-  const suggestedBooks = [
-    {
-      id: 101,
-      title: 'Atomic Habits',
-      author: 'James Clear',
-      price: '129.000đ',
-      originalPrice: '180.000đ',
-      rating: 4.9,
-      image:
-        'https://images.unsplash.com/photo-1546913760-e23d946dd386?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzZWxmJTIwaGVscCUyMGJvb2t8ZW58MXx8fHwxNzczODQ3MDAxfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-    {
-      id: 102,
-      title: 'The Psychology of Money',
-      author: 'Morgan Housel',
-      price: '149.000đ',
-      originalPrice: '195.000đ',
-      rating: 4.8,
-      image:
-        'https://images.unsplash.com/photo-1768991732235-ac3e1bc9259c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXNpbmVzcyUyMGJvb2slMjBoYXJkY292ZXJ8ZW58MXx8fHwxNzczODIyMjA1fDA&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-    {
-      id: 103,
-      title: 'Deep Work',
-      author: 'Cal Newport',
-      price: '139.000đ',
-      originalPrice: '175.000đ',
-      rating: 4.7,
-      image:
-        'https://images.unsplash.com/photo-1707586234446-a1338e496161?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhY2FkZW1pYyUyMHRleHRib29rfGVufDF8fHx8MTc3Mzg0NzE0OXww&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-    {
-      id: 104,
-      title: 'Thinking, Fast and Slow',
-      author: 'Daniel Kahneman',
-      price: '169.000đ',
-      originalPrice: '220.000đ',
-      rating: 4.8,
-      image:
-        'https://images.unsplash.com/photo-1605263995534-995965cb88e1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3RpdmF0aW9uYWwlMjBib29rJTIwaW5zcGlyZXxlbnwxfHx8fDE3NzM4NDcxNDl8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-  ];
+  const SuggestedSection = ({ title }: { title: string }) => (
+    <div className="mt-16">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">{title}</h2>
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        {suggestedBooks.map((book) => (
+          <div
+            key={book.id}
+            className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer"
+            onClick={() => navigate(`/book/${book.id}`)}
+          >
+            <div className="relative aspect-[3/4] overflow-hidden">
+              <img src={book.image} alt={book.title} className="w-full h-full object-cover" />
+            </div>
+            <div className="p-4">
+              <h3 className="font-bold text-gray-900 mb-1 line-clamp-2">{book.title}</h3>
+              <p className="text-sm text-gray-600 mb-3">{book.author}</p>
+              <div className="flex items-center gap-1 mb-3">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className={`w-3.5 h-3.5 ${i < Math.floor(book.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
+                ))}
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-orange-500 font-bold">{formatCurrency(book.price)}</div>
+                  {book.originalPrice && (
+                    <div className="text-gray-400 line-through text-sm">{formatCurrency(book.originalPrice)}</div>
+                  )}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addToCart({
+                      id: book.id,
+                      title: book.title,
+                      author: book.author,
+                      price: formatCurrency(book.price),
+                      image: book.image,
+                    });
+                  }}
+                  className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white hover:bg-orange-600 transition-colors"
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Breadcrumb */}
         <div className="bg-white border-b">
           <div className="max-w-7xl mx-auto px-4 py-4">
-            <button
-              onClick={() => navigate('/')}
-              className="flex items-center gap-2 text-gray-600 hover:text-orange-500 transition-colors"
-            >
+            <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-600 hover:text-orange-500 transition-colors">
               <ChevronLeft className="w-5 h-5" />
               <span className="text-sm">Trang chủ / Giỏ hàng</span>
             </button>
           </div>
         </div>
 
-        {/* Empty State */}
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="max-w-md mx-auto text-center">
             <div className="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <ShoppingCart className="w-16 h-16 text-gray-400" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">
-              Giỏ hàng trống
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">Giỏ hàng trống</h2>
             <p className="text-gray-600 mb-8">
-              Bạn chưa có sản phẩm nào trong giỏ hàng. Hãy khám phá và chọn những
-              cuốn sách yêu thích của bạn!
+              Bạn chưa có sản phẩm nào trong giỏ hàng. Hãy khám phá và chọn những cuốn sách yêu thích của bạn!
             </p>
             <button
               onClick={() => navigate('/')}
@@ -122,54 +136,7 @@ export function CartPage() {
             </button>
           </div>
 
-          {/* Suggested Books */}
-          <div className="mt-16">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-              Có thể bạn sẽ thích
-            </h3>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-              {suggestedBooks.map((book) => (
-                <div
-                  key={book.id}
-                  className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer"
-                >
-                  <div className="relative aspect-[3/4] overflow-hidden">
-                    <img
-                      src={book.image}
-                      alt={book.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-4">
-                    <h4 className="font-bold text-gray-900 mb-1 line-clamp-2">
-                      {book.title}
-                    </h4>
-                    <p className="text-sm text-gray-600 mb-3">{book.author}</p>
-                    <div className="flex items-center gap-1 mb-3">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-3.5 h-3.5 ${
-                            i < Math.floor(book.rating)
-                              ? 'fill-yellow-400 text-yellow-400'
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-orange-500 font-bold">
-                        {book.price}
-                      </span>
-                      <span className="text-gray-400 line-through text-sm">
-                        {book.originalPrice}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <SuggestedSection title="Có thể bạn sẽ thích" />
         </div>
       </div>
     );
@@ -177,13 +144,9 @@ export function CartPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Breadcrumb */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-gray-600 hover:text-orange-500 transition-colors"
-          >
+          <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-600 hover:text-orange-500 transition-colors">
             <ChevronLeft className="w-5 h-5" />
             <span className="text-sm">Trang chủ / Giỏ hàng</span>
           </button>
@@ -192,51 +155,35 @@ export function CartPage() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Giỏ hàng của bạn
-          </h1>
-          <p className="text-gray-600">
-            Bạn có {totalItems} sản phẩm trong giỏ hàng
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Giỏ hàng của bạn</h1>
+          <p className="text-gray-600">Bạn có {totalItems} sản phẩm trong giỏ hàng</p>
         </div>
 
         <div className="grid gap-8 xl:grid-cols-12">
-          {/* Left Column - Cart Items */}
           <div className="xl:col-span-8">
-            {/* Benefits Banner */}
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-                    <Truck className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-gray-900">Miễn phí vận chuyển</div>
-                    <div className="text-sm text-gray-600">Đơn từ 200.000đ</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                    <Shield className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-gray-900">Hàng chính hãng</div>
-                    <div className="text-sm text-gray-600">100% cam kết</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
-                    <Clock className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-gray-900">Giao hàng nhanh</div>
-                    <div className="text-sm text-gray-600">2-3 ngày</div>
-                  </div>
-                </div>
+                {[
+                  { icon: Truck, color: 'bg-blue-500', title: 'Miễn phí vận chuyển', desc: 'Đơn từ 200.000đ' },
+                  { icon: Shield, color: 'bg-green-500', title: 'Hàng chính hãng', desc: '100% cam kết' },
+                  { icon: Clock, color: 'bg-orange-500', title: 'Giao hàng nhanh', desc: '2-3 ngày' },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.title} className="flex items-center gap-3">
+                      <div className={`w-12 h-12 ${item.color} rounded-full flex items-center justify-center`}>
+                        <Icon className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900">{item.title}</div>
+                        <div className="text-sm text-gray-600">{item.desc}</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Cart Items List */}
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
               <div className="p-6 border-b bg-gray-50">
                 <div className="hidden grid-cols-12 gap-4 text-sm font-bold text-gray-700 md:grid">
@@ -249,77 +196,44 @@ export function CartPage() {
 
               <div className="divide-y">
                 {items.map((item) => {
-                  const itemPrice = parseFloat(
-                    item.price.replace(/[^\d]/g, '')
-                  );
+                  const itemPrice = parseFloat(item.price.replace(/[^\d]/g, ''));
                   const itemTotal = itemPrice * item.quantity;
 
                   return (
                     <div key={item.id} className="p-5 transition-colors hover:bg-gray-50 sm:p-6">
                       <div className="grid gap-4 md:grid-cols-12 md:items-center">
-                        {/* Product Info */}
                         <div className="flex gap-4 md:col-span-6">
                           <div className="w-24 h-32 rounded-lg overflow-hidden flex-shrink-0 shadow-md">
-                            <img
-                              src={item.image}
-                              alt={item.title}
-                              className="w-full h-full object-cover"
-                            />
+                            <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-bold text-gray-900 mb-2 line-clamp-2">
-                              {item.title}
-                            </h3>
-                            <p className="text-sm text-gray-600 mb-3">
-                              {item.author}
-                            </p>
-                            <button
-                              onClick={() => removeFromCart(item.id)}
-                              className="flex items-center gap-1 text-sm text-red-600 hover:text-red-700 transition-colors"
-                            >
+                            <h3 className="font-bold text-gray-900 mb-2 line-clamp-2">{item.title}</h3>
+                            <p className="text-sm text-gray-600 mb-3">{item.author}</p>
+                            <button onClick={() => removeFromCart(item.id)} className="flex items-center gap-1 text-sm text-red-600 hover:text-red-700 transition-colors">
                               <Trash2 className="w-4 h-4" />
                               Xóa
                             </button>
                           </div>
                         </div>
 
-                        {/* Price */}
                         <div className="md:col-span-2 md:text-center">
-                          <span className="font-bold text-gray-900">
-                            {item.price}
-                          </span>
+                          <span className="font-bold text-gray-900">{item.price}</span>
                         </div>
 
-                        {/* Quantity */}
                         <div className="md:col-span-2 md:flex md:justify-center">
                           <div className="flex items-center gap-3 bg-gray-100 rounded-lg p-1">
-                            <button
-                              onClick={() =>
-                                updateQuantity(item.id, item.quantity - 1)
-                              }
-                              className="w-8 h-8 rounded-md bg-white border border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-colors"
-                            >
+                            <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-8 h-8 rounded-md bg-white border border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-colors">
                               <Minus className="w-4 h-4" />
                             </button>
-                            <span className="w-12 text-center font-bold">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() =>
-                                updateQuantity(item.id, item.quantity + 1)
-                              }
-                              className="w-8 h-8 rounded-md bg-white border border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-colors"
-                            >
+                            <span className="w-12 text-center font-bold">{item.quantity}</span>
+                            <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-8 h-8 rounded-md bg-white border border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-colors">
                               <Plus className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
 
-                        {/* Total */}
                         <div className="md:col-span-2 md:text-right">
-                          <span className="font-bold text-orange-600 text-lg">
-                            {itemTotal.toLocaleString('vi-VN')}đ
-                          </span>
+                          <span className="font-bold text-orange-600 text-lg">{itemTotal.toLocaleString('vi-VN')}đ</span>
                         </div>
                       </div>
                     </div>
@@ -328,20 +242,14 @@ export function CartPage() {
               </div>
             </div>
 
-            {/* Continue Shopping */}
-            <button
-              onClick={() => navigate('/')}
-              className="mt-6 flex items-center gap-2 text-orange-600 hover:text-orange-700 font-medium transition-colors"
-            >
+            <button onClick={() => navigate('/')} className="mt-6 flex items-center gap-2 text-orange-600 hover:text-orange-700 font-medium transition-colors">
               <ChevronLeft className="w-5 h-5" />
               Tiếp tục mua sắm
             </button>
           </div>
 
-          {/* Right Column - Order Summary */}
           <div className="xl:col-span-4">
             <div className="sticky top-4">
-              {/* Coupon Card */}
               <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -358,10 +266,7 @@ export function CartPage() {
                     placeholder="Nhập mã giảm giá"
                     className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 transition-colors"
                   />
-                  <button
-                    onClick={applyCoupon}
-                    className="bg-orange-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-orange-600 transition-colors"
-                  >
+                  <button onClick={applyCoupon} className="bg-orange-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-orange-600 transition-colors">
                     Áp dụng
                   </button>
                 </div>
@@ -370,14 +275,9 @@ export function CartPage() {
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Gift className="w-5 h-5 text-green-600" />
-                      <span className="text-sm text-green-700 font-medium">
-                        Mã "{appliedCoupon.code}" đã được áp dụng
-                      </span>
+                      <span className="text-sm text-green-700 font-medium">Mã "{appliedCoupon.code}" đã được áp dụng</span>
                     </div>
-                    <button
-                      onClick={() => setAppliedCoupon(null)}
-                      className="text-green-700 hover:text-green-800"
-                    >
+                    <button onClick={() => setAppliedCoupon(null)} className="text-green-700 hover:text-green-800">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -391,65 +291,35 @@ export function CartPage() {
                 </div>
               </div>
 
-              {/* Order Summary */}
               <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h3 className="font-bold text-gray-900 mb-6 text-lg">
-                  Thông tin đơn hàng
-                </h3>
-
+                <h3 className="font-bold text-gray-900 mb-6 text-lg">Thông tin đơn hàng</h3>
                 <div className="space-y-4 mb-6">
                   <div className="flex items-center justify-between text-gray-600">
                     <span>Tạm tính ({totalItems} sản phẩm)</span>
-                    <span className="font-medium">
-                      {totalPrice.toLocaleString('vi-VN')}đ
-                    </span>
+                    <span className="font-medium">{totalPrice.toLocaleString('vi-VN')}đ</span>
                   </div>
-
                   <div className="flex items-center justify-between text-gray-600">
                     <span>Phí vận chuyển</span>
                     {shippingFee === 0 ? (
                       <span className="font-medium text-green-600">Miễn phí</span>
                     ) : (
-                      <span className="font-medium">
-                        {shippingFee.toLocaleString('vi-VN')}đ
-                      </span>
+                      <span className="font-medium">{shippingFee.toLocaleString('vi-VN')}đ</span>
                     )}
                   </div>
-
                   {discount > 0 && (
                     <div className="flex items-center justify-between text-green-600">
                       <span>Giảm giá</span>
-                      <span className="font-medium">
-                        -{discount.toLocaleString('vi-VN')}đ
-                      </span>
-                    </div>
-                  )}
-
-                  {totalPrice < 200000 && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-sm text-blue-700">
-                        Mua thêm{' '}
-                        <span className="font-bold">
-                          {(200000 - totalPrice).toLocaleString('vi-VN')}đ
-                        </span>{' '}
-                        để được miễn phí vận chuyển!
-                      </p>
+                      <span className="font-medium">-{discount.toLocaleString('vi-VN')}đ</span>
                     </div>
                   )}
                 </div>
 
                 <div className="border-t pt-6 mb-6">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-lg font-bold text-gray-900">
-                      Tổng cộng
-                    </span>
-                    <span className="text-3xl font-bold text-orange-600">
-                      {finalTotal.toLocaleString('vi-VN')}đ
-                    </span>
+                    <span className="text-lg font-bold text-gray-900">Tổng cộng</span>
+                    <span className="text-3xl font-bold text-orange-600">{finalTotal.toLocaleString('vi-VN')}đ</span>
                   </div>
-                  <p className="text-sm text-gray-600 text-right">
-                    (Đã bao gồm VAT)
-                  </p>
+                  <p className="text-sm text-gray-600 text-right">(Đã bao gồm VAT)</p>
                 </div>
 
                 <button
@@ -467,94 +337,12 @@ export function CartPage() {
                 >
                   Tiếp tục mua sắm
                 </button>
-
-                {/* Payment Methods */}
-                <div className="mt-6 pt-6 border-t">
-                  <p className="text-sm text-gray-600 mb-3 font-medium">
-                    Phương thức thanh toán
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="border-2 border-gray-200 rounded-lg p-2 hover:border-orange-500 transition-colors cursor-pointer">
-                      <img
-                        src="https://images.unsplash.com/photo-1726137570589-4461351d1180?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzaG9wcGluZyUyMGNoZWNrb3V0JTIwcGF5bWVudHxlbnwxfHx8fDE3NzM4NDgxMTB8MA&ixlib=rb-4.1.0&q=80&w=1080"
-                        alt="Payment"
-                        className="w-full h-8 object-contain"
-                      />
-                    </div>
-                    <div className="border-2 border-gray-200 rounded-lg p-2 hover:border-orange-500 transition-colors cursor-pointer">
-                      <img
-                        src="https://images.unsplash.com/photo-1665521032636-e8d2f6927053?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkZWxpdmVyeSUyMHRydWNrJTIwZmFzdCUyMHNoaXBwaW5nfGVufDF8fHx8MTc3Mzc2NDk4OXww&ixlib=rb-4.1.0&q=80&w=1080"
-                        alt="COD"
-                        className="w-full h-8 object-contain"
-                      />
-                    </div>
-                    <div className="border-2 border-gray-200 rounded-lg p-2 hover:border-orange-500 transition-colors cursor-pointer">
-                      <img
-                        src="https://images.unsplash.com/photo-1707960190026-e0fb6f03ceae?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzZWN1cmUlMjBwYXltZW50JTIwc2FmZXxlbnwxfHx8fDE3NzM4NDgxMTF8MA&ixlib=rb-4.1.0&q=80&w=1080"
-                        alt="Secure"
-                        className="w-full h-8 object-contain"
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Suggested Products */}
-        <div className="mt-16">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            Có thể bạn cũng thích
-          </h2>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-            {suggestedBooks.map((book) => (
-              <div
-                key={book.id}
-                className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer"
-              >
-                <div className="relative aspect-[3/4] overflow-hidden">
-                  <img
-                    src={book.image}
-                    alt={book.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="p-4">
-                  <h3 className="font-bold text-gray-900 mb-1 line-clamp-2">
-                    {book.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3">{book.author}</p>
-                  <div className="flex items-center gap-1 mb-3">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-3.5 h-3.5 ${
-                          i < Math.floor(book.rating)
-                            ? 'fill-yellow-400 text-yellow-400'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-orange-500 font-bold">
-                        {book.price}
-                      </div>
-                      <div className="text-gray-400 line-through text-sm">
-                        {book.originalPrice}
-                      </div>
-                    </div>
-                    <button className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white hover:bg-orange-600 transition-colors">
-                      <ShoppingCart className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <SuggestedSection title="Có thể bạn cũng thích" />
       </div>
     </div>
   );

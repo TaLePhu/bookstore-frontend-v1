@@ -716,7 +716,7 @@ export function CategoryPage() {
                       <button
                         onClick={() =>
                           addToCart({
-                            id: book.id as never,
+                            id: book.id,
                             title: book.title,
                             author: book.author,
                             price: formatCurrency(book.price),
@@ -804,7 +804,7 @@ export function CategoryPage() {
                         <button
                           onClick={() =>
                             addToCart({
-                              id: book.id as never,
+                              id: book.id,
                               title: book.title,
                               author: book.author,
                               price: formatCurrency(book.price),

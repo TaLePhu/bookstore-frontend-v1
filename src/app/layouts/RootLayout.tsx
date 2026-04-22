@@ -1,20 +1,17 @@
-import { useState } from 'react';
 import { Outlet } from 'react-router';
 import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
-import { CartSidebar } from '../components/CartSidebar';
+import { Toaster } from 'sonner';
 
 export function RootLayout() {
-  const [isCartOpen, setIsCartOpen] = useState(false);
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header onCartClick={() => setIsCartOpen(true)} />
+      <Header />
       <Navigation />
       <Outlet />
       <Footer />
-      <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+      <Toaster position="top-right" richColors closeButton />
     </div>
   );
 }

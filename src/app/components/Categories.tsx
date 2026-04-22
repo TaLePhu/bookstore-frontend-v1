@@ -1,64 +1,60 @@
-import { Book, Briefcase, TrendingUp, Cpu, GraduationCap, Baby } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { getCategories } from '../services/category.service';
+import { toDisplayCategory, type DisplayCategory } from '../utils/category-display';
 
 export function Categories() {
-  const categories = [
-    {
-      icon: Book,
-      title: 'Văn học',
-      count: '1,234 sách',
-      color: 'from-purple-400 to-purple-600',
-    },
-    {
-      icon: Briefcase,
-      title: 'Kinh tế - Kinh doanh',
-      count: '856 sách',
-      color: 'from-blue-400 to-blue-600',
-    },
-    {
-      icon: TrendingUp,
-      title: 'Phát triển bản thân',
-      count: '945 sách',
-      color: 'from-green-400 to-green-600',
-    },
-    {
-      icon: Cpu,
-      title: 'Công nghệ',
-      count: '567 sách',
-      color: 'from-cyan-400 to-cyan-600',
-    },
-    {
-      icon: GraduationCap,
-      title: 'Giáo khoa',
-      count: '1,456 sách',
-      color: 'from-orange-400 to-orange-600',
-    },
-    {
-      icon: Baby,
-      title: 'Thiếu nhi',
-      count: '789 sách',
-      color: 'from-pink-400 to-pink-600',
-    },
-  ];
+  const navigate = useNavigate();
+  const [categories, setCategories] = useState<DisplayCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoading(true);
+        const data = await getCategories();
+        setCategories(data.map(toDisplayCategory));
+      } catch (error) {
+        console.error('Fetch featured categories error:', error);
+        setCategories([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   return (
     <section className="max-w-7xl mx-auto px-4 py-12">
       <h2 className="text-3xl font-bold text-gray-900 mb-8">Danh mục nổi bật</h2>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {categories.map((category, index) => {
-          const Icon = category.icon;
-          return (
-            <div
-              key={index}
-              className={`bg-gradient-to-br ${category.color} cursor-pointer rounded-2xl p-6 text-white transition-all hover:-translate-y-2 hover:shadow-2xl sm:p-8`}
-            >
-              <Icon className="w-12 h-12 mb-4" />
-              <h3 className="text-2xl font-bold mb-2">{category.title}</h3>
-              <p className="text-white/90">{category.count}</p>
-            </div>
-          );
-        })}
-      </div>
+      {loading ? (
+        <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
+          Đang tải danh mục...
+        </div>
+      ) : categories.length === 0 ? (
+        <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
+          Chưa có dữ liệu danh mục.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {categories.map((category) => {
+            const Icon = category.icon;
+            return (
+              <button
+                key={category.id}
+                onClick={() => navigate(`/category/${category.id}`)}
+                className={`bg-gradient-to-br ${category.color} cursor-pointer rounded-2xl p-6 text-left text-white transition-all hover:-translate-y-2 hover:shadow-2xl sm:p-8`}
+              >
+                <Icon className="w-12 h-12 mb-4" />
+                <h3 className="text-2xl font-bold mb-2">{category.name}</h3>
+                <p className="text-white/90 line-clamp-2">{category.description}</p>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
