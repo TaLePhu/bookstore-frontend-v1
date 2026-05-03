@@ -52,12 +52,12 @@ export const getBookById = async (id: string): Promise<ApiBook> => {
 };
 
 export const getLatestBooks = async (): Promise<ApiBook[]> => {
-  const res = await api.get('/books/latest');
+  const res = await api.get('books?sort=latest');
   return res.data.data;
 };
 
 export const getBestSellerBooks = async (): Promise<ApiBook[]> => {
-  const res = await api.get('/books/best-sellers');
+  const res = await api.get('books?sort=bestseller');
   return res.data.data;
 };
 

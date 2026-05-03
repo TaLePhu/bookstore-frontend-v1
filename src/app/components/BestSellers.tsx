@@ -50,7 +50,7 @@ export function BestSellers() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-          {books.map((book) => (
+          {books.slice(0, 6).map((book) => (
             <div
               key={book.id}
               onClick={() => navigate(`/book/${book.id}`)}
@@ -58,7 +58,7 @@ export function BestSellers() {
             >
               <div className="relative aspect-[3/4] overflow-hidden">
                 <img
-                  src={book.image}
+                  src={book.images?.[0] || "https://via.placeholder.com/300x400?text=Book"}
                   alt={book.title}
                   className="w-full h-full object-cover"
                 />

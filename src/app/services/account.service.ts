@@ -92,6 +92,13 @@ export const getOrderById = async (id: string): Promise<OrderDto> => {
   return res.data.data;
 };
 
+export const trackOrderPublic = async (orderCode: string, phone: string): Promise<OrderDto> => {
+  const res = await api.get('/orders/track', {
+    params: { orderCode, phone },
+  });
+  return res.data.data;
+};
+
 export const getMyAddresses = async (): Promise<AddressItem[]> => {
   const res = await api.get('/addresses');
   return res.data.data;

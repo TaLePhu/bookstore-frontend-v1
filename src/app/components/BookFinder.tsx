@@ -80,7 +80,7 @@ export function BookFinder() {
             {loadingCategories ? (
               <div className="text-sm text-gray-500">Đang tải danh mục...</div>
             ) : (
-              categories.map((tab) => (
+              categories.slice(0, 6).map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -111,7 +111,7 @@ export function BookFinder() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            {books.map((book, index) => (
+            {books.slice(0, 5).map((book, index) => (
               <div
                 key={book.id}
                 onClick={() => navigate(`/book/${book.id}`)}
@@ -119,7 +119,8 @@ export function BookFinder() {
               >
                 <div className="relative aspect-[4/5] overflow-hidden bg-gray-100">
                   <img
-                    src={book.image}
+                    // src={book.images?.[0] || "https://via.placeholder.com/300x400?text=Book"}
+                    src={ `https://picsum.photos/200/300?random=${book.id}`} // sưa lại thành ảnh thật khi có APIs
                     alt={book.title}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />

@@ -20,7 +20,7 @@ export const getBooksByCategory = async (
   categoryId: string
 ): Promise<Book[]> => {
   try {
-    const res = await api.get(`/books/category/${categoryId}`);
+    const res = await api.get(`books?category_id=${categoryId}`);
 
     // API của bạn: { success: true, data: [...] }
     return res.data.data;

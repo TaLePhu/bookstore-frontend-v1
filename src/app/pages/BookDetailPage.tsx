@@ -30,6 +30,7 @@ interface ReviewCard {
   comment: string;
 }
 
+// Sửa lại khi có
 const buildReviews = (book: ApiBook): ReviewCard[] => {
   const baseName = book.author || 'Độc giả';
   return [
@@ -97,14 +98,22 @@ export function BookDetailPage() {
     fetchBook();
   }, [id]);
 
-  const galleryImages = useMemo(() => {
-    if (!book) return [];
-    const images = book.images?.map((item) =>
-      typeof item === 'string' ? item : item.imageUrl || item.url || ''
-    ).filter(Boolean);
-    const merged = [book.image, ...(images || []), getBookImage(book)].filter(Boolean);
-    return [...new Set(merged)];
-  }, [book]);
+  //Sửa lại ảnh
+  // const galleryImages = useMemo(() => {
+  //   if (!book) return [];
+  //   const images = book.images?.map((item) =>
+  //     typeof item === 'string' ? item : item.imageUrl || item.url || ''
+  //   ).filter(Boolean);
+  //   const merged = [book.image, ...(images || []), getBookImage(book)].filter(Boolean);
+  //   return [...new Set(merged)];
+  // }, [book]);
+
+  const galleryImages = useMemo(()=>{
+
+    return Array.from({ length: 3 }, (_, i) =>
+    `https://picsum.photos/400/600?random=i}`
+  );
+  })
 
   const displayBook = useMemo(() => {
     if (!book) return null;
@@ -418,7 +427,7 @@ export function BookDetailPage() {
           <div className="mt-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Sách liên quan</h2>
             <div className="grid grid-cols-2 gap-6 md:grid-cols-3 xl:grid-cols-5">
-              {relatedBooks.map((relatedBook, index) => {
+              {relatedBooks.slice(0, 6).map((relatedBook, index) => {
                 const item = toDisplayBook(relatedBook, index);
                 return (
                   <div
@@ -427,7 +436,12 @@ export function BookDetailPage() {
                     onClick={() => navigate(`/book/${relatedBook.id}`)}
                   >
                     <div className="relative aspect-[3/4] overflow-hidden">
-                      <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                      <img 
+                        // src={book.images?.[0] || "https://via.placeholder.com/300x400?text=Book"}
+                  src={ `https://picsum.photos/200/300?random=${item.id}`}s
+                        alt={item.title} 
+                        className="w-full h-full object-cover" />
+
                     </div>
                     <div className="p-4">
                       <h3 className="font-bold text-gray-900 mb-1 line-clamp-2">{item.title}</h3>

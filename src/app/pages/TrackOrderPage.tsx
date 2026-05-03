@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
   Search,
@@ -18,8 +18,9 @@ import {
   ClipboardCheck,
   PackageCheck,
 } from 'lucide-react';
-import { getMyOrders, getOrderById, type OrderDto } from '../services/account.service';
+import { trackOrderPublic, type OrderDto } from '../services/account.service';
 import { formatCurrency, getBookImage } from '../utils/book-display';
+import { toast } from 'sonner';
 
 const formatOrderCode = (id: string) => `#${id.slice(0, 8).toUpperCase()}`;
 
@@ -45,31 +46,11 @@ export function TrackOrderPage() {
   const location = useLocation();
   const initialOrderId = (location.state as { orderId?: string } | null)?.orderId || '';
   const [orderCode, setOrderCode] = useState(initialOrderId);
-  const [showTracking, setShowTracking] = useState(Boolean(initialOrderId));
-  const [orders, setOrders] = useState<OrderDto[]>([]);
+  const [phone, setPhone] = useState('');
+  const [showTracking, setShowTracking] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrderDto | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setLoading(true);
-        const result = await getMyOrders(1, 20);
-        setOrders(result.orders || []);
-
-        if (initialOrderId) {
-          const detail = await getOrderById(initialOrderId);
-          setSelectedOrder(detail);
-        }
-      } catch (error) {
-        console.error('Fetch orders for tracking error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrders();
-  }, [initialOrderId]);
 
   const currentStatus = selectedOrder ? statusToStep(selectedOrder.status) : 0;
 
@@ -111,29 +92,28 @@ export function TrackOrderPage() {
     },
   ];
 
-  const matchedOrders = useMemo(() => {
-    const query = orderCode.trim().replace('#', '').toLowerCase();
-    if (!query) return orders;
-    return orders.filter((order) => order.id.toLowerCase().includes(query));
-  }, [orderCode, orders]);
-
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const order = matchedOrders[0];
-    if (!order) return;
+    const code = orderCode.trim();
+    const phoneNumber = phone.trim();
+
+    if (!code || !phoneNumber) {
+      toast.error('Vui long nhap ma don hang va so dien thoai');
+      return;
+    }
 
     try {
-      const detail = await getOrderById(order.id);
+      setSearching(true);
+      const detail = await trackOrderPublic(code, phoneNumber);
       setSelectedOrder(detail);
       setShowTracking(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Fetch selected order detail error:', error);
+      toast.error(error?.response?.data?.message || 'Khong tim thay don hang phu hop');
+    } finally {
+      setSearching(false);
     }
   };
-
-  if (loading) {
-    return <div className="min-h-screen bg-gray-50 p-8 text-center text-gray-500">Đang tải đơn hàng...</div>;
-  }
 
   if (!showTracking || !selectedOrder) {
     return (
@@ -146,49 +126,42 @@ export function TrackOrderPage() {
             <h1 className="text-4xl font-bold text-gray-900 mb-4">Tra cứu đơn hàng</h1>
             <p className="text-lg text-gray-600">Nhập mã đơn hàng để theo dõi tình trạng giao hàng của bạn</p>
           </div>
-
           <form onSubmit={handleSearch} className="mb-12">
             <div className="bg-white rounded-2xl shadow-2xl p-8">
-              <label className="block text-sm font-medium text-gray-700 mb-3">Mã đơn hàng</label>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <div className="flex-1 relative">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="relative">
+                  <label className="mb-3 block text-sm font-medium text-gray-700">Ma don hang</label>
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
                   <input
                     type="text"
                     value={orderCode}
                     onChange={(e) => setOrderCode(e.target.value)}
-                    placeholder="Nhập mã đơn hàng hoặc 8 ký tự đầu UUID"
+                    placeholder="Nhap ma don hang (vi du: ORD-...)"
                     className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 transition-colors text-lg"
                   />
                 </div>
+                <div className="relative">
+                  <label className="mb-3 block text-sm font-medium text-gray-700">So dien thoai</label>
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Nhap so dien thoai nguoi nhan"
+                    className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 transition-colors text-lg"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
                 <button
                   type="submit"
-                  className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 flex items-center gap-2"
+                  disabled={searching}
+                  className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 flex items-center gap-2 disabled:opacity-60 disabled:hover:translate-y-0"
                 >
                   <Search className="w-5 h-5" />
-                  Tra cứu
+                  {searching ? 'Dang tra cuu...' : 'Tra cuu'}
                 </button>
               </div>
-              {matchedOrders.length > 0 && orderCode.trim() && (
-                <div className="mt-4 space-y-2">
-                  {matchedOrders.slice(0, 5).map((order) => (
-                    <button
-                      key={order.id}
-                      type="button"
-                      onClick={async () => {
-                        setOrderCode(order.id);
-                        const detail = await getOrderById(order.id);
-                        setSelectedOrder(detail);
-                        setShowTracking(true);
-                      }}
-                      className="w-full rounded-lg border px-4 py-3 text-left hover:bg-orange-50"
-                    >
-                      <div className="font-medium text-gray-900">{formatOrderCode(order.id)}</div>
-                      <div className="text-sm text-gray-600">{new Date(order.createdAt).toLocaleDateString('vi-VN')}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </form>
 
@@ -215,12 +188,12 @@ export function TrackOrderPage() {
             <h3 className="font-bold text-gray-900 mb-4">Liên kết nhanh</h3>
             <div className="space-y-2">
               <button
-                onClick={() => navigate('/account')}
+                onClick={() => navigate('/')}
                 className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-orange-50 transition-colors group"
               >
                 <div className="flex items-center gap-3">
                   <User className="w-5 h-5 text-gray-600 group-hover:text-orange-600" />
-                  <span className="font-medium text-gray-900">Xem tất cả đơn hàng</span>
+                  <span className="font-medium text-gray-900">Tiep tuc mua sam</span>
                 </div>
                 <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600" />
               </button>
@@ -242,16 +215,35 @@ export function TrackOrderPage() {
             <button onClick={() => setShowTracking(false)} className="text-gray-600 hover:text-orange-500 transition-colors">
               <Package className="w-6 h-6" />
             </button>
-            <form onSubmit={handleSearch} className="flex-1 max-w-2xl">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={orderCode}
-                  onChange={(e) => setOrderCode(e.target.value)}
-                  placeholder="Nhập mã đơn hàng khác"
-                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
-                />
+            <form onSubmit={handleSearch} className="flex-1">
+              <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={orderCode}
+                    onChange={(e) => setOrderCode(e.target.value)}
+                    placeholder="Ma don hang"
+                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
+                  />
+                </div>
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="So dien thoai"
+                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={searching}
+                  className="bg-orange-500 text-white px-5 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors disabled:opacity-60"
+                >
+                  Tra cuu
+                </button>
               </div>
             </form>
           </div>

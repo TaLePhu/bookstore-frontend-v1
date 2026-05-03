@@ -67,6 +67,7 @@ interface DisplayBook {
 }
 
 const FALLBACK_BOOK_IMAGE = 'https://via.placeholder.com/300x400?text=Book';
+const ITEMS_PER_PAGE =10;
 
 const categoryMetaLibrary = [
   {
@@ -376,7 +377,7 @@ export function CategoryPage() {
         </div>
       </div>
 
-      <div className="bg-white border-b">
+      {/* <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center gap-4 overflow-x-auto">
             {loadingCategories ? (
@@ -402,7 +403,7 @@ export function CategoryPage() {
             )}
           </div>
         </div>
-      </div>
+      </div> */}
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
@@ -514,7 +515,7 @@ export function CategoryPage() {
 
         <div className="grid gap-6 lg:grid-cols-12">
           <div className={`${showMobileFilters ? 'block' : 'hidden'} space-y-6 lg:col-span-3 lg:block`}>
-            <div className="bg-white rounded-xl shadow-sm border p-6">
+            {/* <div className="bg-white rounded-xl shadow-sm border p-6">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-orange-600" />
                 Danh mục con
@@ -540,7 +541,7 @@ export function CategoryPage() {
                   </label>
                 ))}
               </div>
-            </div>
+            </div> */}
 
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -643,7 +644,8 @@ export function CategoryPage() {
                   >
                     <div className="relative aspect-[3/4] overflow-hidden bg-gray-100">
                       <img
-                        src={book.image}
+                        // src={book.image}
+                        src={'https://picsum.photos/200/300?random=${book.id}'}
                         alt={book.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
@@ -833,7 +835,7 @@ export function CategoryPage() {
               </div>
             )}
 
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+            {/* <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
               <button className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium">
                 Trước
               </button>
@@ -852,7 +854,47 @@ export function CategoryPage() {
               <button className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium">
                 Sau
               </button>
-            </div>
+            </div> */}
+
+{books.length > ITEMS_PER_PAGE && (
+  <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+    
+    <button
+      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+      className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium"
+    >
+      Trước
+    </button>
+
+    {[...Array(totalPages)].map((_, index) => {
+      const page = index + 1;
+      return (
+        <button
+          key={page}
+          onClick={() => setCurrentPage(page)}
+          className={`w-10 h-10 rounded-lg font-medium transition-colors ${
+            page === currentPage
+              ? 'bg-orange-500 text-white'
+              : 'border-2 border-gray-200 hover:border-orange-500 hover:text-orange-600'
+          }`}
+        >
+          {page}
+        </button>
+      );
+    })}
+
+    <button
+      onClick={() =>
+        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+      }
+      className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium"
+    >
+      Sau
+    </button>
+
+  </div>
+)}
+            
           </div>
         </div>
       </div>

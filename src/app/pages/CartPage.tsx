@@ -22,7 +22,19 @@ import { formatCurrency, toDisplayBook, type DisplayBook } from '../utils/book-d
 
 export function CartPage() {
   const navigate = useNavigate();
-  const { items, removeFromCart, updateQuantity, totalItems, totalPrice, addToCart } = useCart();
+  const {
+    items,
+    removeFromCart,
+    updateQuantity,
+    totalItems,
+    addToCart,
+    selectedTotalItems,
+    selectedTotalPrice,
+    areAllItemsSelected,
+    toggleAllSelection,
+    toggleItemSelection,
+    isItemSelected,
+  } = useCart();
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
   const [suggestedBooks, setSuggestedBooks] = useState<DisplayBook[]>([]);
@@ -41,19 +53,19 @@ export function CartPage() {
     fetchSuggestedBooks();
   }, []);
 
-  const shippingFee = totalPrice >= 200000 ? 0 : 30000;
+  const shippingFee = selectedTotalPrice >= 200000 ? 0 : 30000;
   const discount = appliedCoupon ? appliedCoupon.discount : 0;
-  const finalTotal = totalPrice + shippingFee - discount;
+  const finalTotal = selectedTotalPrice + shippingFee - discount;
 
-  const applyCoupon = () => {
-    if (couponCode.toUpperCase() === 'TRAMSACH2024') {
-      setAppliedCoupon({ code: couponCode, discount: 50000 });
-    } else if (couponCode.toUpperCase() === 'FREESHIP') {
-      setAppliedCoupon({ code: couponCode, discount: shippingFee });
-    } else {
-      toast.error('Mã giảm giá không hợp lệ');
-    }
-  };
+  // const applyCoupon = () => {
+  //   if (couponCode.toUpperCase() === 'TRAMSACH2024') {
+  //     setAppliedCoupon({ code: couponCode, discount: 50000 });
+  //   } else if (couponCode.toUpperCase() === 'FREESHIP') {
+  //     setAppliedCoupon({ code: couponCode, discount: shippingFee });
+  //   } else {
+  //     toast.error('Mã giảm giá không hợp lệ');
+  //   }
+  // };
 
   const SuggestedSection = ({ title }: { title: string }) => (
     <div className="mt-16">
@@ -187,7 +199,15 @@ export function CartPage() {
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
               <div className="p-6 border-b bg-gray-50">
                 <div className="hidden grid-cols-12 gap-4 text-sm font-bold text-gray-700 md:grid">
-                  <div className="col-span-6">SẢN PHẨM</div>
+                  <div className="col-span-6 flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={areAllItemsSelected}
+                      onChange={toggleAllSelection}
+                      className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                    />
+                    <span>SẢN PHẨM</span>
+                  </div>
                   <div className="col-span-2 text-center">ĐƠN GIÁ</div>
                   <div className="col-span-2 text-center">SỐ LƯỢNG</div>
                   <div className="col-span-2 text-right">THÀNH TIỀN</div>
@@ -203,6 +223,14 @@ export function CartPage() {
                     <div key={item.id} className="p-5 transition-colors hover:bg-gray-50 sm:p-6">
                       <div className="grid gap-4 md:grid-cols-12 md:items-center">
                         <div className="flex gap-4 md:col-span-6">
+                          <div className="flex items-start pt-1">
+                            <input
+                              type="checkbox"
+                              checked={isItemSelected(item.id)}
+                              onChange={() => toggleItemSelection(item.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                            />
+                          </div>
                           <div className="w-24 h-32 rounded-lg overflow-hidden flex-shrink-0 shadow-md">
                             <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
                           </div>
@@ -250,7 +278,7 @@ export function CartPage() {
 
           <div className="xl:col-span-4">
             <div className="sticky top-4">
-              <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+              {/* <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
                     <Tag className="w-5 h-5 text-orange-600" />
@@ -289,14 +317,14 @@ export function CartPage() {
                     <span>Mã khả dụng: TRAMSACH2024, FREESHIP</span>
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               <div className="bg-white rounded-2xl shadow-lg p-6">
                 <h3 className="font-bold text-gray-900 mb-6 text-lg">Thông tin đơn hàng</h3>
                 <div className="space-y-4 mb-6">
                   <div className="flex items-center justify-between text-gray-600">
-                    <span>Tạm tính ({totalItems} sản phẩm)</span>
-                    <span className="font-medium">{totalPrice.toLocaleString('vi-VN')}đ</span>
+                    <span>Tạm tính ({selectedTotalItems} sản phẩm)</span>
+                    <span className="font-medium">{selectedTotalPrice.toLocaleString('vi-VN')}đ</span>
                   </div>
                   <div className="flex items-center justify-between text-gray-600">
                     <span>Phí vận chuyển</span>
@@ -324,12 +352,16 @@ export function CartPage() {
 
                 <button
                   onClick={() => navigate('/checkout')}
-                  className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2 mb-3"
+                  disabled={selectedTotalItems === 0}
+                  className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2 mb-3 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
                 >
                   <CreditCard className="w-5 h-5" />
                   Thanh toán ngay
                   <ArrowRight className="w-5 h-5" />
                 </button>
+                {selectedTotalItems === 0 && (
+                  <p className="mb-3 text-sm text-red-500">Vui long chon it nhat 1 san pham de thanh toan.</p>
+                )}
 
                 <button
                   onClick={() => navigate('/')}

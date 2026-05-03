@@ -17,7 +17,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [successMessage, setSuccessMessage] = useState('');
 
   // Form states
-  const [name, setName] = useState('');
+  const [userName, setUserName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -38,12 +38,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         }
         await login(email, password);
         // Reset form and close modal on success
-        setName('');
+        setUserName('');
         setEmail('');
         setPassword('');
         onClose();
       } else {
-        if (!name || !email || !password) {
+        if (!userName || !email || !password) {
           setError('Vui lòng điền đầy đủ thông tin');
           setIsLoading(false);
           return;
@@ -53,9 +53,9 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           setIsLoading(false);
           return;
         }
-        await register(name, email, password);
+        await register(userName, email, password);
         // Reset form and close modal on success
-        setName('');
+        setUserName('');
         setEmail('');
         setPassword('');
         onClose();
@@ -97,7 +97,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setIsForgotPasswordMode(false);
     setError('');
     setSuccessMessage('');
-    setName('');
+    setUserName('');
     setEmail('');
     setPassword('');
   };
@@ -117,6 +117,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setSuccessMessage('');
     setEmail('');
   };
+
+  // console.log(userName, email, password);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -234,8 +236,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
                     placeholder="Nguyễn Văn A"
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
@@ -311,16 +313,16 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 : 'Đăng ký'}
             </button>
 
-            <div className="relative my-6">
+            {/* <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300"></div>
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-2 bg-white text-gray-500">Hoặc</span>
               </div>
-            </div>
+            </div> */}
 
-            <div className="space-y-3">
+            {/* <div className="space-y-3">
               <button
                 type="button"
                 className="w-full flex items-center justify-center gap-3 border border-gray-300 py-3 rounded-lg hover:bg-gray-50 transition-colors"
@@ -343,7 +345,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 />
                 <span className="font-medium text-gray-700">Tiếp tục với Facebook</span>
               </button>
-            </div>
+            </div> */}
 
             <div className="text-center text-sm text-gray-600 mt-6">
               {isLoginMode ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}{' '}

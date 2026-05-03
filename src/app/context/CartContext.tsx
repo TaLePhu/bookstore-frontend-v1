@@ -16,12 +16,21 @@ interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
+  selectedItems: CartItem[];
+  selectedItemIds: string[];
   addToCart: (item: Omit<CartItem, 'quantity'>) => Promise<void>;
   removeFromCart: (id: string | number) => Promise<void>;
   updateQuantity: (id: string | number, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
+  removeSelectedItems: () => Promise<void>;
+  toggleItemSelection: (id: string | number) => void;
+  toggleAllSelection: () => void;
+  isItemSelected: (id: string | number) => boolean;
   totalItems: number;
   totalPrice: number;
+  selectedTotalItems: number;
+  selectedTotalPrice: number;
+  areAllItemsSelected: boolean;
 }
 
 interface ServerCartItem {
@@ -63,12 +72,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const stored = localStorage.getItem(LOCAL_CART_KEY);
     return stored ? JSON.parse(stored) : [];
   });
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
+
+  const toItemKey = (id: string | number) => String(id);
+  const getItemPrice = (item: CartItem) => parseFloat(item.price.replace(/[^\d]/g, ''));
 
   useEffect(() => {
     if (!isAuthenticated) {
       localStorage.setItem(LOCAL_CART_KEY, JSON.stringify(items));
     }
   }, [items, isAuthenticated]);
+
+  useEffect(() => {
+    if (!items.length) {
+      setSelectedItemIds([]);
+      setHasInitializedSelection(false);
+      return;
+    }
+
+    const itemKeys = new Set(items.map((item) => toItemKey(item.id)));
+
+    if (!hasInitializedSelection) {
+      setSelectedItemIds(Array.from(itemKeys));
+      setHasInitializedSelection(true);
+      return;
+    }
+
+    setSelectedItemIds((prev) => prev.filter((id) => itemKeys.has(id)));
+  }, [items, hasInitializedSelection]);
 
   const loadServerCart = async () => {
     const response = await authApi.get('/cart');
@@ -212,22 +244,73 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(LOCAL_CART_KEY);
   };
 
+  const removeSelectedItems = async () => {
+    if (selectedItemIds.length === 0) return;
+
+    const selectedSet = new Set(selectedItemIds);
+    const selectedItems = items.filter((item) => selectedSet.has(toItemKey(item.id)));
+
+    if (isAuthenticated) {
+      try {
+        await Promise.all(
+          selectedItems
+            .filter((item) => item.cartItemId)
+            .map((item) => authApi.delete(`/cart/remove/${item.cartItemId}`))
+        );
+        await loadServerCart();
+      } catch (error) {
+        console.error('Remove selected items error:', error);
+      }
+      return;
+    }
+
+    setItems((prevItems) => prevItems.filter((item) => !selectedSet.has(toItemKey(item.id))));
+  };
+
+  const toggleItemSelection = (id: string | number) => {
+    const itemKey = toItemKey(id);
+    setSelectedItemIds((prev) =>
+      prev.includes(itemKey) ? prev.filter((selectedId) => selectedId !== itemKey) : [...prev, itemKey]
+    );
+  };
+
+  const toggleAllSelection = () => {
+    const allItemKeys = items.map((item) => toItemKey(item.id));
+    const allSelected = allItemKeys.length > 0 && allItemKeys.every((id) => selectedItemIds.includes(id));
+    setSelectedItemIds(allSelected ? [] : allItemKeys);
+  };
+
+  const isItemSelected = (id: string | number) => selectedItemIds.includes(toItemKey(id));
+
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = items.reduce((sum, item) => {
-    const price = parseFloat(item.price.replace(/[^\d]/g, ''));
-    return sum + price * item.quantity;
+    return sum + getItemPrice(item) * item.quantity;
   }, 0);
+  const selectedItems = items.filter((item) => selectedItemIds.includes(toItemKey(item.id)));
+  const selectedTotalItems = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const selectedTotalPrice = selectedItems.reduce((sum, item) => sum + getItemPrice(item) * item.quantity, 0);
+  const areAllItemsSelected =
+    items.length > 0 && items.every((item) => selectedItemIds.includes(toItemKey(item.id)));
 
   return (
     <CartContext.Provider
       value={{
         items,
+        selectedItems,
+        selectedItemIds,
         addToCart,
         removeFromCart,
         updateQuantity,
         clearCart,
+        removeSelectedItems,
+        toggleItemSelection,
+        toggleAllSelection,
+        isItemSelected,
         totalItems,
         totalPrice,
+        selectedTotalItems,
+        selectedTotalPrice,
+        areAllItemsSelected,
       }}
     >
       {children}
