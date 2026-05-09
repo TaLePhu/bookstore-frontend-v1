@@ -23,6 +23,7 @@ interface CartContextType {
   updateQuantity: (id: string | number, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
   removeSelectedItems: () => Promise<void>;
+  refreshCart: () => Promise<void>;
   toggleItemSelection: (id: string | number) => void;
   toggleAllSelection: () => void;
   isItemSelected: (id: string | number) => boolean;
@@ -52,8 +53,9 @@ const LOCAL_CART_KEY = 'tram-sach-local-cart';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const formatPrice = (value: number | string) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
-
 const isValidBookId = (value: string | number) => typeof value === 'string' && UUID_PATTERN.test(value);
+const toItemKey = (id: string | number) => String(id);
+const getItemPrice = (item: CartItem) => Number(item.price.replace(/[^\d]/g, '')) || 0;
 
 const mapServerCartItems = (items: ServerCartItem[]): CartItem[] =>
   items.map((item) => ({
@@ -66,17 +68,20 @@ const mapServerCartItems = (items: ServerCartItem[]): CartItem[] =>
     quantity: item.quantity,
   }));
 
+const readLocalCart = (): CartItem[] => {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_CART_KEY) || '[]') as CartItem[];
+  } catch {
+    localStorage.removeItem(LOCAL_CART_KEY);
+    return [];
+  }
+};
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
-  const [items, setItems] = useState<CartItem[]>(() => {
-    const stored = localStorage.getItem(LOCAL_CART_KEY);
-    return stored ? JSON.parse(stored) : [];
-  });
+  const [items, setItems] = useState<CartItem[]>(() => readLocalCart());
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
-
-  const toItemKey = (id: string | number) => String(id);
-  const getItemPrice = (item: CartItem) => parseFloat(item.price.replace(/[^\d]/g, ''));
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -111,23 +116,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const syncCart = async () => {
       if (!isAuthenticated) {
-        const stored = localStorage.getItem(LOCAL_CART_KEY);
-        setItems(stored ? JSON.parse(stored) : []);
+        setItems(readLocalCart());
         return;
       }
 
       try {
-        const localItems = JSON.parse(localStorage.getItem(LOCAL_CART_KEY) || '[]') as CartItem[];
+        const localItems = readLocalCart();
         const validLocalItems = localItems.filter((item) => isValidBookId(item.id));
         const invalidLocalItems = localItems.filter((item) => !isValidBookId(item.id));
 
-        if (validLocalItems.length > 0) {
-          for (const item of validLocalItems) {
-            await authApi.post('/cart/add', {
-              bookId: item.id,
-              quantity: item.quantity,
-            });
-          }
+        for (const item of validLocalItems) {
+          await authApi.post('/cart/add', {
+            bookId: item.id,
+            quantity: item.quantity,
+          });
         }
 
         if (invalidLocalItems.length > 0) {
@@ -148,7 +150,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addToCart = async (item: Omit<CartItem, 'quantity'>) => {
     if (isAuthenticated) {
       if (!isValidBookId(item.id)) {
-        toast.error('Sáº£n pháº©m nĂ y chÆ°a sáºµn sĂ ng Ä‘á»ƒ mua trÃªn há»‡ thá»‘ng');
+        toast.error('Sản phẩm này chưa sẵn sàng để mua trên hệ thống');
         return;
       }
 
@@ -167,7 +169,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     setItems((prevItems) => {
-      const existingItem = prevItems.find((i) => i.id === item.id);
+      const existingItem = prevItems.find((cartItem) => cartItem.id === item.id);
       const nextQuantity = existingItem ? existingItem.quantity + 1 : 1;
 
       toast.success(`Đã thêm "${item.title}" vào giỏ hàng`, {
@@ -175,7 +177,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       });
 
       if (existingItem) {
-        return prevItems.map((i) => (i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i));
+        return prevItems.map((cartItem) =>
+          cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
+        );
       }
 
       return [...prevItems, { ...item, quantity: 1 }];
@@ -267,6 +271,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prevItems) => prevItems.filter((item) => !selectedSet.has(toItemKey(item.id))));
   };
 
+  const refreshCart = async () => {
+    if (isAuthenticated) {
+      await loadServerCart();
+      return;
+    }
+
+    setItems(readLocalCart());
+  };
+
   const toggleItemSelection = (id: string | number) => {
     const itemKey = toItemKey(id);
     setSelectedItemIds((prev) =>
@@ -283,9 +296,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const isItemSelected = (id: string | number) => selectedItemIds.includes(toItemKey(id));
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = items.reduce((sum, item) => {
-    return sum + getItemPrice(item) * item.quantity;
-  }, 0);
+  const totalPrice = items.reduce((sum, item) => sum + getItemPrice(item) * item.quantity, 0);
   const selectedItems = items.filter((item) => selectedItemIds.includes(toItemKey(item.id)));
   const selectedTotalItems = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
   const selectedTotalPrice = selectedItems.reduce((sum, item) => sum + getItemPrice(item) * item.quantity, 0);
@@ -303,6 +314,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         updateQuantity,
         clearCart,
         removeSelectedItems,
+        refreshCart,
         toggleItemSelection,
         toggleAllSelection,
         isItemSelected,

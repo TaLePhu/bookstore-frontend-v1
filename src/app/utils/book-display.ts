@@ -16,7 +16,18 @@ export interface DisplayBook {
   categoryId?: string;
 }
 
-const FALLBACK_BOOK_IMAGE = 'https://via.placeholder.com/300x400?text=Book';
+const FALLBACK_BOOK_IMAGES = [
+  'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=800',
+  'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?q=80&w=800',
+  'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?q=80&w=800',
+  'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=800',
+  'https://images.unsplash.com/photo-1516979187457-637abb4f9353?q=80&w=800',
+];
+
+const getFallbackBookImage = (bookId: string) => {
+  const hash = bookId.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return FALLBACK_BOOK_IMAGES[hash % FALLBACK_BOOK_IMAGES.length];
+};
 
 export const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')}đ`;
 
@@ -43,7 +54,7 @@ export const getBookImage = (book: ApiBook) => {
     return firstImage;
   }
 
-  return firstImage?.imageUrl || firstImage?.url || FALLBACK_BOOK_IMAGE;
+  return firstImage?.imageUrl || firstImage?.url || getFallbackBookImage(book.id);
 };
 
 export const toDisplayBook = (book: ApiBook, index: number): DisplayBook => {
@@ -68,7 +79,7 @@ export const toDisplayBook = (book: ApiBook, index: number): DisplayBook => {
     discount,
     rating: Number(book.rating) || 4.5,
     reviews: Number(book.totalReviews) || 0,
-    sold: 100 + index * 43,
+    sold: Number(book.soldCount) || index,
     image: getBookImage(book),
     releaseDate: book.releaseDate || null,
     categoryId: book.categoryId,

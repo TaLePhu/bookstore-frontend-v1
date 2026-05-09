@@ -15,7 +15,7 @@ export function HomePage() {
       <BookFinder />
       <NewBooks />
       <AIRecommendation />
-      <Categories />
+      {/* <Categories /> */}
     </>
   );
 }

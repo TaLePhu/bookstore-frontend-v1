@@ -36,6 +36,7 @@ interface RawBook {
   description?: string;
   price: number | string;
   stock?: number;
+  soldCount?: number | string | null;
   image?: string;
   images?: Array<string | { imageUrl?: string; url?: string }>;
   originalPrice?: number | string | null;
@@ -66,8 +67,14 @@ interface DisplayBook {
   isNew: boolean;
 }
 
-const FALLBACK_BOOK_IMAGE = 'https://via.placeholder.com/300x400?text=Book';
-const ITEMS_PER_PAGE =10;
+const FALLBACK_BOOK_IMAGES = [
+  'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=800',
+  'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?q=80&w=800',
+  'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?q=80&w=800',
+  'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=800',
+  'https://images.unsplash.com/photo-1516979187457-637abb4f9353?q=80&w=800',
+];
+const ITEMS_PER_PAGE = 10;
 
 const categoryMetaLibrary = [
   {
@@ -124,6 +131,11 @@ const getCategoryMeta = (name: string) => {
 
 const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')}đ`;
 
+const getFallbackBookImage = (bookId: string) => {
+  const hash = bookId.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return FALLBACK_BOOK_IMAGES[hash % FALLBACK_BOOK_IMAGES.length];
+};
+
 const getBookImage = (book: RawBook) => {
   if (book.image) {
     return book.image;
@@ -134,7 +146,7 @@ const getBookImage = (book: RawBook) => {
     return firstImage;
   }
 
-  return firstImage?.imageUrl || firstImage?.url || FALLBACK_BOOK_IMAGE;
+  return firstImage?.imageUrl || firstImage?.url || getFallbackBookImage(book.id);
 };
 
 const toDisplayBook = (book: RawBook, index: number): DisplayBook => {
@@ -158,7 +170,7 @@ const toDisplayBook = (book: RawBook, index: number): DisplayBook => {
     discount,
     rating: Number(book.rating) || 4.5,
     reviews: Number(book.totalReviews) || 0,
-    sold: 100 + index * 37,
+    sold: Number(book.soldCount) || index,
     image: getBookImage(book),
     badge: index % 5 === 0 ? 'BEST SELLER' : null,
     isNew: index % 7 === 0,
@@ -181,6 +193,7 @@ export function CategoryPage() {
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [loadingBooks, setLoadingBooks] = useState(true);
   const [error, setError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -225,8 +238,13 @@ export function CategoryPage() {
     setSelectedPriceRange('all');
     setSelectedRating('all');
     setSortBy('popular');
+    setCurrentPage(1);
     fetchBooks();
   }, [categoryId]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedPriceRange, selectedRating, sortBy, viewMode]);
 
   const displayCategories = useMemo<CategoryDisplay[]>(
     () =>
@@ -308,6 +326,12 @@ export function CategoryPage() {
 
     return result;
   }, [books, selectedPriceRange, selectedRating, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredBooks.length / ITEMS_PER_PAGE));
+  const paginatedBooks = useMemo(
+    () => filteredBooks.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE),
+    [currentPage, filteredBooks]
+  );
 
   const CategoryIcon = currentCategory.icon;
 
@@ -637,15 +661,14 @@ export function CategoryPage() {
               </div>
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredBooks.map((book) => (
+                {paginatedBooks.map((book) => (
                   <div
                     key={book.id}
                     className="bg-white rounded-xl shadow-sm border hover:shadow-xl transition-all group overflow-hidden"
                   >
                     <div className="relative aspect-[3/4] overflow-hidden bg-gray-100">
                       <img
-                        // src={book.image}
-                        src={'https://picsum.photos/200/300?random=${book.id}'}
+                        src={book.image}
                         alt={book.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
@@ -723,7 +746,6 @@ export function CategoryPage() {
                             author: book.author,
                             price: formatCurrency(book.price),
                             image: book.image,
-                            quantity: 1,
                           })
                         }
                         className="w-full bg-orange-500 text-white py-2.5 rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
@@ -737,7 +759,7 @@ export function CategoryPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredBooks.map((book) => (
+                {paginatedBooks.map((book) => (
                   <div
                     key={book.id}
                     className="flex flex-col gap-4 rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-lg sm:flex-row"
@@ -811,7 +833,6 @@ export function CategoryPage() {
                               author: book.author,
                               price: formatCurrency(book.price),
                               image: book.image,
-                              quantity: 1,
                             })
                           }
                           className="flex-1 bg-orange-500 text-white py-2.5 rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
@@ -856,7 +877,7 @@ export function CategoryPage() {
               </button>
             </div> */}
 
-{books.length > ITEMS_PER_PAGE && (
+{filteredBooks.length > ITEMS_PER_PAGE && (
   <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
     
     <button

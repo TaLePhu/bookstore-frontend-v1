@@ -1,11 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bot, Sparkles, Search, TrendingUp, Heart, BookOpen, Star, ShoppingCart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { getBestSellerBooks, semanticSearchBooks } from '../services/book.service';
+import { getCategories } from '../services/category.service';
+import { formatCurrency, toDisplayBook, type DisplayBook } from '../utils/book-display';
+
+interface CategoryItem {
+  id: string;
+  name: string;
+}
 
 export function AIRecommendation() {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [aiBooks, setAiBooks] = useState<DisplayBook[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
   const { addToCart } = useCart();
 
   const quickPrompts = [
@@ -15,68 +25,49 @@ export function AIRecommendation() {
     { icon: Sparkles, text: 'Phát triển bản thân', color: 'from-orange-500 to-amber-500' },
   ];
 
-  const recommendedBooks = [
-    {
-      id: 1,
-      title: 'AI và Tương Lai',
-      author: 'Kai-Fu Lee',
-      category: 'Công nghệ',
-      price: '189.000đ',
-      originalPrice: '245.000đ',
-      rating: 4.8,
-      matchScore: 95,
-      reason: 'Phù hợp với sở thích công nghệ của bạn',
-      image: 'https://images.unsplash.com/photo-1625314887424-9f190599bd56?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhcnRpZmljaWFsJTIwaW50ZWxsaWdlbmNlJTIwcm9ib3R8ZW58MXx8fHwxNzczODQ2NDgxfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-    {
-      id: 2,
-      title: 'Nghệ Thuật Đọc Sách',
-      author: 'Mortimer J. Adler',
-      category: 'Kỹ năng',
-      price: '129.000đ',
-      originalPrice: '170.000đ',
-      rating: 4.9,
-      matchScore: 92,
-      reason: 'Người đọc như bạn thường thích cuốn này',
-      image: 'https://images.unsplash.com/photo-1569251703679-fad917f9409e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxib29rJTIwcmVjb21tZW5kYXRpb24lMjByZWFkaW5nfGVufDF8fHx8MTc3Mzg0NzI2MXww&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-    {
-      id: 3,
-      title: 'Kinh Tế Học Vui',
-      author: 'Steven Levitt',
-      category: 'Kinh tế',
-      price: '145.000đ',
-      originalPrice: '195.000đ',
-      rating: 4.7,
-      matchScore: 88,
-      reason: 'Dựa trên lịch sử đọc của bạn',
-      image: 'https://images.unsplash.com/photo-1692742593570-ca989f1febd9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2aW50YWdlJTIwY2xhc3NpYyUyMGJvb2t8ZW58MXx8fHwxNzczODQ3MjYxfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-    {
-      id: 4,
-      title: 'Vũ Trụ Trong Vỏ Hạt Dẻ',
-      author: 'Stephen Hawking',
-      category: 'Khoa học',
-      price: '165.000đ',
-      originalPrice: '210.000đ',
-      rating: 4.9,
-      matchScore: 90,
-      reason: 'Xu hướng đọc của bạn',
-      image: 'https://images.unsplash.com/photo-1554357395-dbdc356ca5da?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzY2llbmNlJTIwZmljdGlvbiUyMGJvb2t8ZW58MXx8fHwxNzczODIwNzIzfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-  ];
+  useEffect(() => {
+    getCategories()
+      .then((data) => setCategories(data))
+      .catch((error) => {
+        console.error('Fetch categories for AI recommendation error:', error);
+        setCategories([]);
+      });
+  }, []);
+
+  const getCategoryName = (categoryId?: string) =>
+    categories.find((category) => category.id === categoryId)?.name || 'Gợi ý phù hợp';
+
+  const runSearch = async (value: string) => {
+    setIsLoading(true);
+    try {
+      const keyword = value.trim();
+      const result = keyword ? await semanticSearchBooks(keyword, 1, 8) : { data: [] };
+      const fallbackBooks = result.data.length > 0 ? result.data : await getBestSellerBooks();
+      setAiBooks(fallbackBooks.slice(0, 4).map((book, index) => toDisplayBook(book, index)));
+      setShowResults(true);
+    } catch (error) {
+      console.error('Fetch AI recommendation books error:', error);
+      try {
+        const fallbackBooks = await getBestSellerBooks();
+        setAiBooks(fallbackBooks.slice(0, 4).map((book, index) => toDisplayBook(book, index)));
+        setShowResults(true);
+      } catch (fallbackError) {
+        console.error('Fetch fallback recommendation books error:', fallbackError);
+        setAiBooks([]);
+        setShowResults(true);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSearch = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setShowResults(true);
-    }, 1500);
+    runSearch(prompt);
   };
 
   const handleQuickPrompt = (text: string) => {
     setPrompt(text);
-    handleSearch();
+    runSearch(text);
   };
 
   return (
@@ -163,12 +154,12 @@ export function AIRecommendation() {
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900">
-                  AI đã tìm thấy {recommendedBooks.length} cuốn sách phù hợp
+                  AI đã tìm thấy {aiBooks.length} cuốn sách phù hợp
                 </h3>
               </div>
 
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-                {recommendedBooks.map((book) => (
+                {aiBooks.map((book, index) => (
                   <div
                     key={book.id}
                     className="bg-gradient-to-br from-gray-50 to-white rounded-xl overflow-hidden border-2 border-gray-100 hover:border-indigo-300 transition-all hover:shadow-xl group"
@@ -183,14 +174,14 @@ export function AIRecommendation() {
                       {/* Match Score Badge */}
                       <div className="absolute top-3 left-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                         <Sparkles className="w-3 h-3" />
-                        {book.matchScore}% phù hợp
+                        {95 - index * 3}% phù hợp
                       </div>
                     </div>
 
                     {/* Info */}
                     <div className="p-4">
                       <div className="text-xs text-indigo-600 font-semibold mb-1">
-                        {book.category}
+                        {getCategoryName(book.categoryId)}
                       </div>
                       <h4 className="font-bold text-gray-900 mb-1 line-clamp-1">
                         {book.title}
@@ -201,7 +192,7 @@ export function AIRecommendation() {
                       <div className="bg-indigo-50 rounded-lg p-2 mb-3">
                         <p className="text-xs text-indigo-700 flex items-start gap-1">
                           <Bot className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                          <span>{book.reason}</span>
+                          <span>Dựa trên nội dung bạn vừa tìm và dữ liệu sách thật trong kho</span>
                         </p>
                       </div>
 
@@ -226,11 +217,11 @@ export function AIRecommendation() {
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="text-red-600 font-bold">
-                            {book.price}
+                            {formatCurrency(book.price)}
                           </div>
                           {book.originalPrice && (
                             <div className="text-gray-400 line-through text-xs">
-                              {book.originalPrice}
+                              {formatCurrency(book.originalPrice)}
                             </div>
                           )}
                         </div>
@@ -240,7 +231,7 @@ export function AIRecommendation() {
                               id: book.id,
                               title: book.title,
                               author: book.author,
-                              price: book.price,
+                              price: formatCurrency(book.price),
                               image: book.image,
                             });
                           }}

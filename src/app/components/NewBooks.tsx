@@ -87,8 +87,7 @@ export function NewBooks() {
             >
               <div className="relative aspect-[3/4] overflow-hidden bg-gray-100">
                 <img
-                  // src={book.images?.[0] || "https://via.placeholder.com/300x400?text=Book"}
-                  src={ `https://picsum.photos/200/300?random=${book.id}`} // sưa lại thành ảnh thật khi có APIs
+                  src={book.image}
                   alt={book.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />

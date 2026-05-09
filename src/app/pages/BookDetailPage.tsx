@@ -17,8 +17,7 @@ import {
   Minus,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-import { getBooksByCategory } from '../services/category.service';
-import { getBookById, type ApiBook } from '../services/book.service';
+import { getBookById, getRelatedBooks, type ApiBook } from '../services/book.service';
 import { formatCurrency, formatReleaseDate, getBookImage, toDisplayBook } from '../utils/book-display';
 
 interface ReviewCard {
@@ -30,36 +29,32 @@ interface ReviewCard {
   comment: string;
 }
 
-// Sửa lại khi có
-const buildReviews = (book: ApiBook): ReviewCard[] => {
-  const baseName = book.author || 'Độc giả';
-  return [
-    {
-      id: `${book.id}-1`,
-      user: `${baseName} Fan`,
-      rating: Math.round(Number(book.rating) || 5),
-      date: '15/03/2026',
-      verified: true,
-      comment: 'Nội dung cuốn hút, trình bày tốt và rất đáng để đọc.',
-    },
-    {
-      id: `${book.id}-2`,
-      user: 'Khách hàng Trạm Sách',
-      rating: Math.max(4, Math.round(Number(book.rating) || 4)),
-      date: '12/03/2026',
-      verified: true,
-      comment: 'Sách giao nhanh, chất lượng ổn và phần nội dung khá hữu ích.',
-    },
-  ];
+const getBookGalleryImages = (book: ApiBook) => {
+  const images = book.images?.map((item) =>
+    typeof item === 'string' ? item : item.imageUrl || item.url || ''
+  ).filter(Boolean) || [];
+  return [...new Set([book.image, ...images, getBookImage(book)].filter(Boolean) as string[])];
 };
+
+const buildReviews = (book: ApiBook): ReviewCard[] =>
+  (book.reviews || [])
+    .filter((review) => review.comment)
+    .map((review) => ({
+      id: review.id,
+      user: review.user?.fullName || review.user?.userName || review.user?.email || 'Độc giả',
+      rating: Number(review.rating) || 0,
+      date: review.createdAt ? new Date(review.createdAt).toLocaleDateString('vi-VN') : 'Đang cập nhật',
+      verified: true,
+      comment: review.comment || '',
+    }));
 
 export function BookDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [selectedTab, setSelectedTab] = useState('description');
   const [isFavorite, setIsFavorite] = useState(false);
-  const { addToCart } = useCart();
   const [book, setBook] = useState<ApiBook | null>(null);
   const [relatedBooks, setRelatedBooks] = useState<ApiBook[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,20 +68,15 @@ export function BookDetailPage() {
       try {
         setLoading(true);
         setError('');
+        setQuantity(1);
+        setSelectedTab('description');
+
         const data = await getBookById(id);
         setBook(data);
+        setMainImage(getBookImage(data));
 
-        const images = data.images?.map((item) =>
-          typeof item === 'string' ? item : item.imageUrl || item.url || ''
-        ).filter(Boolean);
-        setMainImage(data.image || images?.[0] || getBookImage(data));
-
-        if (data.categoryId) {
-          const related = await getBooksByCategory(data.categoryId);
-          setRelatedBooks(related.filter((item) => item.id !== data.id).slice(0, 5));
-        } else {
-          setRelatedBooks([]);
-        }
+        const related = await getRelatedBooks(data.id, 5);
+        setRelatedBooks(related);
       } catch (fetchError) {
         console.error('Fetch book detail error:', fetchError);
         setError('Không tải được thông tin sách.');
@@ -98,29 +88,10 @@ export function BookDetailPage() {
     fetchBook();
   }, [id]);
 
-  //Sửa lại ảnh
-  // const galleryImages = useMemo(() => {
-  //   if (!book) return [];
-  //   const images = book.images?.map((item) =>
-  //     typeof item === 'string' ? item : item.imageUrl || item.url || ''
-  //   ).filter(Boolean);
-  //   const merged = [book.image, ...(images || []), getBookImage(book)].filter(Boolean);
-  //   return [...new Set(merged)];
-  // }, [book]);
-
-  const galleryImages = useMemo(()=>{
-
-    return Array.from({ length: 3 }, (_, i) =>
-    `https://picsum.photos/400/600?random=i}`
-  );
-  })
-
-  const displayBook = useMemo(() => {
-    if (!book) return null;
-    return toDisplayBook(book, 0);
-  }, [book]);
-
+  const displayBook = useMemo(() => (book ? toDisplayBook(book, 0) : null), [book]);
+  const galleryImages = useMemo(() => (book ? getBookGalleryImages(book) : []), [book]);
   const reviews = useMemo(() => (book ? buildReviews(book) : []), [book]);
+  const maxQuantity = Math.max(1, Number(book?.stock) || 1);
 
   if (loading) {
     return <div className="min-h-screen bg-gray-50 p-8 text-center text-gray-500">Đang tải chi tiết sách...</div>;
@@ -129,6 +100,23 @@ export function BookDetailPage() {
   if (!book || !displayBook) {
     return <div className="min-h-screen bg-gray-50 p-8 text-center text-red-600">{error || 'Không tìm thấy sách.'}</div>;
   }
+
+  const specs = [
+    ['Danh mục', book.category?.name],
+    ['Tác giả', book.author],
+    ['ISBN', book.isbn],
+    ['Người dịch', book.translator],
+    ['Nhà xuất bản', book.publisher],
+    ['Năm xuất bản', book.publishYear],
+    ['Ngày phát hành', formatReleaseDate(book.releaseDate)],
+    ['Số trang', book.pages],
+    ['Kích thước', book.dimensions],
+    ['Trọng lượng', book.weight],
+    ['Hình thức', book.format],
+    ['Ngôn ngữ', book.language],
+    ['Tồn kho', `${Number(book.stock) || 0} cuốn`],
+    ['Đã bán', `${displayBook.sold.toLocaleString('vi-VN')} cuốn`],
+  ].filter((item) => item[1]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -149,7 +137,7 @@ export function BookDetailPage() {
           <div className="xl:col-span-5">
             <div className="bg-white rounded-2xl p-6 shadow-lg sticky top-4">
               <div className="relative aspect-[3/4] mb-4 rounded-xl overflow-hidden bg-gray-100">
-                <img src={mainImage} alt={book.title} className="w-full h-full object-cover" />
+                <img src={mainImage || displayBook.image} alt={book.title} className="w-full h-full object-cover" />
                 {displayBook.discount > 0 && (
                   <div className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-full font-bold text-lg">
                     -{displayBook.discount}%
@@ -163,7 +151,9 @@ export function BookDetailPage() {
                     key={`${image}-${index}`}
                     onClick={() => setMainImage(image)}
                     className={`aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
-                      mainImage === image ? 'border-orange-500 scale-95' : 'border-gray-200 hover:border-orange-300'
+                      (mainImage || displayBook.image) === image
+                        ? 'border-orange-500 scale-95'
+                        : 'border-gray-200 hover:border-orange-300'
                     }`}
                   >
                     <img src={image} alt={`${book.title} ${index + 1}`} className="w-full h-full object-cover" />
@@ -248,15 +238,21 @@ export function BookDetailPage() {
                 <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center">
                   <span className="text-gray-700 font-medium">Số lượng:</span>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-all">
+                    <button
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-all"
+                    >
                       <Minus className="w-4 h-4" />
                     </button>
                     <span className="w-12 text-center font-bold text-lg">{quantity}</span>
-                    <button onClick={() => setQuantity(quantity + 1)} className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-all">
+                    <button
+                      onClick={() => setQuantity(Math.min(maxQuantity, quantity + 1))}
+                      className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-all"
+                    >
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                  <span className="text-sm text-gray-600">{book.stock || 0} sản phẩm có sẵn</span>
+                  <span className="text-sm text-gray-600">{Number(book.stock) || 0} sản phẩm có sẵn</span>
                 </div>
 
                 <div className="flex flex-col gap-4 sm:flex-row">
@@ -268,7 +264,7 @@ export function BookDetailPage() {
                         title: book.title,
                         author: book.author,
                         price: formatCurrency(displayBook.price),
-                        image: getBookImage(book),
+                        image: displayBook.image,
                       })
                     }
                   >
@@ -312,7 +308,7 @@ export function BookDetailPage() {
               <div className="flex flex-col border-b sm:flex-row">
                 {[
                   { id: 'description', label: 'Mô tả sản phẩm' },
-                  { id: 'specifications', label: 'Thông số kỹ thuật' },
+                  { id: 'specifications', label: 'Thông tin chi tiết' },
                   { id: 'reviews', label: `Đánh giá (${displayBook.reviews})` },
                 ].map((tab) => (
                   <button
@@ -359,63 +355,63 @@ export function BookDetailPage() {
                 {selectedTab === 'specifications' && (
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 mb-4">Thông tin chi tiết</h3>
-                    <table className="w-full">
-                      <tbody>
-                        {[
-                          ['Tác giả', book.author],
-                          ['Người dịch', book.translator],
-                          ['Nhà xuất bản', book.publisher],
-                          ['Năm xuất bản', book.publishYear],
-                          ['Số trang', book.pages],
-                          ['Kích thước', book.dimensions],
-                          ['Trọng lượng', book.weight],
-                          ['Hình thức', book.format],
-                          ['Ngôn ngữ', book.language],
-                        ].filter((item) => item[1]).map(([label, value], index) => (
-                          <tr key={label} className={index % 2 === 1 ? 'bg-gray-50 border-b' : 'border-b'}>
-                            <td className="py-3 text-gray-600 font-medium w-1/3">{label}</td>
-                            <td className="py-3 text-gray-900">{String(value)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    {specs.length === 0 ? (
+                      <div className="rounded-xl bg-gray-50 p-6 text-center text-gray-500">Chưa có thông tin chi tiết.</div>
+                    ) : (
+                      <table className="w-full">
+                        <tbody>
+                          {specs.map(([label, value], index) => (
+                            <tr key={label} className={index % 2 === 1 ? 'bg-gray-50 border-b' : 'border-b'}>
+                              <td className="py-3 text-gray-600 font-medium w-1/3">{label}</td>
+                              <td className="py-3 text-gray-900">{String(value)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 )}
 
                 {selectedTab === 'reviews' && (
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 mb-6">Đánh giá từ khách hàng</h3>
-                    <div className="space-y-6">
-                      {reviews.map((review) => (
-                        <div key={review.id} className="border-b pb-6 last:border-b-0">
-                          <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-600">
-                              {review.user.charAt(0)}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-medium text-gray-900">{review.user}</span>
-                                {review.verified && (
-                                  <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <Shield className="w-3 h-3" />
-                                    Đã mua hàng
-                                  </span>
-                                )}
+                    {reviews.length === 0 ? (
+                      <div className="rounded-xl bg-gray-50 p-6 text-center text-gray-500">
+                        Chưa có đánh giá cho cuốn sách này.
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {reviews.map((review) => (
+                          <div key={review.id} className="border-b pb-6 last:border-b-0">
+                            <div className="flex items-start gap-4">
+                              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-600">
+                                {review.user.charAt(0)}
                               </div>
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="flex items-center gap-1">
-                                  {[...Array(5)].map((_, i) => (
-                                    <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
-                                  ))}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="font-medium text-gray-900">{review.user}</span>
+                                  {review.verified && (
+                                    <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                                      <Shield className="w-3 h-3" />
+                                      Đã mua hàng
+                                    </span>
+                                  )}
                                 </div>
-                                <span className="text-sm text-gray-500">{review.date}</span>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="flex items-center gap-1">
+                                    {[...Array(5)].map((_, i) => (
+                                      <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
+                                    ))}
+                                  </div>
+                                  <span className="text-sm text-gray-500">{review.date}</span>
+                                </div>
+                                <p className="text-gray-700">{review.comment}</p>
                               </div>
-                              <p className="text-gray-700">{review.comment}</p>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -427,7 +423,7 @@ export function BookDetailPage() {
           <div className="mt-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Sách liên quan</h2>
             <div className="grid grid-cols-2 gap-6 md:grid-cols-3 xl:grid-cols-5">
-              {relatedBooks.slice(0, 6).map((relatedBook, index) => {
+              {relatedBooks.map((relatedBook, index) => {
                 const item = toDisplayBook(relatedBook, index);
                 return (
                   <div
@@ -436,12 +432,7 @@ export function BookDetailPage() {
                     onClick={() => navigate(`/book/${relatedBook.id}`)}
                   >
                     <div className="relative aspect-[3/4] overflow-hidden">
-                      <img 
-                        // src={book.images?.[0] || "https://via.placeholder.com/300x400?text=Book"}
-                  src={ `https://picsum.photos/200/300?random=${item.id}`}s
-                        alt={item.title} 
-                        className="w-full h-full object-cover" />
-
+                      <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
                     </div>
                     <div className="p-4">
                       <h3 className="font-bold text-gray-900 mb-1 line-clamp-2">{item.title}</h3>

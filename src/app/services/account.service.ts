@@ -51,6 +51,7 @@ export interface PaymentDto {
 
 export interface OrderDto {
   id: string;
+  orderCode?: string | null;
   totalAmount: number | string;
   shippingFee: number | string;
   note?: string | null;
@@ -92,9 +93,9 @@ export const getOrderById = async (id: string): Promise<OrderDto> => {
   return res.data.data;
 };
 
-export const trackOrderPublic = async (orderCode: string, phone: string): Promise<OrderDto> => {
+export const trackOrderPublic = async (orderCode: string): Promise<OrderDto> => {
   const res = await api.get('/orders/track', {
-    params: { orderCode, phone },
+    params: { orderCode },
   });
   return res.data.data;
 };

@@ -1,4 +1,6 @@
 import api from "./api";
+import type { ApiBook } from "./book.service";
+
 export interface Book {
   id: string;
   title: string;
@@ -18,9 +20,11 @@ export const getCategories = async () => {
 
 export const getBooksByCategory = async (
   categoryId: string
-): Promise<Book[]> => {
+): Promise<ApiBook[]> => {
   try {
-    const res = await api.get(`books?category_id=${categoryId}`);
+    const res = await api.get('/books', {
+      params: { category_id: categoryId, limit: 50 },
+    });
 
     // API của bạn: { success: true, data: [...] }
     return res.data.data;
