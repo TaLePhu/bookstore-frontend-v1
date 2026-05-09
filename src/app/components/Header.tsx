@@ -161,7 +161,13 @@ export function Header() {
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex min-h-12 w-full flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14 lg:flex-row lg:justify-start lg:gap-2"
                 >
-                  <img src={user?.avatar} alt={user?.name} className="w-8 h-8 rounded-full object-cover" />
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt={user?.name} className="w-8 h-8 rounded-full object-cover" />
+                  ) : (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-600">
+                      {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div className="hidden flex-col items-start lg:flex">
                     <span className="text-xs font-medium">{user?.name}</span>
                     <span className="text-xs text-gray-500">Tài khoản</span>

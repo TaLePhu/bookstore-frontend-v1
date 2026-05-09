@@ -20,11 +20,28 @@ export interface AddressItem {
   phone: string;
   addressLine: string;
   country?: string;
+  provinceCode?: string;
   provinceName?: string;
+  districtCode?: string;
   districtName?: string;
+  wardCode?: string;
   wardName?: string;
   isDefault?: boolean;
   createdAt?: string;
+}
+
+export interface AddressPayload {
+  receiverName: string;
+  phone: string;
+  addressLine: string;
+  country: string;
+  provinceCode: string;
+  provinceName: string;
+  districtCode: string;
+  districtName: string;
+  wardCode: string;
+  wardName: string;
+  isDefault?: boolean;
 }
 
 export interface OrderItemDto {
@@ -81,6 +98,11 @@ export const updateMyProfile = async (payload: Partial<UserProfile>) => {
   return res.data.data;
 };
 
+export const changeMyPassword = async (payload: { oldPassword: string; newPassword: string }) => {
+  const res = await api.put('/users/change-password', payload);
+  return res.data.data;
+};
+
 export const getMyOrders = async (page = 1, limit = 10): Promise<MyOrdersResponse> => {
   const res = await api.get('/orders/my', {
     params: { page, limit },
@@ -103,4 +125,18 @@ export const trackOrderPublic = async (orderCode: string): Promise<OrderDto> => 
 export const getMyAddresses = async (): Promise<AddressItem[]> => {
   const res = await api.get('/addresses');
   return res.data.data;
+};
+
+export const createMyAddress = async (payload: AddressPayload): Promise<AddressItem> => {
+  const res = await api.post('/addresses', payload);
+  return res.data.data;
+};
+
+export const updateMyAddress = async (id: string, payload: AddressPayload): Promise<AddressItem> => {
+  const res = await api.patch(`/addresses/${id}`, payload);
+  return res.data.data;
+};
+
+export const deleteMyAddress = async (id: string): Promise<void> => {
+  await api.delete(`/addresses/${id}`);
 };

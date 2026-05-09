@@ -18,6 +18,8 @@ interface CartContextType {
   items: CartItem[];
   selectedItems: CartItem[];
   selectedItemIds: string[];
+  isLoading: boolean;
+  error: string;
   addToCart: (item: Omit<CartItem, 'quantity'>) => Promise<void>;
   removeFromCart: (id: string | number) => Promise<void>;
   updateQuantity: (id: string | number, quantity: number) => Promise<void>;
@@ -57,9 +59,9 @@ const isValidBookId = (value: string | number) => typeof value === 'string' && U
 const toItemKey = (id: string | number) => String(id);
 const getItemPrice = (item: CartItem) => Number(item.price.replace(/[^\d]/g, '')) || 0;
 
-const mapServerCartItems = (items: ServerCartItem[]): CartItem[] =>
-  items.map((item) => ({
-    id: item.bookId,
+const mapServerCartItems = (items: ServerCartItem[] = []): CartItem[] =>
+  items.filter((item) => item.bookId || item.book?.id).map((item) => ({
+    id: item.bookId || item.book!.id,
     cartItemId: item.id,
     title: item.book?.title || 'Sách',
     author: item.book?.author || 'Đang cập nhật',
@@ -82,6 +84,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(() => readLocalCart());
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -108,15 +112,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items, hasInitializedSelection]);
 
   const loadServerCart = async () => {
-    const response = await authApi.get('/cart');
-    const serverItems = response.data?.data?.items || [];
-    setItems(mapServerCartItems(serverItems));
+    try {
+      setIsLoading(true);
+      setError('');
+      const response = await authApi.get('/cart');
+      const serverItems = response.data?.data?.items || [];
+      setItems(mapServerCartItems(serverItems));
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Không thể tải giỏ hàng';
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     const syncCart = async () => {
       if (!isAuthenticated) {
         setItems(readLocalCart());
+        setError('');
         return;
       }
 
@@ -141,6 +156,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         await loadServerCart();
       } catch (error) {
         console.error('Cart sync error:', error);
+        setError('Không thể đồng bộ giỏ hàng');
       }
     };
 
@@ -309,6 +325,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         items,
         selectedItems,
         selectedItemIds,
+        isLoading,
+        error,
         addToCart,
         removeFromCart,
         updateQuantity,

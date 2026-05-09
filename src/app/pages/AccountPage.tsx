@@ -5,11 +5,14 @@ import {
   User,
   Settings,
   Package,
-  Heart,
   MapPin,
   Bell,
   LogOut,
   Edit2,
+  Plus,
+  Save,
+  Trash2,
+  X,
   Mail,
   Phone,
   Calendar,
@@ -19,21 +22,24 @@ import {
   CheckCircle,
   Truck,
   XCircle,
-  Star,
   ChevronRight,
   Shield,
 } from 'lucide-react';
 import {
+  changeMyPassword,
+  createMyAddress,
+  deleteMyAddress,
   getMyAddresses,
   getMyOrders,
   getMyProfile,
+  updateMyAddress,
   updateMyProfile,
   type AddressItem,
+  type AddressPayload,
   type OrderDto,
   type UserProfile,
 } from '../services/account.service';
-import { getBestSellerBooks } from '../services/book.service';
-import { formatCurrency, getBookImage, toDisplayBook, type DisplayBook } from '../utils/book-display';
+import { formatCurrency, getBookImage } from '../utils/book-display';
 
 const getStatusConfig = (status: string) => {
   switch (status) {
@@ -83,6 +89,42 @@ const formatAddress = (address: AddressItem) =>
     .filter(Boolean)
     .join(', ');
 
+const emptyAddressForm = {
+  receiverName: '',
+  phone: '',
+  addressLine: '',
+  country: 'Việt Nam',
+  provinceName: '',
+  districtName: '',
+  wardName: '',
+  isDefault: false,
+};
+
+const toAddressPayload = (form: typeof emptyAddressForm): AddressPayload => ({
+  receiverName: form.receiverName.trim(),
+  phone: form.phone.trim(),
+  addressLine: form.addressLine.trim(),
+  country: form.country.trim() || 'Việt Nam',
+  provinceName: form.provinceName.trim(),
+  provinceCode: form.provinceName.trim(),
+  districtName: form.districtName.trim(),
+  districtCode: form.districtName.trim(),
+  wardName: form.wardName.trim(),
+  wardCode: form.wardName.trim(),
+  isDefault: form.isDefault,
+});
+
+const toAddressForm = (address: AddressItem) => ({
+  receiverName: address.receiverName || '',
+  phone: address.phone || '',
+  addressLine: address.addressLine || '',
+  country: address.country || 'Việt Nam',
+  provinceName: address.provinceName || '',
+  districtName: address.districtName || '',
+  wardName: address.wardName || '',
+  isDefault: Boolean(address.isDefault),
+});
+
 export function AccountPage() {
   const navigate = useNavigate();
   const { user, logout, updateUser } = useAuth();
@@ -93,7 +135,19 @@ export function AccountPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [orders, setOrders] = useState<OrderDto[]>([]);
   const [addresses, setAddresses] = useState<AddressItem[]>([]);
-  const [wishlistBooks, setWishlistBooks] = useState<DisplayBook[]>([]);
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [actionSuccess, setActionSuccess] = useState('');
+  const [addressForm, setAddressForm] = useState(emptyAddressForm);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [isAddressFormOpen, setIsAddressFormOpen] = useState(false);
+  const [isAddressSaving, setIsAddressSaving] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [editForm, setEditForm] = useState({
     fullName: '',
     phone: '',
@@ -109,38 +163,56 @@ export function AccountPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [profileData, orderData, addressData, bestSellerData] = await Promise.all([
+        setLoadError('');
+        const [profileData, orderData, addressData] = await Promise.all([
           getMyProfile(),
           getMyOrders(1, 10),
           getMyAddresses(),
-          getBestSellerBooks(),
         ]);
 
-        setProfile(profileData);
+        const normalizedProfile = {
+          ...profileData,
+          fullName: profileData.fullName || user.fullName || user.name,
+          phone: profileData.phone || user.phone,
+        };
+
+        setProfile(normalizedProfile);
+        updateUser({
+          id: normalizedProfile.id,
+          name: normalizedProfile.fullName || normalizedProfile.userName,
+          userName: normalizedProfile.userName,
+          fullName: normalizedProfile.fullName,
+          email: normalizedProfile.email,
+          role: normalizedProfile.role,
+          avatar: normalizedProfile.avatar,
+          phone: normalizedProfile.phone,
+        });
         setOrders(orderData.orders || []);
         setAddresses(addressData);
-        setWishlistBooks(bestSellerData.map((book, index) => toDisplayBook(book, index)).slice(0, 4));
         setEditForm({
-          fullName: profileData.fullName || profileData.userName || '',
-          phone: profileData.phone || '',
-          dob: profileData.dob ? new Date(profileData.dob).toISOString().slice(0, 10) : '',
+          fullName: normalizedProfile.fullName || normalizedProfile.userName || '',
+          phone: normalizedProfile.phone || '',
+          dob: normalizedProfile.dob ? new Date(normalizedProfile.dob).toISOString().slice(0, 10) : '',
         });
       } catch (error) {
         console.error('Fetch account data error:', error);
+        setLoadError('Không thể tải thông tin tài khoản. Vui lòng thử lại.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [user, navigate]);
+  }, [user?.id, navigate, updateUser]);
 
   const stats = useMemo(
     () => [
       { label: 'Đơn hàng', value: orders.length.toString(), icon: Package, color: 'bg-blue-500' },
       {
         label: 'Sách đã mua',
-        value: orders.reduce((sum, order) => sum + order.items.length, 0).toString(),
+        value: orders
+          .reduce((sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0)
+          .toString(),
         icon: BookOpen,
         color: 'bg-green-500',
       },
@@ -150,26 +222,126 @@ export function AccountPage() {
         icon: MapPin,
         color: 'bg-orange-500',
       },
-      {
-        label: 'Yêu thích',
-        value: wishlistBooks.length.toString(),
-        icon: Heart,
-        color: 'bg-red-500',
-      },
     ],
-    [orders, addresses, wishlistBooks.length]
+    [orders, addresses]
   );
 
   const tabs = [
     { id: 'profile', label: 'Thông tin cá nhân', icon: User },
     { id: 'orders', label: 'Đơn hàng', icon: Package },
-    { id: 'wishlist', label: 'Yêu thích', icon: Heart },
     { id: 'addresses', label: 'Địa chỉ', icon: MapPin },
     { id: 'settings', label: 'Cài đặt', icon: Settings },
   ];
 
+  const showActionSuccess = (message: string) => {
+    setActionError('');
+    setActionSuccess(message);
+  };
+
+  const showActionError = (message: string) => {
+    setActionSuccess('');
+    setActionError(message);
+  };
+
+  const startCreateAddress = () => {
+    setEditingAddressId(null);
+    setAddressForm({
+      ...emptyAddressForm,
+      receiverName: profile?.fullName || profile?.userName || '',
+      phone: profile?.phone || '',
+    });
+    setIsAddressFormOpen(true);
+    setActionError('');
+    setActionSuccess('');
+  };
+
+  const startEditAddress = (address: AddressItem) => {
+    setEditingAddressId(address.id);
+    setAddressForm(toAddressForm(address));
+    setIsAddressFormOpen(true);
+    setActionError('');
+    setActionSuccess('');
+  };
+
+  const handleSaveAddress = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsAddressSaving(true);
+    try {
+      const payload = toAddressPayload(addressForm);
+      if (editingAddressId) {
+        const updated = await updateMyAddress(editingAddressId, payload);
+        setAddresses((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+        showActionSuccess('Đã cập nhật địa chỉ.');
+      } else {
+        const created = await createMyAddress(payload);
+        setAddresses((prev) => [created, ...prev]);
+        showActionSuccess('Đã thêm địa chỉ mới.');
+      }
+      setIsAddressFormOpen(false);
+      setEditingAddressId(null);
+      setAddressForm(emptyAddressForm);
+    } catch (error: any) {
+      showActionError(error?.response?.data?.message || 'Không thể lưu địa chỉ.');
+    } finally {
+      setIsAddressSaving(false);
+    }
+  };
+
+  const handleDeleteAddress = async (addressId: string) => {
+    if (!window.confirm('Bạn có chắc muốn xóa địa chỉ này?')) return;
+
+    try {
+      await deleteMyAddress(addressId);
+      setAddresses((prev) => prev.filter((item) => item.id !== addressId));
+      showActionSuccess('Đã xóa địa chỉ.');
+    } catch (error: any) {
+      showActionError(error?.response?.data?.message || 'Không thể xóa địa chỉ.');
+    }
+  };
+
+  const handleChangePassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      showActionError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const result = await changeMyPassword({
+        oldPassword: passwordForm.oldPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      if (result?.accessToken) localStorage.setItem('accessToken', result.accessToken);
+      if (result?.refreshToken) localStorage.setItem('refreshToken', result.refreshToken);
+      setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      showActionSuccess('Đã đổi mật khẩu thành công.');
+    } catch (error: any) {
+      showActionError(error?.response?.data?.message || 'Không thể đổi mật khẩu.');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   if (!user || loading) {
     return <div className="min-h-screen bg-gray-50 p-8 text-center text-gray-500">Đang tải tài khoản...</div>;
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8 text-center">
+        <div className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-lg">
+          <p className="mb-4 text-gray-700">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-lg bg-orange-500 px-5 py-3 font-semibold text-white hover:bg-orange-600"
+          >
+            Tải lại
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -199,6 +371,49 @@ export function AccountPage() {
                     {profile?.role || 'MEMBER'}
                   </div>
                 </div>
+                <form onSubmit={handleChangePassword} className="bg-white rounded-2xl shadow-lg p-8">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Đổi mật khẩu</h2>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Mật khẩu hiện tại</label>
+                      <input
+                        type="password"
+                        value={passwordForm.oldPassword}
+                        onChange={(event) => setPasswordForm((prev) => ({ ...prev, oldPassword: event.target.value }))}
+                        required
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Mật khẩu mới</label>
+                      <input
+                        type="password"
+                        value={passwordForm.newPassword}
+                        onChange={(event) => setPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }))}
+                        required
+                        minLength={6}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Xác nhận mật khẩu</label>
+                      <input
+                        type="password"
+                        value={passwordForm.confirmPassword}
+                        onChange={(event) => setPasswordForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
+                        required
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isChangingPassword}
+                    className="mt-5 rounded-lg bg-orange-500 px-5 py-3 font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    {isChangingPassword ? 'Đang đổi mật khẩu...' : 'Đổi mật khẩu'}
+                  </button>
+                </form>
               </div>
             </div>
 
@@ -232,6 +447,18 @@ export function AccountPage() {
           </div>
 
           <div className="col-span-9">
+            {(actionError || actionSuccess) && (
+              <div
+                className={`mb-6 rounded-xl border p-4 text-sm ${
+                  actionError
+                    ? 'border-red-200 bg-red-50 text-red-700'
+                    : 'border-green-200 bg-green-50 text-green-700'
+                }`}
+              >
+                {actionError || actionSuccess}
+              </div>
+            )}
+
             <div className="grid grid-cols-4 gap-6 mb-8">
               {stats.map((stat) => {
                 const Icon = stat.icon;
@@ -270,22 +497,29 @@ export function AccountPage() {
                         onClick={async () => {
                           try {
                             setIsSaving(true);
+                            setActionError('');
+                            setActionSuccess('');
                             const updated = await updateMyProfile({
-                              fullName: editForm.fullName,
-                              phone: editForm.phone,
-                              dob: editForm.dob,
+                              fullName: editForm.fullName.trim(),
+                              phone: editForm.phone.trim(),
+                              dob: editForm.dob || undefined,
                             });
                             setProfile(updated);
                             updateUser({
                               id: updated.id,
                               name: updated.fullName || updated.userName,
+                              userName: updated.userName,
+                              fullName: updated.fullName,
                               email: updated.email,
                               role: updated.role,
                               avatar: updated.avatar,
+                              phone: updated.phone,
                             });
                             setIsEditing(false);
-                          } catch (error) {
+                            setActionSuccess('Đã cập nhật thông tin cá nhân.');
+                          } catch (error: any) {
                             console.error('Update profile error:', error);
+                            setActionError(error?.response?.data?.message || 'Không thể cập nhật thông tin cá nhân.');
                           } finally {
                             setIsSaving(false);
                           }
@@ -356,6 +590,49 @@ export function AccountPage() {
                     </div>
                   </div>
                 </div>
+                <form onSubmit={handleChangePassword} className="hidden">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Đổi mật khẩu</h2>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Mật khẩu hiện tại</label>
+                      <input
+                        type="password"
+                        value={passwordForm.oldPassword}
+                        onChange={(event) => setPasswordForm((prev) => ({ ...prev, oldPassword: event.target.value }))}
+                        required
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Mật khẩu mới</label>
+                      <input
+                        type="password"
+                        value={passwordForm.newPassword}
+                        onChange={(event) => setPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }))}
+                        required
+                        minLength={6}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Xác nhận mật khẩu</label>
+                      <input
+                        type="password"
+                        value={passwordForm.confirmPassword}
+                        onChange={(event) => setPasswordForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
+                        required
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isChangingPassword}
+                    className="mt-5 rounded-lg bg-orange-500 px-5 py-3 font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    {isChangingPassword ? 'Đang đổi mật khẩu...' : 'Đổi mật khẩu'}
+                  </button>
+                </form>
               </div>
             )}
 
@@ -381,7 +658,7 @@ export function AccountPage() {
                               <div>
                                 <div className="font-bold text-gray-900 mb-1">Đơn hàng {formatOrderCode(order.id)}</div>
                                 <div className="text-sm text-gray-600 mb-2">
-                                  {order.items.length} sản phẩm • {new Date(order.createdAt).toLocaleDateString('vi-VN')}
+                                  {order.items.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm • {new Date(order.createdAt).toLocaleDateString('vi-VN')}
                                 </div>
                                 <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg text-sm font-medium border ${status.className}`}>
                                   {status.icon}
@@ -411,55 +688,81 @@ export function AccountPage() {
               </div>
             )}
 
-            {activeTab === 'wishlist' && (
-              <div className="bg-white rounded-2xl shadow-lg p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Gợi ý cho bạn</h2>
-                  <p className="text-gray-600">{wishlistBooks.length} sản phẩm</p>
-                </div>
-                <div className="grid grid-cols-4 gap-6">
-                  {wishlistBooks.map((book) => (
-                    <div key={book.id} className="group relative bg-gray-50 rounded-xl overflow-hidden hover:shadow-xl transition-all hover:-translate-y-1">
-                      <div className="relative aspect-[3/4] overflow-hidden">
-                        <img src={book.image} alt={book.title} className="w-full h-full object-cover" />
-                        <button className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md hover:bg-red-50">
-                          <Heart className="w-4 h-4 fill-red-500 text-red-500" />
-                        </button>
-                      </div>
-                      <div className="p-4">
-                        <h3 className="font-bold text-gray-900 mb-1 line-clamp-2">{book.title}</h3>
-                        <p className="text-sm text-gray-600 mb-3">{book.author}</p>
-                        <div className="flex items-center gap-1 mb-3">
-                          {[...Array(5)].map((_, i) => (
-                            <Star key={i} className={`w-3.5 h-3.5 ${i < Math.floor(book.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
-                          ))}
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-orange-500 font-bold">{formatCurrency(book.price)}</div>
-                            {book.originalPrice && (
-                              <div className="text-gray-400 line-through text-sm">{formatCurrency(book.originalPrice)}</div>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => navigate(`/book/${book.id}`)}
-                            className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white hover:bg-orange-600 transition-colors"
-                          >
-                            <Package className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {activeTab === 'addresses' && (
               <div className="bg-white rounded-2xl shadow-lg p-8">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold text-gray-900">Địa chỉ nhận hàng</h2>
+                  <button
+                    type="button"
+                    onClick={startCreateAddress}
+                    className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-white hover:bg-orange-600"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Thêm địa chỉ
+                  </button>
                 </div>
+                {isAddressFormOpen && (
+                  <form onSubmit={handleSaveAddress} className="mb-6 rounded-xl border border-orange-200 bg-orange-50 p-5">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {[
+                        ['receiverName', 'Người nhận'],
+                        ['phone', 'Số điện thoại'],
+                        ['provinceName', 'Tỉnh/Thành phố'],
+                        ['districtName', 'Quận/Huyện'],
+                        ['wardName', 'Phường/Xã'],
+                        ['country', 'Quốc gia'],
+                      ].map(([field, label]) => (
+                        <div key={field}>
+                          <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
+                          <input
+                            value={(addressForm as any)[field]}
+                            onChange={(event) => setAddressForm((prev) => ({ ...prev, [field]: event.target.value }))}
+                            required
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                          />
+                        </div>
+                      ))}
+                      <div className="md:col-span-2">
+                        <label className="mb-1 block text-sm font-medium text-gray-700">Địa chỉ chi tiết</label>
+                        <input
+                          value={addressForm.addressLine}
+                          onChange={(event) => setAddressForm((prev) => ({ ...prev, addressLine: event.target.value }))}
+                          required
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 text-sm text-gray-700 md:col-span-2">
+                        <input
+                          type="checkbox"
+                          checked={addressForm.isDefault}
+                          onChange={(event) => setAddressForm((prev) => ({ ...prev, isDefault: event.target.checked }))}
+                          className="h-4 w-4 rounded text-orange-500"
+                        />
+                        Đặt làm địa chỉ mặc định
+                      </label>
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={isAddressSaving}
+                        className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-white disabled:opacity-50"
+                      >
+                        <Save className="h-4 w-4" />
+                        {isAddressSaving ? 'Đang lưu...' : 'Lưu địa chỉ'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddressFormOpen(false);
+                          setEditingAddressId(null);
+                        }}
+                        className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-white"
+                      >
+                        Hủy
+                      </button>
+                    </div>
+                  </form>
+                )}
                 <div className="space-y-4">
                   {addresses.length === 0 ? (
                     <div className="text-gray-500">Bạn chưa có địa chỉ nào.</div>
@@ -479,6 +782,24 @@ export function AccountPage() {
                             <div className="font-bold text-gray-900 mb-2">{addr.receiverName}</div>
                             <div className="text-gray-600 mb-1">{addr.phone}</div>
                             <div className="text-gray-600">{formatAddress(addr)}</div>
+                            <div className="mt-4 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startEditAddress(addr)}
+                                className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                                Sửa
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteAddress(addr.id)}
+                                className="flex items-center gap-1 rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Xóa
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -525,6 +846,49 @@ export function AccountPage() {
                     })}
                   </div>
                 </div>
+                <form onSubmit={handleChangePassword} className="bg-white rounded-2xl shadow-lg p-8">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Đổi mật khẩu</h2>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Mật khẩu hiện tại</label>
+                      <input
+                        type="password"
+                        value={passwordForm.oldPassword}
+                        onChange={(event) => setPasswordForm((prev) => ({ ...prev, oldPassword: event.target.value }))}
+                        required
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Mật khẩu mới</label>
+                      <input
+                        type="password"
+                        value={passwordForm.newPassword}
+                        onChange={(event) => setPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }))}
+                        required
+                        minLength={6}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Xác nhận mật khẩu</label>
+                      <input
+                        type="password"
+                        value={passwordForm.confirmPassword}
+                        onChange={(event) => setPasswordForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
+                        required
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isChangingPassword}
+                    className="mt-5 rounded-lg bg-orange-500 px-5 py-3 font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    {isChangingPassword ? 'Đang đổi mật khẩu...' : 'Đổi mật khẩu'}
+                  </button>
+                </form>
               </div>
             )}
           </div>

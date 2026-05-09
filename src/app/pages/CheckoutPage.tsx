@@ -134,7 +134,8 @@ export function CheckoutPage() {
     if (user) {
       setFormData((prev) => ({
         ...prev,
-        fullName: prev.fullName || user.name || '',
+        fullName: prev.fullName || user.fullName || user.name || '',
+        phone: prev.phone || user.phone || '',
         email: prev.email || user.email || '',
       }));
     }

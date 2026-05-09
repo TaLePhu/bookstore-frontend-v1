@@ -42,6 +42,9 @@ export function CartPage() {
     selectedTotalItems,
     selectedTotalPrice,
     areAllItemsSelected,
+    isLoading,
+    error,
+    refreshCart,
     toggleAllSelection,
     toggleItemSelection,
     isItemSelected,
@@ -109,6 +112,14 @@ export function CartPage() {
 
     navigate('/checkout');
   };
+
+  if (isLoading && items.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8 text-center text-gray-500">
+        Đang tải giỏ hàng...
+      </div>
+    );
+  }
 
   const SuggestedSection = ({ title }: { title: string }) => {
     if (suggestedBooks.length === 0) return null;
@@ -298,6 +309,18 @@ export function CartPage() {
         <div className="mb-6">
           <h1 className="mb-2 text-3xl font-bold text-gray-900">Giỏ hàng của bạn</h1>
           <p className="text-gray-600">Bạn có {totalItems} sản phẩm trong giỏ hàng</p>
+          {error && (
+            <div className="mt-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+              <span>{error}</span>
+              <button
+                type="button"
+                onClick={refreshCart}
+                className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-700"
+              >
+                Tải lại
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="grid gap-8 xl:grid-cols-12">

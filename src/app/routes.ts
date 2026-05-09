@@ -1,4 +1,5 @@
-import { createBrowserRouter } from 'react-router';
+import { createElement } from 'react';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { RootLayout } from './layouts/RootLayout';
 import { HomePage } from './pages/HomePage';
 import { BookDetailPage } from './pages/BookDetailPage';
@@ -14,6 +15,21 @@ import { AIAdvisorPage } from './pages/AIAdvisorPage';
 import { AdminPage } from './pages/AdminPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { useAuth } from './context/AuthContext';
+
+function AdminRoute() {
+  const { user, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return createElement(Navigate, { to: '/login', replace: true });
+  }
+
+  if (user?.role?.toUpperCase() !== 'ADMIN') {
+    return createElement(Navigate, { to: '/', replace: true });
+  }
+
+  return createElement(AdminPage);
+}
 
 export const router = createBrowserRouter([
   {
@@ -35,7 +51,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/admin',
-    Component: AdminPage,
+    Component: AdminRoute,
   },
   {
     path: '/login',
