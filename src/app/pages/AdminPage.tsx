@@ -75,6 +75,7 @@ type ConfirmDialog = {
 } | null;
 
 const COLORS = ['#F97316', '#3B82F6', '#8B5CF6', '#10B981', '#EF4444', '#14B8A6'];
+const LOW_STOCK_THRESHOLD = 5;
 
 const formatCurrency = (value: number | string | null | undefined) =>
   `${Number(value || 0).toLocaleString('vi-VN')}đ`;
@@ -232,6 +233,10 @@ export function AdminPage() {
 
   const isBookDeleted = (book: ApiBook) => Boolean(book.deletedAt || book.status === 'deleted');
   const outOfStockBooks = books.filter((book) => !isBookDeleted(book) && Number(book.stock || 0) <= 0);
+  const lowStockBooks = books.filter((book) => {
+    const stock = Number(book.stock || 0);
+    return !isBookDeleted(book) && stock > 0 && stock <= LOW_STOCK_THRESHOLD;
+  });
 
   const showPopup = (message: Exclude<PopupMessage, null>) => {
     setPopupMessage(message);
@@ -757,6 +762,20 @@ export function AdminPage() {
                 </div>
               )}
 
+              {lowStockBooks.length > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-yellow-800">
+                      Có {lowStockBooks.length} sách sắp hết hàng
+                    </h4>
+                    <p className="text-sm text-yellow-700">
+                      {lowStockBooks.map((book) => `${book.title} (${Number(book.stock || 0)} cuốn)`).join(', ')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm sách theo tên, tác giả, danh mục..." />
                 <select
@@ -804,8 +823,10 @@ export function AdminPage() {
                         <TableCell>
                           {isBookDeleted(book) ? (
                             <span className="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700">Đã xóa mềm</span>
+                          ) : Number(book.stock || 0) > 0 && Number(book.stock || 0) <= LOW_STOCK_THRESHOLD ? (
+                            <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">Sắp hết hàng</span>
                           ) : (
-                          <span className={`text-xs px-2 py-1 rounded-full ${isBookDeleted(book) ? 'bg-gray-200 text-gray-700' : Number(book.stock || 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          <span className={`text-xs px-2 py-1 rounded-full ${Number(book.stock || 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             {Number(book.stock || 0) > 0 ? 'Còn hàng' : 'Hết hàng'}
                           </span>
                           )}
