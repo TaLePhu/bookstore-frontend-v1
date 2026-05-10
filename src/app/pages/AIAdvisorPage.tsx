@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Bot,
@@ -15,7 +15,11 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-import { getAIAdvisorRecommendations, type AdvisorBook } from '../services/advisor.service';
+import {
+  getAIAdvisorRecommendations,
+  type AdvisorBook,
+  type AdvisorHistoryMessage,
+} from '../services/advisor.service';
 import { formatCurrency, getBookImage } from '../utils/book-display';
 
 interface Message {
@@ -28,6 +32,7 @@ interface Message {
 export function AIAdvisorPage() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -37,6 +42,10 @@ export function AIAdvisorPage() {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, isTyping]);
 
   const quickQuestions = [
     { icon: TrendingUp, text: 'Sách bán chạy nhất hiện nay', color: 'bg-orange-100 text-orange-600' },
@@ -49,19 +58,26 @@ export function AIAdvisorPage() {
     const messageText = text || inputValue.trim();
     if (!messageText || isTyping) return;
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        type: 'user',
-        text: messageText,
-      },
-    ]);
+    const userMessage: Message = {
+      id: Date.now(),
+      type: 'user',
+      text: messageText,
+    };
+    const nextMessages = [...messages, userMessage];
+    const history: AdvisorHistoryMessage[] = messages
+      .filter((message) => message.id !== 1)
+      .slice(-8)
+      .map((message) => ({
+        role: message.type === 'user' ? 'user' : 'assistant',
+        content: message.text,
+      }));
+
+    setMessages(nextMessages);
     setInputValue('');
     setIsTyping(true);
 
     try {
-      const result = await getAIAdvisorRecommendations(messageText, 5);
+      const result = await getAIAdvisorRecommendations(messageText, 5, history);
       setMessages((prev) => [
         ...prev,
         {
@@ -260,6 +276,7 @@ export function AIAdvisorPage() {
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           {messages.length <= 2 && (
