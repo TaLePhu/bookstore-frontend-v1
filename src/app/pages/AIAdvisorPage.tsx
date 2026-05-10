@@ -20,7 +20,7 @@ import {
   type AdvisorBook,
   type AdvisorHistoryMessage,
 } from '../services/advisor.service';
-import { formatCurrency, getBookImage } from '../utils/book-display';
+import { formatCurrency, getBookImage, isBookDeleted } from '../utils/book-display';
 
 interface Message {
   id: number;
@@ -84,7 +84,7 @@ export function AIAdvisorPage() {
           id: Date.now() + 1,
           type: 'ai',
           text: result.answer,
-          books: result.books,
+          books: result.books.filter((book) => !isBookDeleted(book)),
         },
       ]);
     } catch (error) {
@@ -221,6 +221,11 @@ export function AIAdvisorPage() {
                                   <span className="text-sm text-gray-600 ml-1">{Number(book.rating) || 0}</span>
                                 </div>
                                 <p className="text-sm text-gray-600 mb-3 italic">{book.reason}</p>
+                                {Number(book.stock) <= 0 && (
+                                  <div className="mb-3 inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                                    Hết hàng
+                                  </div>
+                                )}
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                   <span className="text-lg font-bold text-blue-600">
                                     {formatCurrency(Number(book.price) || 0)}
@@ -233,16 +238,18 @@ export function AIAdvisorPage() {
                                       Xem chi tiết
                                     </button>
                                     <button
-                                      onClick={() =>
+                                      disabled={Number(book.stock) <= 0}
+                                      onClick={() => {
+                                        if (Number(book.stock) <= 0) return;
                                         addToCart({
                                           id: book.id,
                                           title: book.title,
                                           author: book.author,
                                           price: formatCurrency(Number(book.price) || 0),
                                           image: getBookImage(book),
-                                        })
-                                      }
-                                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
+                                        });
+                                      }}
+                                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:hover:bg-gray-300"
                                     >
                                       <ShoppingCart className="w-4 h-4" />
                                       Thêm vào giỏ

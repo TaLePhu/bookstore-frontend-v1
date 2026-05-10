@@ -122,6 +122,21 @@ export const trackOrderPublic = async (orderCode: string): Promise<OrderDto> => 
   return res.data.data;
 };
 
+export const requestCancelOrder = async (orderCode: string, reason: string): Promise<OrderDto> => {
+  const res = await api.post('/orders/cancel-request', { orderCode, reason });
+  return res.data.data;
+};
+
+export const submitOrderReview = async (payload: {
+  orderCode: string;
+  bookId: string;
+  rating: number;
+  comment?: string;
+}) => {
+  const res = await api.post('/orders/review', payload);
+  return res.data.data;
+};
+
 export const getMyAddresses = async (): Promise<AddressItem[]> => {
   const res = await api.get('/addresses');
   return res.data.data;

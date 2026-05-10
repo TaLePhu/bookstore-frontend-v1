@@ -4,7 +4,7 @@ import { useCart } from '../context/CartContext';
 import { getBestSellerBooks } from '../services/book.service';
 import { getCategories } from '../services/category.service';
 import { getAIAdvisorRecommendations } from '../services/advisor.service';
-import { formatCurrency, toDisplayBook, type DisplayBook } from '../utils/book-display';
+import { formatCurrency, toVisibleDisplayBooks, type DisplayBook } from '../utils/book-display';
 
 interface CategoryItem {
   id: string;
@@ -49,7 +49,7 @@ export function AIRecommendation() {
       const result = await getAIAdvisorRecommendations(keyword, 4);
       setAiAnswer(result.answer);
       setBookReasons(Object.fromEntries(result.books.map((book) => [book.id, book.reason])));
-      setAiBooks(result.books.map((book, index) => toDisplayBook(book, index)));
+      setAiBooks(toVisibleDisplayBooks(result.books));
       setShowResults(true);
     } catch (error) {
       console.error('Fetch AI recommendation books error:', error);
@@ -57,7 +57,7 @@ export function AIRecommendation() {
         const fallbackBooks = await getBestSellerBooks();
         setAiAnswer('AI tạm thời chưa phản hồi được, mình hiển thị các sách nổi bật để bạn tham khảo trước.');
         setBookReasons({});
-        setAiBooks(fallbackBooks.slice(0, 4).map((book, index) => toDisplayBook(book, index)));
+        setAiBooks(toVisibleDisplayBooks(fallbackBooks).slice(0, 4));
         setShowResults(true);
       } catch (fallbackError) {
         console.error('Fetch fallback recommendation books error:', fallbackError);
@@ -239,7 +239,9 @@ export function AIRecommendation() {
                           )}
                         </div>
                         <button 
+                          disabled={book.isOutOfStock}
                           onClick={() => {
+                            if (book.isOutOfStock) return;
                             addToCart({
                               id: book.id,
                               title: book.title,
@@ -248,7 +250,7 @@ export function AIRecommendation() {
                               image: book.image,
                             });
                           }}
-                          className="w-9 h-9 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white hover:shadow-lg transition-all hover:scale-110"
+                          className="w-9 h-9 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white hover:shadow-lg transition-all hover:scale-110 disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 disabled:hover:scale-100 disabled:hover:shadow-none"
                         >
                           <ShoppingCart className="w-4 h-4" />
                         </button>

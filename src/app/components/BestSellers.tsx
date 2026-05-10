@@ -3,7 +3,7 @@ import { Star, ShoppingCart } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useCart } from '../context/CartContext';
 import { getBestSellerBooks } from '../services/book.service';
-import { formatCurrency, toDisplayBook, type DisplayBook } from '../utils/book-display';
+import { formatCurrency, toVisibleDisplayBooks, type DisplayBook } from '../utils/book-display';
 
 export function BestSellers() {
   const navigate = useNavigate();
@@ -16,7 +16,7 @@ export function BestSellers() {
       try {
         setLoading(true);
         const data = await getBestSellerBooks();
-        setBooks(data.map((book, index) => toDisplayBook(book, index)));
+        setBooks(toVisibleDisplayBooks(data));
       } catch (error) {
         console.error('Fetch best seller books error:', error);
         setBooks([]);
@@ -67,6 +67,11 @@ export function BestSellers() {
                     -{book.discount}%
                   </div>
                 )}
+                {book.isOutOfStock && (
+                  <div className="absolute bottom-3 left-3 rounded-full bg-gray-900/85 px-3 py-1 text-sm font-bold text-white">
+                    Hết hàng
+                  </div>
+                )}
               </div>
 
               <div className="p-4">
@@ -99,8 +104,10 @@ export function BestSellers() {
                     )}
                   </div>
                   <button
+                    disabled={book.isOutOfStock}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (book.isOutOfStock) return;
                       addToCart({
                         id: book.id,
                         title: book.title,
@@ -109,7 +116,11 @@ export function BestSellers() {
                         image: book.image,
                       });
                     }}
-                    className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white hover:bg-orange-600 transition-colors hover:scale-110"
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-colors ${
+                      book.isOutOfStock
+                        ? 'bg-gray-300 cursor-not-allowed'
+                        : 'bg-orange-500 hover:bg-orange-600 hover:scale-110'
+                    }`}
                   >
                     <ShoppingCart className="w-5 h-5" />
                   </button>

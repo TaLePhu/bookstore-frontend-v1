@@ -7,7 +7,7 @@ import { getLatestBooks } from '../services/book.service';
 import {
   formatCurrency,
   formatReleaseDate,
-  toDisplayBook,
+  toVisibleDisplayBooks,
   type DisplayBook,
 } from '../utils/book-display';
 
@@ -34,7 +34,7 @@ export function NewBooks() {
           getCategories(),
         ]);
 
-        setBooks(latestBooks.map((book, index) => toDisplayBook(book, index)));
+        setBooks(toVisibleDisplayBooks(latestBooks));
         setCategories(categoryData);
       } catch (error) {
         console.error('Fetch latest books error:', error);
@@ -102,6 +102,11 @@ export function NewBooks() {
                     -{book.discount}%
                   </div>
                 )}
+                {book.isOutOfStock && (
+                  <div className="absolute bottom-2 left-2 rounded-md bg-gray-900/85 px-2 py-1 text-xs font-bold text-white">
+                    Hết hàng
+                  </div>
+                )}
 
                 <button
                   onClick={(e) => e.stopPropagation()}
@@ -112,8 +117,10 @@ export function NewBooks() {
 
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
+                    disabled={book.isOutOfStock}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (book.isOutOfStock) return;
                       addToCart({
                         id: book.id,
                         title: book.title,
@@ -122,10 +129,14 @@ export function NewBooks() {
                         image: book.image,
                       });
                     }}
-                    className="w-full bg-orange-500 text-white py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors"
+                    className={`w-full py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
+                      book.isOutOfStock
+                        ? 'bg-gray-300 text-white cursor-not-allowed'
+                        : 'bg-orange-500 text-white hover:bg-orange-600'
+                    }`}
                   >
                     <ShoppingCart className="w-4 h-4" />
-                    Thêm giỏ hàng
+                    {book.isOutOfStock ? 'Hết hàng' : 'Thêm giỏ hàng'}
                   </button>
                 </div>
               </div>

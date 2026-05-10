@@ -11,6 +11,10 @@ export interface DisplayBook {
   rating: number;
   reviews: number;
   sold: number;
+  stock: number;
+  status: 'in_stock' | 'out_of_stock' | 'deleted';
+  isOutOfStock: boolean;
+  isDeleted: boolean;
   image: string;
   releaseDate: string | null;
   categoryId?: string;
@@ -57,8 +61,14 @@ export const getBookImage = (book: ApiBook) => {
   return firstImage?.imageUrl || firstImage?.url || getFallbackBookImage(book.id);
 };
 
+export const isBookDeleted = (book: ApiBook) =>
+  Boolean(book.deletedAt || book.status === 'deleted');
+
 export const toDisplayBook = (book: ApiBook, index: number): DisplayBook => {
   const price = Number(book.price) || 0;
+  const stock = Number(book.stock) || 0;
+  const isDeleted = isBookDeleted(book);
+  const status = isDeleted ? 'deleted' : stock > 0 ? 'in_stock' : 'out_of_stock';
   const originalPrice =
     book.originalPrice != null ? Number(book.originalPrice) : Math.round(price * 1.25);
   const safeOriginalPrice = originalPrice > price ? originalPrice : null;
@@ -80,8 +90,17 @@ export const toDisplayBook = (book: ApiBook, index: number): DisplayBook => {
     rating: Number(book.rating) || 4.5,
     reviews: Number(book.totalReviews) || 0,
     sold: Number(book.soldCount) || index,
+    stock,
+    status,
+    isOutOfStock: status === 'out_of_stock',
+    isDeleted,
     image: getBookImage(book),
     releaseDate: book.releaseDate || null,
     categoryId: book.categoryId,
   };
 };
+
+export const toVisibleDisplayBooks = (books: ApiBook[]): DisplayBook[] =>
+  books
+    .filter((book) => !isBookDeleted(book))
+    .map((book, index) => toDisplayBook(book, index));

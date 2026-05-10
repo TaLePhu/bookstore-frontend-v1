@@ -14,11 +14,14 @@ import {
   PackageCheck,
   Phone,
   Search,
+  Star,
   Truck,
   User,
+  X,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { trackOrderPublic, type OrderDto } from '../services/account.service';
+import { requestCancelOrder, submitOrderReview, trackOrderPublic, type OrderDto } from '../services/account.service';
 import { formatCurrency, getBookImage } from '../utils/book-display';
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
@@ -78,6 +81,14 @@ export function TrackOrderPage() {
   );
   const [selectedOrder, setSelectedOrder] = useState<OrderDto | null>(null);
   const [searching, setSearching] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [reviewingBookId, setReviewingBookId] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewedBookIds, setReviewedBookIds] = useState<string[]>([]);
 
   const trackingSteps = useMemo(
     () => [
@@ -95,6 +106,8 @@ export function TrackOrderPage() {
   const payment = selectedOrder?.payments?.[0];
   const displayOrderCode = selectedOrder?.orderCode || (selectedOrder?.id ? formatOrderCode(selectedOrder.id) : '');
   const subtotal = selectedOrder?.items.reduce((sum, item) => sum + Number(item.subTotal || 0), 0) || 0;
+  const canRequestCancel = selectedOrder ? ['PENDING', 'PROCESSING'].includes(selectedOrder.status) : false;
+  const canReviewOrder = selectedOrder?.status === 'COMPLETED';
   const shippingAddress = address
     ? [address.addressLine, address.wardName, address.districtName, address.provinceName, address.country]
         .filter(Boolean)
@@ -133,6 +146,74 @@ export function TrackOrderPage() {
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
     void searchOrder(orderCode);
+  };
+
+  const openCancelModal = () => {
+    setCancelReason('');
+    setShowCancelModal(true);
+  };
+
+  const handleCancelOrder = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const reason = cancelReason.trim();
+    const code = selectedOrder?.orderCode || orderCode.trim();
+
+    if (!code) {
+      toast.error('Không tìm thấy mã đơn hàng để hủy.');
+      return;
+    }
+
+    if (!reason) {
+      toast.error('Vui lòng nhập lý do hủy đơn hàng.');
+      return;
+    }
+
+    try {
+      setIsCancelling(true);
+      const updatedOrder = await requestCancelOrder(code, reason);
+      setSelectedOrder(updatedOrder);
+      setShowCancelModal(false);
+      setCancelReason('');
+      toast.success('Yêu cầu hủy đơn hàng đã được ghi nhận.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Không thể gửi yêu cầu hủy đơn hàng.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const openReviewModal = (bookId: string) => {
+    setReviewingBookId(bookId);
+    setReviewRating(5);
+    setReviewComment('');
+  };
+
+  const handleSubmitReview = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const code = selectedOrder?.orderCode || orderCode.trim();
+
+    if (!reviewingBookId || !code) {
+      toast.error('Không tìm thấy thông tin đánh giá.');
+      return;
+    }
+
+    try {
+      setIsSubmittingReview(true);
+      await submitOrderReview({
+        orderCode: code,
+        bookId: reviewingBookId,
+        rating: reviewRating,
+        comment: reviewComment.trim() || undefined,
+      });
+      setReviewedBookIds((prev) => Array.from(new Set([...prev, reviewingBookId])));
+      setReviewingBookId(null);
+      setReviewComment('');
+      toast.success('Cảm ơn bạn đã đánh giá sản phẩm.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Không thể gửi đánh giá.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   return (
@@ -310,6 +391,18 @@ export function TrackOrderPage() {
                             <div className="text-xs text-gray-500">Đơn giá: {formatCurrency(Number(item.price || 0))}</div>
                           </div>
                         </div>
+                        {canReviewOrder && (
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => openReviewModal(item.bookId)}
+                              className="inline-flex items-center gap-2 rounded-lg border border-yellow-300 bg-white px-3 py-2 text-sm font-semibold text-yellow-700 transition-colors hover:bg-yellow-50"
+                            >
+                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                              {reviewedBookIds.includes(item.bookId) ? 'Cập nhật đánh giá' : 'Đánh giá sách'}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -373,10 +466,172 @@ export function TrackOrderPage() {
                   </div>
                 </div>
               </div>
+
+              <div className="rounded-2xl bg-white p-6 shadow-lg">
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                    <XCircle className="h-5 w-5 text-red-600" />
+                  </div>
+                  <h3 className="font-bold text-gray-900">Yêu cầu hủy đơn hàng</h3>
+                </div>
+
+                {canRequestCancel ? (
+                  <>
+                    <p className="mb-4 text-sm leading-6 text-gray-600">
+                      Bạn có thể gửi yêu cầu hủy khi đơn hàng còn ở trạng thái chờ xác nhận hoặc đang xử lý.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={openCancelModal}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 font-bold text-white transition-colors hover:bg-red-700"
+                    >
+                      <XCircle className="h-5 w-5" />
+                      Yêu cầu hủy đơn
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex gap-2 rounded-xl bg-gray-50 p-4 text-sm leading-6 text-gray-600">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
+                    Đơn hàng ở trạng thái {getStatusLabel(selectedOrder.status).toLowerCase()} nên không thể gửi yêu cầu hủy từ trang tra cứu.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
       </div>
+
+      {showCancelModal && selectedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={handleCancelOrder} className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Yêu cầu hủy đơn hàng</h3>
+                <p className="mt-1 text-sm text-gray-600">Đơn hàng {displayOrderCode}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                disabled={isCancelling}
+                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <div className="rounded-xl bg-red-50 p-4 text-sm leading-6 text-red-700">
+                Sau khi gửi yêu cầu, đơn hàng sẽ chuyển sang trạng thái đã hủy nếu còn đủ điều kiện hủy.
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">Lý do hủy</label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(event) => setCancelReason(event.target.value.slice(0, 500))}
+                  rows={4}
+                  required
+                  placeholder="Nhập lý do bạn muốn hủy đơn hàng..."
+                  className="w-full resize-none rounded-xl border-2 border-gray-200 px-4 py-3 outline-none transition-colors focus:border-red-500"
+                />
+                <div className="mt-1 text-right text-xs text-gray-500">{cancelReason.length}/500</div>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                disabled={isCancelling}
+                className="rounded-lg border border-gray-300 px-5 py-2.5 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Đóng
+              </button>
+              <button
+                type="submit"
+                disabled={isCancelling}
+                className="rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {isCancelling ? 'Đang gửi...' : 'Gửi yêu cầu hủy'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {reviewingBookId && selectedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={handleSubmitReview} className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Đánh giá sản phẩm</h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  {selectedOrder.items.find((item) => item.bookId === reviewingBookId)?.book?.title || 'Sách đã mua'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewingBookId(null)}
+                disabled={isSubmittingReview}
+                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 px-6 py-5">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">Số sao</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <button
+                      key={rating}
+                      type="button"
+                      onClick={() => setReviewRating(rating)}
+                      className="rounded-lg p-1 transition-transform hover:scale-105"
+                    >
+                      <Star
+                        className={`h-8 w-8 ${
+                          rating <= reviewRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">Nhận xét</label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(event) => setReviewComment(event.target.value.slice(0, 1000))}
+                  rows={5}
+                  placeholder="Chia sẻ cảm nhận của bạn về cuốn sách..."
+                  className="w-full resize-none rounded-xl border-2 border-gray-200 px-4 py-3 outline-none transition-colors focus:border-orange-500"
+                />
+                <div className="mt-1 text-right text-xs text-gray-500">{reviewComment.length}/1000</div>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setReviewingBookId(null)}
+                disabled={isSubmittingReview}
+                className="rounded-lg border border-gray-300 px-5 py-2.5 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Đóng
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmittingReview}
+                className="rounded-lg bg-orange-500 px-5 py-2.5 font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+              >
+                {isSubmittingReview ? 'Đang gửi...' : 'Gửi đánh giá'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

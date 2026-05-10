@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Bell, ShoppingCart, User, LogOut, ChevronDown } from 'lucide-react';
+import { Search, Bell, ShoppingCart, User, LogOut, ChevronDown, ShieldCheck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +23,7 @@ export function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
 
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -58,9 +59,10 @@ export function Header() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     setShowUserMenu(false);
+    navigate('/');
   };
 
   return (
@@ -135,7 +137,16 @@ export function Header() {
             </div>
           </div>
 
-          <div className="grid w-auto shrink-0 grid-cols-3 gap-1 rounded-xl border border-blue-200 p-1.5 sm:gap-2 sm:p-2 lg:flex lg:w-auto lg:flex-nowrap lg:items-center lg:justify-end lg:gap-6 lg:px-4 lg:py-2">
+          <div className={`grid w-auto shrink-0 ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-1 rounded-xl border border-blue-200 p-1.5 sm:gap-2 sm:p-2 lg:flex lg:w-auto lg:flex-nowrap lg:items-center lg:justify-end lg:gap-6 lg:px-4 lg:py-2`}>
+            {isAdmin && (
+              <button
+                onClick={() => navigate('/admin')}
+                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14"
+              >
+                <ShieldCheck className="w-5 h-5" />
+                <span className="text-xs">Quản lý</span>
+              </button>
+            )}
             <button className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14">
               <Bell className="w-5 h-5" />
               <span className="text-xs">Thông báo</span>
@@ -177,6 +188,18 @@ export function Header() {
 
                 {showUserMenu && (
                   <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    {isAdmin && (
+                      <button
+                        onClick={() => {
+                          navigate('/admin');
+                          setShowUserMenu(false);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-2"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        Trang quản lý
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         navigate('/account');

@@ -82,16 +82,17 @@ const readLocalCart = (): CartItem[] => {
 export function CartProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
   const [items, setItems] = useState<CartItem[]>(() => readLocalCart());
+  const [cartOwner, setCartOwner] = useState<'guest' | 'user'>(() => (isAuthenticated ? 'user' : 'guest'));
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated && cartOwner === 'guest') {
       localStorage.setItem(LOCAL_CART_KEY, JSON.stringify(items));
     }
-  }, [items, isAuthenticated]);
+  }, [items, isAuthenticated, cartOwner]);
 
   useEffect(() => {
     if (!items.length) {
@@ -130,15 +131,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const syncCart = async () => {
       if (!isAuthenticated) {
+        setCartOwner('guest');
         setItems(readLocalCart());
         setError('');
         return;
       }
 
       try {
+        setCartOwner('user');
         const localItems = readLocalCart();
         const validLocalItems = localItems.filter((item) => isValidBookId(item.id));
         const invalidLocalItems = localItems.filter((item) => !isValidBookId(item.id));
+        const mergedQuantity = validLocalItems.reduce((sum, item) => sum + item.quantity, 0);
 
         for (const item of validLocalItems) {
           await authApi.post('/cart/add', {
@@ -154,6 +158,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
 
         await loadServerCart();
+
+        if (validLocalItems.length > 0) {
+          toast.success('Đã gộp giỏ hàng của khách vào tài khoản', {
+            description: `${mergedQuantity} sản phẩm từ giỏ hàng khách đã được thêm vào giỏ hàng của bạn.`,
+          });
+        }
       } catch (error) {
         console.error('Cart sync error:', error);
         setError('Không thể đồng bộ giỏ hàng');

@@ -19,7 +19,7 @@ import {
 import { toast } from 'sonner';
 import { useCart } from '../context/CartContext';
 import { getBestSellerBooks } from '../services/book.service';
-import { formatCurrency, toDisplayBook, type DisplayBook } from '../utils/book-display';
+import { formatCurrency, toVisibleDisplayBooks, type DisplayBook } from '../utils/book-display';
 
 type CartItemView = {
   id: string | number;
@@ -59,7 +59,7 @@ export function CartPage() {
     const fetchSuggestedBooks = async () => {
       try {
         const data = await getBestSellerBooks();
-        setSuggestedBooks(data.map((book, index) => toDisplayBook(book, index)).slice(0, 4));
+        setSuggestedBooks(toVisibleDisplayBooks(data).slice(0, 4));
       } catch (error) {
         console.error('Fetch suggested books error:', error);
         setSuggestedBooks([]);
@@ -157,8 +157,10 @@ export function CartPage() {
                   </div>
                   <button
                     type="button"
+                    disabled={book.isOutOfStock}
                     onClick={(event) => {
                       event.stopPropagation();
+                      if (book.isOutOfStock) return;
                       addToCart({
                         id: book.id,
                         title: book.title,
@@ -167,7 +169,7 @@ export function CartPage() {
                         image: book.image,
                       });
                     }}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-white transition-colors hover:bg-orange-600"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:hover:bg-gray-300"
                     aria-label={`Thêm ${book.title} vào giỏ hàng`}
                   >
                     <ShoppingCart className="h-5 w-5" />

@@ -3,7 +3,7 @@ import { Star, ShoppingCart, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useCart } from '../context/CartContext';
 import { getBooksByCategory, getCategories } from '../services/category.service';
-import { formatCurrency, toDisplayBook, type DisplayBook } from '../utils/book-display';
+import { formatCurrency, toVisibleDisplayBooks, type DisplayBook } from '../utils/book-display';
 
 interface CategoryItem {
   id: string;
@@ -52,7 +52,7 @@ export function BookFinder() {
       try {
         setLoadingBooks(true);
         const data = await getBooksByCategory(activeTab);
-        setBooks(data.map((book, index) => toDisplayBook(book, index)));
+        setBooks(toVisibleDisplayBooks(data));
       } catch (error) {
         console.error('Fetch category books for BookFinder error:', error);
         setBooks([]);
@@ -130,6 +130,12 @@ export function BookFinder() {
                     </div>
                   )}
 
+                  {book.isOutOfStock && (
+                    <div className="absolute bottom-3 left-3 rounded-full bg-gray-900/85 px-3 py-1 text-xs font-bold text-white">
+                      Hết hàng
+                    </div>
+                  )}
+
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => {
@@ -178,9 +184,15 @@ export function BookFinder() {
                       )}
                     </div>
                     <button
-                      className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white hover:bg-orange-600 transition-colors shadow-md"
+                      disabled={book.isOutOfStock}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-colors shadow-md ${
+                        book.isOutOfStock
+                          ? 'bg-gray-300 cursor-not-allowed'
+                          : 'bg-orange-500 hover:bg-orange-600'
+                      }`}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (book.isOutOfStock) return;
                         addToCart({
                           id: book.id,
                           title: book.title,

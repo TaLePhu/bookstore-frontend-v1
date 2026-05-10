@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import {
   User,
@@ -25,6 +26,8 @@ import {
   XCircle,
   ChevronRight,
   Shield,
+  KeyRound,
+  RefreshCw,
 } from 'lucide-react';
 import {
   changeMyPassword,
@@ -78,6 +81,8 @@ const getStatusConfig = (status: string) => {
 };
 
 const formatOrderCode = (id: string) => `#${id.slice(0, 8).toUpperCase()}`;
+
+const getDisplayOrderCode = (order: OrderDto) => order.orderCode || formatOrderCode(order.id);
 
 const formatAddress = (address: AddressItem) =>
   [
@@ -142,6 +147,8 @@ export function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [orders, setOrders] = useState<OrderDto[]>([]);
+  const [orderTotal, setOrderTotal] = useState(0);
+  const [isOrdersLoading, setIsOrdersLoading] = useState(false);
   const [addresses, setAddresses] = useState<AddressItem[]>([]);
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
@@ -157,12 +164,27 @@ export function AccountPage() {
     newPassword: '',
     confirmPassword: '',
   });
+  const [isPasswordFormOpen, setIsPasswordFormOpen] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [editForm, setEditForm] = useState({
     fullName: '',
     phone: '',
     dob: '',
   });
+
+  const loadOrders = async (showToast = false) => {
+    try {
+      setIsOrdersLoading(true);
+      const orderData = await getMyOrders(1, 50);
+      setOrders(orderData.orders || []);
+      setOrderTotal(orderData.total || orderData.orders?.length || 0);
+      if (showToast) toast.success('Đã cập nhật danh sách đơn hàng.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Không thể tải danh sách đơn hàng.');
+    } finally {
+      setIsOrdersLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -176,7 +198,7 @@ export function AccountPage() {
         setLoadError('');
         const [profileData, orderData, addressData] = await Promise.all([
           getMyProfile(),
-          getMyOrders(1, 10),
+          getMyOrders(1, 50),
           getMyAddresses(),
         ]);
 
@@ -198,6 +220,7 @@ export function AccountPage() {
           phone: normalizedProfile.phone,
         });
         setOrders(orderData.orders || []);
+        setOrderTotal(orderData.total || orderData.orders?.length || 0);
         setAddresses(addressData);
         setEditForm({
           fullName: normalizedProfile.fullName || normalizedProfile.userName || '',
@@ -215,9 +238,15 @@ export function AccountPage() {
     fetchData();
   }, [user?.id, navigate, updateUser]);
 
+  useEffect(() => {
+    if (activeTab === 'orders' && user) {
+      void loadOrders(false);
+    }
+  }, [activeTab, user?.id]);
+
   const stats = useMemo(
     () => [
-      { label: 'Đơn hàng', value: orders.length.toString(), icon: Package, color: 'bg-blue-500' },
+      { label: 'Đơn hàng', value: orderTotal.toString(), icon: Package, color: 'bg-blue-500' },
       {
         label: 'Sách đã mua',
         value: orders
@@ -233,7 +262,7 @@ export function AccountPage() {
         color: 'bg-orange-500',
       },
     ],
-    [orders, addresses]
+    [orders, addresses, orderTotal]
   );
 
   const tabs = [
@@ -251,6 +280,19 @@ export function AccountPage() {
   const showActionError = (message: string) => {
     setActionSuccess('');
     setActionError(message);
+  };
+
+  const openPasswordForm = () => {
+    setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    setActionError('');
+    setActionSuccess('');
+    setIsPasswordFormOpen(true);
+  };
+
+  const closePasswordForm = () => {
+    if (isChangingPassword) return;
+    setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    setIsPasswordFormOpen(false);
   };
 
   const startCreateAddress = () => {
@@ -328,7 +370,7 @@ export function AccountPage() {
   const handleChangePassword = async (event: React.FormEvent) => {
     event.preventDefault();
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      showActionError('Mật khẩu xác nhận không khớp.');
+      toast.error('Mật khẩu xác nhận không khớp.');
       return;
     }
 
@@ -341,9 +383,10 @@ export function AccountPage() {
       if (result?.accessToken) localStorage.setItem('accessToken', result.accessToken);
       if (result?.refreshToken) localStorage.setItem('refreshToken', result.refreshToken);
       setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
-      showActionSuccess('Đã đổi mật khẩu thành công.');
+      setIsPasswordFormOpen(false);
+      toast.success('Đã đổi mật khẩu thành công.');
     } catch (error: any) {
-      showActionError(error?.response?.data?.message || 'Không thể đổi mật khẩu.');
+      toast.error(error?.response?.data?.message || 'Không thể đổi mật khẩu.');
     } finally {
       setIsChangingPassword(false);
     }
@@ -397,7 +440,7 @@ export function AccountPage() {
                     {profile?.role || 'MEMBER'}
                   </div>
                 </div>
-                <form onSubmit={handleChangePassword} className="bg-white rounded-2xl shadow-lg p-8">
+                <form onSubmit={handleChangePassword} className="hidden">
                   <h2 className="text-2xl font-bold text-gray-900 mb-6">Đổi mật khẩu</h2>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div>
@@ -464,7 +507,10 @@ export function AccountPage() {
             </div>
 
             <button
-              onClick={logout}
+              onClick={async () => {
+                await logout();
+                navigate('/');
+              }}
               className="w-full bg-white rounded-2xl shadow-lg p-4 flex items-center gap-3 text-red-600 hover:bg-red-50 transition-colors"
             >
               <LogOut className="w-5 h-5" />
@@ -616,6 +662,29 @@ export function AccountPage() {
                     </div>
                   </div>
                 </div>
+                <div className="mt-6 rounded-xl border border-orange-100 bg-orange-50/60 p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className="rounded-xl bg-orange-100 p-3 text-orange-600">
+                        <KeyRound className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900">Đổi mật khẩu</h3>
+                        <p className="mt-1 text-sm text-gray-600">
+                          Cập nhật mật khẩu đăng nhập để bảo vệ tài khoản của bạn.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={openPasswordForm}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-5 py-3 font-semibold text-white transition-colors hover:bg-orange-600"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      Đổi mật khẩu
+                    </button>
+                  </div>
+                </div>
                 <form onSubmit={handleChangePassword} className="hidden">
                   <h2 className="text-2xl font-bold text-gray-900 mb-6">Đổi mật khẩu</h2>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -664,7 +733,23 @@ export function AccountPage() {
 
             {activeTab === 'orders' && (
               <div className="bg-white rounded-2xl shadow-lg p-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Đơn hàng của tôi</h2>
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Đơn hàng của tôi</h2>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Hiển thị {orders.length.toLocaleString('vi-VN')} / {orderTotal.toLocaleString('vi-VN')} đơn hàng mới nhất
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void loadOrders(true)}
+                    disabled={isOrdersLoading}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-orange-200 px-4 py-2 font-medium text-orange-600 transition-colors hover:bg-orange-50 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isOrdersLoading ? 'animate-spin' : ''}`} />
+                    Cập nhật
+                  </button>
+                </div>
                 <div className="space-y-4">
                   {orders.length === 0 ? (
                     <div className="text-gray-500">Bạn chưa có đơn hàng nào.</div>
@@ -672,6 +757,7 @@ export function AccountPage() {
                     orders.map((order) => {
                       const status = getStatusConfig(order.status);
                       const firstItem = order.items[0];
+                      const displayOrderCode = getDisplayOrderCode(order);
                       return (
                         <div key={order.id} className="border-2 border-gray-200 rounded-xl p-6 hover:border-orange-300 transition-colors">
                           <div className="flex items-center justify-between mb-4">
@@ -682,7 +768,7 @@ export function AccountPage() {
                                 ) : null}
                               </div>
                               <div>
-                                <div className="font-bold text-gray-900 mb-1">Đơn hàng {formatOrderCode(order.id)}</div>
+                                <div className="font-bold text-gray-900 mb-1">Đơn hàng {displayOrderCode}</div>
                                 <div className="text-sm text-gray-600 mb-2">
                                   {order.items.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm • {new Date(order.createdAt).toLocaleDateString('vi-VN')}
                                 </div>
@@ -698,7 +784,7 @@ export function AccountPage() {
                                 {formatCurrency(Number(order.totalAmount))}
                               </div>
                               <button
-                                onClick={() => navigate('/track-order', { state: { orderId: order.id } })}
+                                onClick={() => navigate('/track-order', { state: { orderCode: order.orderCode || order.id } })}
                                 className="flex items-center gap-2 text-orange-600 hover:text-orange-700 font-medium"
                               >
                                 Xem chi tiết
@@ -872,7 +958,7 @@ export function AccountPage() {
                     })}
                   </div>
                 </div>
-                <form onSubmit={handleChangePassword} className="bg-white rounded-2xl shadow-lg p-8">
+                <form onSubmit={handleChangePassword} className="hidden">
                   <h2 className="text-2xl font-bold text-gray-900 mb-6">Đổi mật khẩu</h2>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div>
@@ -920,6 +1006,88 @@ export function AccountPage() {
           </div>
         </div>
       </div>
+      {isPasswordFormOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+          <form
+            onSubmit={handleChangePassword}
+            className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+              <div className="flex items-start gap-4">
+                <div className="rounded-xl bg-orange-100 p-3 text-orange-600">
+                  <KeyRound className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Đổi mật khẩu</h3>
+                  <p className="mt-1 text-sm text-gray-600">Nhập mật khẩu hiện tại và mật khẩu mới.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closePasswordForm}
+                disabled={isChangingPassword}
+                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Mật khẩu hiện tại</label>
+                <input
+                  type="password"
+                  value={passwordForm.oldPassword}
+                  onChange={(event) => setPasswordForm((prev) => ({ ...prev, oldPassword: event.target.value }))}
+                  required
+                  autoFocus
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Mật khẩu mới</label>
+                <input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(event) => setPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }))}
+                  required
+                  minLength={6}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Xác nhận mật khẩu</label>
+                <input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(event) => setPasswordForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
+                  required
+                  minLength={6}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closePasswordForm}
+                disabled={isChangingPassword}
+                className="rounded-lg border border-gray-300 px-5 py-2.5 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={isChangingPassword}
+                className="rounded-lg bg-orange-500 px-5 py-2.5 font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+              >
+                {isChangingPassword ? 'Đang đổi mật khẩu...' : 'Lưu mật khẩu'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
       {confirmDialog && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">

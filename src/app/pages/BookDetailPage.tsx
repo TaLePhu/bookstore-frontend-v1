@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { getBookById, getRelatedBooks, type ApiBook } from '../services/book.service';
-import { formatCurrency, formatReleaseDate, getBookImage, toDisplayBook } from '../utils/book-display';
+import { formatCurrency, formatReleaseDate, getBookImage, isBookDeleted, toDisplayBook } from '../utils/book-display';
 
 interface ReviewCard {
   id: string;
@@ -76,7 +76,7 @@ export function BookDetailPage() {
         setMainImage(getBookImage(data));
 
         const related = await getRelatedBooks(data.id, 5);
-        setRelatedBooks(related);
+        setRelatedBooks(related.filter((item) => !isBookDeleted(item)));
       } catch (fetchError) {
         console.error('Fetch book detail error:', fetchError);
         setError('Không tải được thông tin sách.');
@@ -100,6 +100,8 @@ export function BookDetailPage() {
   if (!book || !displayBook) {
     return <div className="min-h-screen bg-gray-50 p-8 text-center text-red-600">{error || 'Không tìm thấy sách.'}</div>;
   }
+
+  const isOutOfStock = displayBook.isOutOfStock;
 
   const specs = [
     ['Danh mục', book.category?.name],
@@ -141,6 +143,11 @@ export function BookDetailPage() {
                 {displayBook.discount > 0 && (
                   <div className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-full font-bold text-lg">
                     -{displayBook.discount}%
+                  </div>
+                )}
+                {isOutOfStock && (
+                  <div className="absolute bottom-4 left-4 rounded-full bg-gray-900/85 px-4 py-2 text-sm font-bold text-white">
+                    Hết hàng
                   </div>
                 )}
               </div>
@@ -239,41 +246,50 @@ export function BookDetailPage() {
                   <span className="text-gray-700 font-medium">Số lượng:</span>
                   <div className="flex items-center gap-3">
                     <button
+                      disabled={isOutOfStock}
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-all"
+                      className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-all disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Minus className="w-4 h-4" />
                     </button>
                     <span className="w-12 text-center font-bold text-lg">{quantity}</span>
                     <button
+                      disabled={isOutOfStock}
                       onClick={() => setQuantity(Math.min(maxQuantity, quantity + 1))}
-                      className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-all"
+                      className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center hover:border-orange-500 hover:bg-orange-50 transition-all disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                  <span className="text-sm text-gray-600">{Number(book.stock) || 0} sản phẩm có sẵn</span>
+                  <span className={`text-sm ${isOutOfStock ? 'font-semibold text-red-600' : 'text-gray-600'}`}>
+                    {isOutOfStock ? 'Hết hàng' : `${Number(book.stock) || 0} sản phẩm có sẵn`}
+                  </span>
                 </div>
 
                 <div className="flex flex-col gap-4 sm:flex-row">
                   <button
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2"
-                    onClick={() =>
+                    disabled={isOutOfStock}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+                    onClick={() => {
+                      if (isOutOfStock) return;
                       addToCart({
                         id: book.id,
                         title: book.title,
                         author: book.author,
                         price: formatCurrency(displayBook.price),
                         image: displayBook.image,
-                      })
-                    }
+                      });
+                    }}
                   >
                     <ShoppingCart className="w-6 h-6" />
                     Thêm vào giỏ hàng
                   </button>
                   <button
-                    className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1"
-                    onClick={() => navigate('/checkout')}
+                    disabled={isOutOfStock}
+                    className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+                    onClick={() => {
+                      if (!isOutOfStock) navigate('/checkout');
+                    }}
                   >
                     Mua ngay
                   </button>

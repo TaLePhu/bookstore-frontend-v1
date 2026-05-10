@@ -17,7 +17,7 @@ import {
 import { useCart } from '../context/CartContext';
 import { getCategories } from '../services/category.service';
 import { getBestSellerBooks } from '../services/book.service';
-import { formatCurrency, toDisplayBook, type DisplayBook } from '../utils/book-display';
+import { formatCurrency, toVisibleDisplayBooks, type DisplayBook } from '../utils/book-display';
 import { type ApiCategory } from '../utils/category-display';
 
 export function BestSellersPage() {
@@ -41,7 +41,7 @@ export function BestSellersPage() {
           getBestSellerBooks(),
           getCategories(),
         ]);
-        setBooks(bookData.map((book, index) => toDisplayBook(book, index)));
+        setBooks(toVisibleDisplayBooks(bookData));
         setCategories(categoryData);
       } catch (error) {
         console.error('Fetch bestseller page data error:', error);
@@ -362,6 +362,11 @@ export function BestSellersPage() {
                             -{book.discount}%
                           </div>
                         )}
+                        {book.isOutOfStock && (
+                          <div className="absolute bottom-3 left-3 rounded-full bg-gray-900/85 px-3 py-1 text-xs font-bold text-white">
+                            Hết hàng
+                          </div>
+                        )}
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <button
                             onClick={() => navigate(`/book/${book.id}`)}
@@ -395,6 +400,7 @@ export function BestSellersPage() {
                           Đã bán {book.sold.toLocaleString()}
                         </div>
                         <button
+                          disabled={book.isOutOfStock}
                           onClick={() =>
                             addToCart({
                               id: book.id,
@@ -404,10 +410,10 @@ export function BestSellersPage() {
                               image: book.image,
                             })
                           }
-                          className="w-full bg-orange-500 text-white py-2.5 rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
+                          className="w-full bg-orange-500 text-white py-2.5 rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:hover:bg-gray-300"
                         >
                           <ShoppingCart className="w-4 h-4" />
-                          Thêm vào giỏ
+                          {book.isOutOfStock ? 'Hết hàng' : 'Thêm vào giỏ'}
                         </button>
                       </div>
                     </div>
@@ -422,6 +428,11 @@ export function BestSellersPage() {
                         {book.discount > 0 && (
                           <div className="absolute top-2 right-2 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold">
                             -{book.discount}%
+                          </div>
+                        )}
+                        {book.isOutOfStock && (
+                          <div className="absolute bottom-2 left-2 rounded-full bg-gray-900/85 px-2 py-1 text-xs font-bold text-white">
+                            Hết hàng
                           </div>
                         )}
                       </div>
@@ -452,6 +463,7 @@ export function BestSellersPage() {
                         </div>
                         <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center">
                           <button
+                            disabled={book.isOutOfStock}
                             onClick={() =>
                               addToCart({
                                 id: book.id,
@@ -461,10 +473,10 @@ export function BestSellersPage() {
                                 image: book.image,
                               })
                             }
-                            className="flex-1 bg-orange-500 text-white py-2.5 rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
+                            className="flex-1 bg-orange-500 text-white py-2.5 rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:hover:bg-gray-300"
                           >
                             <ShoppingCart className="w-4 h-4" />
-                            Thêm vào giỏ
+                            {book.isOutOfStock ? 'Hết hàng' : 'Thêm vào giỏ'}
                           </button>
                           <button
                             onClick={() => navigate(`/book/${book.id}`)}

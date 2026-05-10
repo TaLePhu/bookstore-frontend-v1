@@ -19,7 +19,7 @@ import { getLatestBooks } from '../services/book.service';
 import {
   formatCurrency,
   formatReleaseDate,
-  toDisplayBook,
+  toVisibleDisplayBooks,
   type DisplayBook,
 } from '../utils/book-display';
 import { type ApiCategory } from '../utils/category-display';
@@ -45,7 +45,7 @@ export function NewBooksPage() {
           getLatestBooks(),
           getCategories(),
         ]);
-        setBooks(bookData.map((book, index) => toDisplayBook(book, index)));
+        setBooks(toVisibleDisplayBooks(bookData));
         setCategories(categoryData);
       } catch (error) {
         console.error('Fetch new books page data error:', error);
@@ -304,6 +304,11 @@ export function NewBooksPage() {
                           -{book.discount}%
                         </div>
                       )}
+                      {book.isOutOfStock && (
+                        <div className="absolute bottom-2 left-2 rounded-md bg-gray-900/85 px-2 py-1 text-xs font-bold text-white">
+                          Hết hàng
+                        </div>
+                      )}
                       <button className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <div className="bg-white/90 backdrop-blur-sm rounded-full p-3 hover:bg-white">
                           <Eye className="w-6 h-6 text-gray-800" onClick={() => navigate(`/book/${book.id}`)} />
@@ -330,6 +335,7 @@ export function NewBooksPage() {
                       </div>
                       <div className="flex gap-2">
                         <button
+                          disabled={book.isOutOfStock}
                           onClick={() =>
                             addToCart({
                               id: book.id,
@@ -339,10 +345,10 @@ export function NewBooksPage() {
                               image: book.image,
                             })
                           }
-                          className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+                          className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:hover:bg-gray-300"
                         >
                           <ShoppingCart className="w-4 h-4" />
-                          <span className="text-sm font-medium">Thêm vào giỏ</span>
+                          <span className="text-sm font-medium">{book.isOutOfStock ? 'Hết hàng' : 'Thêm vào giỏ'}</span>
                         </button>
                         <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                           <Heart className="w-5 h-5 text-gray-600" />
@@ -364,6 +370,11 @@ export function NewBooksPage() {
                   {book.discount > 0 && (
                     <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs font-bold">
                       -{book.discount}%
+                    </div>
+                  )}
+                  {book.isOutOfStock && (
+                    <div className="absolute bottom-2 left-2 rounded bg-gray-900/85 px-2 py-1 text-xs font-bold text-white">
+                      Hết hàng
                     </div>
                   )}
                 </div>
@@ -390,6 +401,7 @@ export function NewBooksPage() {
                         Xem chi tiết
                       </button>
                       <button
+                        disabled={book.isOutOfStock}
                         onClick={() =>
                           addToCart({
                             id: book.id,
@@ -399,10 +411,10 @@ export function NewBooksPage() {
                             image: book.image,
                           })
                         }
-                        className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                        className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:hover:bg-gray-300"
                       >
                         <ShoppingCart className="w-4 h-4" />
-                        Thêm vào giỏ
+                        {book.isOutOfStock ? 'Hết hàng' : 'Thêm vào giỏ'}
                       </button>
                     </div>
                   </div>

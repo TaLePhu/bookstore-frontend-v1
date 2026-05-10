@@ -9,6 +9,7 @@ import {
   DollarSign,
   Edit,
   Eye,
+  FolderTree,
   LayoutDashboard,
   LogOut,
   Package,
@@ -17,6 +18,7 @@ import {
   Search,
   Settings,
   ShoppingCart,
+  Store,
   Trash2,
   Users,
   X,
@@ -39,7 +41,9 @@ import {
 import { useAuth } from '../context/AuthContext';
 import {
   createAdminBook,
+  createAdminCategory,
   deleteAdminBook,
+  deleteAdminCategory,
   getAdminBooks,
   getAdminBookDetail,
   getAdminCategories,
@@ -48,11 +52,15 @@ import {
   getAdminOrderDetail,
   getAdminOrders,
   hardDeleteAdminBook,
+  hardDeleteAdminCategory,
   restoreAdminBook,
+  restoreAdminCategory,
+  updateAdminCategory,
   updateAdminBook,
   updateAdminOrderStatus,
   type AdminBookPayload,
   type AdminCategory,
+  type AdminCategoryPayload,
   type AdminDashboardResponse,
   type AdminOrder,
   type AdminOrderDetail,
@@ -62,9 +70,12 @@ import {
 import type { ApiBook } from '../services/book.service';
 import { getBookImage } from '../utils/book-display';
 
-type AdminView = 'dashboard' | 'books' | 'orders' | 'customers' | 'settings';
+type AdminView = 'dashboard' | 'books' | 'categories' | 'orders' | 'customers' | 'settings';
 type ExistingBookImage = { id?: string; url: string; isPrimary?: boolean };
 type BookVisibilityFilter = 'active' | 'deleted' | 'all';
+type BookStockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
+type CategoryVisibilityFilter = 'active' | 'deleted' | 'all';
+type CategoryBookFilter = 'all' | 'with_books' | 'empty';
 type PopupMessage = { type: 'success' | 'error'; text: string } | null;
 type ConfirmDialog = {
   title: string;
@@ -119,6 +130,40 @@ const getNextStatuses = (status: AdminOrderStatus): AdminOrderStatus[] => {
   return transitions[status] || [];
 };
 
+const getBookStatusMeta = (book: ApiBook) => {
+  const stock = Number(book.stock || 0);
+
+  if (book.deletedAt || book.status === 'deleted') {
+    return {
+      label: 'Đã xóa mềm',
+      dot: 'bg-gray-400',
+      className: 'bg-gray-100 text-gray-700 ring-gray-200',
+    };
+  }
+
+  if (stock <= 0) {
+    return {
+      label: 'Hết hàng',
+      dot: 'bg-red-500',
+      className: 'bg-red-50 text-red-700 ring-red-100',
+    };
+  }
+
+  if (stock <= LOW_STOCK_THRESHOLD) {
+    return {
+      label: 'Sắp hết hàng',
+      dot: 'bg-amber-500',
+      className: 'bg-amber-50 text-amber-700 ring-amber-100',
+    };
+  }
+
+  return {
+    label: 'Còn hàng',
+    dot: 'bg-emerald-500',
+    className: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+  };
+};
+
 export function AdminPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -126,6 +171,9 @@ export function AdminPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | AdminOrderStatus>('all');
   const [bookVisibilityFilter, setBookVisibilityFilter] = useState<BookVisibilityFilter>('active');
+  const [bookStockFilter, setBookStockFilter] = useState<BookStockFilter>('all');
+  const [categoryVisibilityFilter, setCategoryVisibilityFilter] = useState<CategoryVisibilityFilter>('active');
+  const [categoryBookFilter, setCategoryBookFilter] = useState<CategoryBookFilter>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [popupMessage, setPopupMessage] = useState<PopupMessage>(null);
@@ -139,6 +187,12 @@ export function AdminPage() {
   const [selectedOrder, setSelectedOrder] = useState<AdminOrderDetail | null>(null);
   const [selectedBook, setSelectedBook] = useState<ApiBook | null>(null);
   const [bookModalMode, setBookModalMode] = useState<'create' | 'edit' | 'detail' | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<AdminCategory | null>(null);
+  const [categoryModalMode, setCategoryModalMode] = useState<'create' | 'edit' | null>(null);
+  const [categoryForm, setCategoryForm] = useState<AdminCategoryPayload>({
+    name: '',
+    description: '',
+  });
   const [bookForm, setBookForm] = useState<AdminBookPayload>({
     title: '',
     author: '',
@@ -155,12 +209,15 @@ export function AdminPage() {
     releaseDate: '',
   });
   const [savingBook, setSavingBook] = useState(false);
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
   const [deletingBookId, setDeletingBookId] = useState<string | null>(null);
   const [deletedImageIds, setDeletedImageIds] = useState<string[]>([]);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const menuItems = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'categories' as const, label: 'Danh mục', icon: FolderTree },
     { id: 'books' as const, label: 'Quản lý sách', icon: BookOpen },
     { id: 'orders' as const, label: 'Đơn hàng', icon: ShoppingCart },
     { id: 'customers' as const, label: 'Khách hàng', icon: Users },
@@ -178,7 +235,7 @@ export function AdminPage() {
           includeDeleted: bookVisibilityFilter === 'all' || bookVisibilityFilter === 'deleted',
           onlyDeleted: bookVisibilityFilter === 'deleted',
         }),
-        getAdminCategories(),
+        getAdminCategories({ includeDeleted: true }),
         getAdminOrders({
           limit: 50,
           status: statusFilter === 'all' ? undefined : statusFilter,
@@ -205,11 +262,22 @@ export function AdminPage() {
 
   const filteredBooks = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
-    if (currentView !== 'books' || !keyword) return books;
-    return books.filter((book) =>
+    let result = [...books];
+
+    if (bookStockFilter !== 'all') {
+      result = result.filter((book) => {
+        const stock = Number(book.stock || 0);
+        if (bookStockFilter === 'out_of_stock') return stock <= 0;
+        if (bookStockFilter === 'low_stock') return stock > 0 && stock <= LOW_STOCK_THRESHOLD;
+        return stock > LOW_STOCK_THRESHOLD;
+      });
+    }
+
+    if (currentView !== 'books' || !keyword) return result;
+    return result.filter((book) =>
       [book.title, book.author, book.category?.name].filter(Boolean).join(' ').toLowerCase().includes(keyword)
     );
-  }, [books, currentView, searchQuery]);
+  }, [books, bookStockFilter, currentView, searchQuery]);
 
   const filteredOrders = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -231,7 +299,38 @@ export function AdminPage() {
     );
   }, [customers, currentView, searchQuery]);
 
+  const filteredCategories = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+    let result = categories.filter((category) => {
+      const deleted = Boolean(category.deletedAt);
+      if (categoryVisibilityFilter === 'deleted') return deleted;
+      if (categoryVisibilityFilter === 'active') return !deleted;
+      return true;
+    });
+
+    if (categoryBookFilter !== 'all') {
+      result = result.filter((category) => {
+        const bookCount = books.filter((book) =>
+          !Boolean(book.deletedAt || book.status === 'deleted') &&
+          (book.categoryId === category.id || book.category?.id === category.id)
+        ).length;
+
+        return categoryBookFilter === 'with_books' ? bookCount > 0 : bookCount === 0;
+      });
+    }
+
+    if (currentView !== 'categories' || !keyword) return result;
+    return result.filter((category) =>
+      [category.name, category.description].filter(Boolean).join(' ').toLowerCase().includes(keyword)
+    );
+  }, [books, categories, categoryBookFilter, categoryVisibilityFilter, currentView, searchQuery]);
+
+  const getCategoryBookCount = (categoryId: string) =>
+    books.filter((book) => !isBookDeleted(book) && (book.categoryId === categoryId || book.category?.id === categoryId)).length;
+
   const isBookDeleted = (book: ApiBook) => Boolean(book.deletedAt || book.status === 'deleted');
+  const isCategoryDeleted = (category: AdminCategory) => Boolean(category.deletedAt);
+  const activeCategories = categories.filter((category) => !isCategoryDeleted(category));
   const outOfStockBooks = books.filter((book) => !isBookDeleted(book) && Number(book.stock || 0) <= 0);
   const lowStockBooks = books.filter((book) => {
     const stock = Number(book.stock || 0);
@@ -298,7 +397,7 @@ export function AdminPage() {
     setBookForm({
       title: '',
       author: '',
-      categoryId: categories[0]?.id || '',
+      categoryId: activeCategories[0]?.id || '',
       price: '',
       originalPrice: '',
       stock: '',
@@ -375,6 +474,133 @@ export function AdminPage() {
     } finally {
       setSavingBook(false);
     }
+  };
+
+  const resetCategoryForm = () => {
+    setSelectedCategory(null);
+    setCategoryForm({ name: '', description: '' });
+  };
+
+  const openCreateCategory = () => {
+    resetCategoryForm();
+    setCategoryModalMode('create');
+  };
+
+  const openEditCategory = (category: AdminCategory) => {
+    setSelectedCategory(category);
+    setCategoryForm({
+      name: category.name || '',
+      description: category.description || '',
+    });
+    setCategoryModalMode('edit');
+  };
+
+  const handleCategoryInput = (field: keyof AdminCategoryPayload, value: string) => {
+    setCategoryForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveCategory = async () => {
+    const payload = {
+      name: categoryForm.name.trim(),
+      description: categoryForm.description.trim(),
+    };
+
+    if (!payload.name || !payload.description) {
+      showPopup({ type: 'error', text: 'Vui lòng nhập đầy đủ tên và mô tả danh mục.' });
+      return;
+    }
+
+    try {
+      setSavingCategory(true);
+      const isEditing = categoryModalMode === 'edit' && Boolean(selectedCategory);
+      if (isEditing && selectedCategory) {
+        await updateAdminCategory(selectedCategory.id, payload);
+      } else {
+        await createAdminCategory(payload);
+      }
+      setCategoryModalMode(null);
+      resetCategoryForm();
+      await loadData();
+      showPopup({
+        type: 'success',
+        text: isEditing ? 'Đã cập nhật danh mục thành công.' : 'Đã thêm danh mục mới thành công.',
+      });
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Không thể lưu danh mục';
+      setError(message);
+      showPopup({ type: 'error', text: message });
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const handleSoftDeleteCategory = async (category: AdminCategory) => {
+    const count = getCategoryBookCount(category.id);
+    setConfirmDialog({
+      title: 'Xóa mềm danh mục',
+      message:
+        count > 0
+          ? `Xóa mềm danh mục "${category.name}"? Danh mục sẽ bị ẩn khỏi trang bán hàng, nhưng ${count} sách hiện có vẫn còn trong hệ thống.`
+          : `Xóa mềm danh mục "${category.name}"? Có thể khôi phục lại sau.`,
+      confirmLabel: 'Xóa mềm',
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          setDeletingCategoryId(category.id);
+          await deleteAdminCategory(category.id);
+          await loadData();
+          showPopup({ type: 'success', text: `Đã xóa mềm danh mục "${category.name}".` });
+        } catch (err: any) {
+          const message = err?.response?.data?.message || 'Không thể xóa mềm danh mục.';
+          setError(message);
+          showPopup({ type: 'error', text: message });
+        } finally {
+          setDeletingCategoryId(null);
+        }
+      },
+    });
+  };
+
+  const handleRestoreCategory = async (category: AdminCategory) => {
+    try {
+      setDeletingCategoryId(category.id);
+      await restoreAdminCategory(category.id);
+      await loadData();
+      showPopup({ type: 'success', text: `Đã khôi phục danh mục "${category.name}".` });
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Không thể khôi phục danh mục.';
+      setError(message);
+      showPopup({ type: 'error', text: message });
+    } finally {
+      setDeletingCategoryId(null);
+    }
+  };
+
+  const handleHardDeleteCategory = async (category: AdminCategory) => {
+    const count = getCategoryBookCount(category.id);
+    setConfirmDialog({
+      title: 'Xóa cứng danh mục',
+      message:
+        count > 0
+          ? `Danh mục "${category.name}" đang có ${count} sách. Xóa cứng có thể thất bại nếu chưa chuyển sách sang danh mục khác.`
+          : `Xóa cứng danh mục "${category.name}"? Thao tác này không thể hoàn tác.`,
+      confirmLabel: 'Xóa cứng',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          setDeletingCategoryId(category.id);
+          await hardDeleteAdminCategory(category.id);
+          await loadData();
+          showPopup({ type: 'success', text: `Đã xóa cứng danh mục "${category.name}".` });
+        } catch (err: any) {
+          const message = err?.response?.data?.message || 'Không thể xóa cứng danh mục. Hãy chuyển sách sang danh mục khác trước.';
+          setError(message);
+          showPopup({ type: 'error', text: message });
+        } finally {
+          setDeletingCategoryId(null);
+        }
+      },
+    });
   };
 
   const handleSoftDeleteBook = async (book: ApiBook) => {
@@ -524,6 +750,13 @@ export function AdminPage() {
         </nav>
 
         <div className="p-4 border-t border-gray-200">
+          <button
+            onClick={() => navigate('/')}
+            className="mb-3 w-full flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors"
+          >
+            <Store className="w-4 h-4" />
+            <span className="text-sm">Web bán hàng</span>
+          </button>
           <div className="flex items-center gap-3 mb-3">
             <img
               src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || user?.userName || 'Admin')}&background=F97316&color=fff`}
@@ -787,6 +1020,16 @@ export function AdminPage() {
                   <option value="deleted">Sách đã xóa mềm</option>
                   <option value="all">Tất cả sách</option>
                 </select>
+                <select
+                  value={bookStockFilter}
+                  onChange={(event) => setBookStockFilter(event.target.value as BookStockFilter)}
+                  className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="all">Tất cả tồn kho</option>
+                  <option value="in_stock">Còn hàng</option>
+                  <option value="low_stock">Sắp hết hàng</option>
+                  <option value="out_of_stock">Hết hàng</option>
+                </select>
                 <button
                   onClick={openCreateBook}
                   className="px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
@@ -796,9 +1039,29 @@ export function AdminPage() {
                 </button>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="flex flex-col gap-3 border-b border-gray-100 bg-white px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Danh sách sách</h3>
+                    <p className="text-sm text-gray-500">
+                      {filteredBooks.length.toLocaleString('vi-VN')} mục phù hợp với bộ lọc hiện tại
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs font-medium">
+                    <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">
+                      Còn hàng: {books.filter((book) => !isBookDeleted(book) && Number(book.stock || 0) > LOW_STOCK_THRESHOLD).length}
+                    </span>
+                    <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700">
+                      Sắp hết: {lowStockBooks.length}
+                    </span>
+                    <span className="rounded-full bg-red-50 px-3 py-1.5 text-red-700">
+                      Hết hàng: {outOfStockBooks.length}
+                    </span>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[1100px]">
+                  <thead className="bg-slate-50/80">
                     <tr>
                       <TableHead>Sách</TableHead>
                       <TableHead>Danh mục</TableHead>
@@ -809,18 +1072,47 @@ export function AdminPage() {
                       <TableHead align="right">Thao tác</TableHead>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredBooks.map((book) => (
-                      <tr key={book.id} className={`hover:bg-gray-50 ${isBookDeleted(book) ? 'bg-gray-50 opacity-75' : ''}`}>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredBooks.map((book) => {
+                      const statusMeta = getBookStatusMeta(book);
+                      const stock = Number(book.stock || 0);
+
+                      return (
+                      <tr key={book.id} title={statusMeta.label} className={`transition-colors hover:bg-orange-50/30 ${isBookDeleted(book) ? 'bg-gray-50/80' : 'bg-white'}`}>
                         <TableCell>
-                          <p className="font-medium text-gray-800">{book.title}</p>
-                          <p className="text-sm text-gray-500">{book.author}</p>
+                          <div className="flex min-w-0 items-center gap-4">
+                            <div className="h-20 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100 shadow-sm ring-1 ring-gray-200">
+                              <img
+                                src={getBookImage(book)}
+                                alt={book.title}
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="line-clamp-2 text-sm font-semibold leading-6 text-gray-950">{book.title}</p>
+                              <p className="mt-1 text-sm text-gray-500">{book.author}</p>
+                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
+                                {book.isbn && (
+                                  <span className="rounded-full bg-gray-100 px-2 py-1">ISBN {book.isbn}</span>
+                                )}
+                                {book.publisher && (
+                                  <span className="rounded-full bg-gray-100 px-2 py-1">{book.publisher}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </TableCell>
                         <TableCell>{book.category?.name || 'Chưa phân loại'}</TableCell>
-                        <TableCell>{formatCurrency(book.price)}</TableCell>
-                        <TableCell>{Number(book.stock || 0)}</TableCell>
-                        <TableCell>{Number(book.soldCount || 0)}</TableCell>
                         <TableCell>
+                          <span className="font-semibold text-gray-900">{formatCurrency(book.price)}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`font-semibold ${stock <= 0 ? 'text-red-600' : stock <= LOW_STOCK_THRESHOLD ? 'text-amber-600' : 'text-gray-900'}`}>
+                            {stock.toLocaleString('vi-VN')}
+                          </span>
+                        </TableCell>
+                        <TableCell>{Number(book.soldCount || 0).toLocaleString('vi-VN')}</TableCell>
+                        <TableCell className="whitespace-nowrap">
                           {isBookDeleted(book) ? (
                             <span className="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700">Đã xóa mềm</span>
                           ) : Number(book.stock || 0) > 0 && Number(book.stock || 0) <= LOW_STOCK_THRESHOLD ? (
@@ -832,10 +1124,10 @@ export function AdminPage() {
                           )}
                         </TableCell>
                         <TableCell align="right">
-                          <div className="flex justify-end gap-1">
+                          <div className="flex justify-end gap-2">
                             <button
                               onClick={() => openBookDetail(book, 'detail')}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-100 transition-colors hover:bg-blue-100"
                               title="Xem chi tiết"
                             >
                               <Eye className="w-4 h-4" />
@@ -843,7 +1135,7 @@ export function AdminPage() {
                             <button
                               onClick={() => openBookDetail(book, 'edit')}
                               disabled={isBookDeleted(book)}
-                              className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-orange-600 ring-1 ring-orange-100 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
                               title="Chỉnh sửa"
                             >
                               <Edit className="w-4 h-4" />
@@ -851,7 +1143,7 @@ export function AdminPage() {
                             <button
                               onClick={() => handleSoftDeleteBook(book)}
                               disabled={deletingBookId === book.id || isBookDeleted(book)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600 ring-1 ring-red-100 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
                               title="Xóa mềm: ẩn sách khỏi trang bán hàng"
                             >
                               <ArchiveX className="w-4 h-4" />
@@ -860,7 +1152,7 @@ export function AdminPage() {
                               <button
                                 onClick={() => handleRestoreDeletedBook(book)}
                                 disabled={deletingBookId === book.id}
-                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600 ring-1 ring-green-100 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40"
                                 title="Khôi phục sách đã xóa mềm"
                               >
                                 <RefreshCcw className="w-4 h-4" />
@@ -869,7 +1161,7 @@ export function AdminPage() {
                             <button
                               onClick={() => handlePermanentDeleteBook(book)}
                               disabled={deletingBookId === book.id}
-                              className="p-2 text-red-800 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-700 ring-1 ring-rose-100 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
                               title="Xóa cứng vĩnh viễn"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -877,10 +1169,168 @@ export function AdminPage() {
                           </div>
                         </TableCell>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
+                </div>
                 {filteredBooks.length === 0 && <EmptyState text="Không có sách phù hợp." />}
+              </div>
+            </div>
+          )}
+
+          {currentView === 'categories' && (
+            <div className="space-y-6">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm danh mục theo tên hoặc mô tả..." />
+                <select
+                  value={categoryVisibilityFilter}
+                  onChange={(event) => setCategoryVisibilityFilter(event.target.value as CategoryVisibilityFilter)}
+                  className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="active">Danh mục đang dùng</option>
+                  <option value="deleted">Danh mục đã xóa mềm</option>
+                  <option value="all">Tất cả danh mục</option>
+                </select>
+                <select
+                  value={categoryBookFilter}
+                  onChange={(event) => setCategoryBookFilter(event.target.value as CategoryBookFilter)}
+                  className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="all">Tất cả số sách</option>
+                  <option value="with_books">Có sách</option>
+                  <option value="empty">Không có sách</option>
+                </select>
+                <button
+                  onClick={openCreateCategory}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-3 font-medium text-white transition-colors hover:bg-orange-600"
+                >
+                  <Plus className="h-5 w-5" />
+                  Thêm danh mục
+                </button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Tổng danh mục</p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900">{activeCategories.length}</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Đang có sách</p>
+                  <p className="mt-2 text-3xl font-bold text-emerald-600">
+                    {activeCategories.filter((category) => getCategoryBookCount(category.id) > 0).length}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Chưa có sách</p>
+                  <p className="mt-2 text-3xl font-bold text-amber-600">
+                    {activeCategories.filter((category) => getCategoryBookCount(category.id) === 0).length}
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-100 px-5 py-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Danh sách danh mục</h3>
+                  <p className="text-sm text-gray-500">
+                    {filteredCategories.length.toLocaleString('vi-VN')} danh mục phù hợp với bộ lọc hiện tại
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[800px]">
+                    <thead className="bg-slate-50/80">
+                      <tr>
+                        <TableHead>Danh mục</TableHead>
+                        <TableHead>Mô tả</TableHead>
+                        <TableHead>Số sách</TableHead>
+                        <TableHead>Ngày tạo</TableHead>
+                        <TableHead align="right">Thao tác</TableHead>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredCategories.map((category) => {
+                        const bookCount = getCategoryBookCount(category.id);
+                        const deleted = isCategoryDeleted(category);
+                        return (
+                          <tr key={category.id} className={`transition-colors hover:bg-orange-50/30 ${deleted ? 'bg-gray-50/80 opacity-80' : 'bg-white'}`}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
+                                  <FolderTree className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-gray-950">{category.name}</p>
+                                  <div className="mt-1 flex items-center gap-2">
+                                    <p className="text-xs text-gray-500">{category.id.slice(0, 8)}</p>
+                                    {deleted && (
+                                      <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                                        Đã xóa mềm
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <p className="max-w-xl line-clamp-2 text-gray-600">
+                                {category.description || 'Chưa có mô tả'}
+                              </p>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${
+                                bookCount > 0
+                                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-100'
+                                  : 'bg-gray-100 text-gray-600 ring-gray-200'
+                              }`}>
+                                {bookCount.toLocaleString('vi-VN')} sách
+                              </span>
+                            </TableCell>
+                            <TableCell>{formatDate(category.createdAt)}</TableCell>
+                            <TableCell align="right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => openEditCategory(category)}
+                                  disabled={deleted}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-orange-600 ring-1 ring-orange-100 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                  title="Chỉnh sửa danh mục"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleSoftDeleteCategory(category)}
+                                  disabled={deletingCategoryId === category.id || deleted}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600 ring-1 ring-red-100 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                  title="Xóa mềm danh mục"
+                                >
+                                  <ArchiveX className="h-4 w-4" />
+                                </button>
+                                {deleted && (
+                                  <button
+                                    onClick={() => handleRestoreCategory(category)}
+                                    disabled={deletingCategoryId === category.id}
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600 ring-1 ring-green-100 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                    title="Khôi phục danh mục"
+                                  >
+                                    <RefreshCcw className="h-4 w-4" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleHardDeleteCategory(category)}
+                                  disabled={deletingCategoryId === category.id}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-700 ring-1 ring-rose-100 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                  title="Xóa cứng danh mục"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </TableCell>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {filteredCategories.length === 0 && <EmptyState text="Không có danh mục phù hợp." />}
               </div>
             </div>
           )}
@@ -1007,6 +1457,77 @@ export function AdminPage() {
         </div>
       </main>
 
+      {categoryModalMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {categoryModalMode === 'create' ? 'Thêm danh mục' : 'Chỉnh sửa danh mục'}
+                </h3>
+                <p className="text-sm text-gray-500">Quản lý nhóm sách hiển thị trên website.</p>
+              </div>
+              <button
+                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                onClick={() => {
+                  setCategoryModalMode(null);
+                  resetCategoryForm();
+                }}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 px-6 py-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Tên danh mục <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={categoryForm.name}
+                  onChange={(event) => handleCategoryInput('name', event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:ring-2 focus:ring-orange-500"
+                  placeholder="Ví dụ: Kỹ năng sống"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Mô tả <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  value={categoryForm.description}
+                  onChange={(event) => handleCategoryInput('description', event.target.value)}
+                  className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:ring-2 focus:ring-orange-500"
+                  placeholder="Mô tả ngắn giúp khách hàng hiểu nhóm sách này"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setCategoryModalMode(null);
+                  resetCategoryForm();
+                }}
+                className="rounded-lg border border-gray-300 px-5 py-2.5 font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCategory}
+                disabled={savingCategory}
+                className="rounded-lg bg-orange-500 px-5 py-2.5 font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingCategory ? 'Đang lưu...' : 'Lưu danh mục'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {bookModalMode && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1082,7 +1603,7 @@ export function AdminPage() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                     >
                       <option value="">Chọn danh mục</option>
-                      {categories.map((category) => (
+                      {activeCategories.map((category) => (
                         <option key={category.id} value={category.id}>
                           {category.name}
                         </option>
@@ -1398,16 +1919,32 @@ function BookImageGallery({
   );
 }
 
-function TableHead({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
+function TableHead({
+  children,
+  align = 'left',
+  className = '',
+}: {
+  children: React.ReactNode;
+  align?: 'left' | 'right';
+  className?: string;
+}) {
   return (
-    <th className={`px-6 py-3 text-sm font-medium text-gray-600 ${align === 'right' ? 'text-right' : 'text-left'}`}>
+    <th className={`px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 ${align === 'right' ? 'text-right' : 'text-left'} ${className}`}>
       {children}
     </th>
   );
 }
 
-function TableCell({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
-  return <td className={`px-6 py-4 text-gray-700 ${align === 'right' ? 'text-right' : 'text-left'}`}>{children}</td>;
+function TableCell({
+  children,
+  align = 'left',
+  className = '',
+}: {
+  children: React.ReactNode;
+  align?: 'left' | 'right';
+  className?: string;
+}) {
+  return <td className={`px-5 py-4 align-top text-sm text-gray-700 ${align === 'right' ? 'text-right' : 'text-left'} ${className}`}>{children}</td>;
 }
 
 function EmptyState({ text }: { text: string }) {

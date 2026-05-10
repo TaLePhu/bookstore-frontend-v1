@@ -72,6 +72,14 @@ export interface AdminCategory {
   id: string;
   name: string;
   description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
+}
+
+export interface AdminCategoryPayload {
+  name: string;
+  description: string;
 }
 
 export interface AdminBookPayload {
@@ -128,9 +136,42 @@ export const getAdminBookDetail = async (id: string): Promise<ApiBook> => {
   return res.data.data;
 };
 
-export const getAdminCategories = async (): Promise<AdminCategory[]> => {
-  const res = await api.get('/admin/categories');
+export const getAdminCategories = async (params?: {
+  includeDeleted?: boolean;
+  onlyDeleted?: boolean;
+}): Promise<AdminCategory[]> => {
+  const res = await api.get('/admin/categories', {
+    params: {
+      include_deleted: params?.includeDeleted ? 'true' : undefined,
+      only_deleted: params?.onlyDeleted ? 'true' : undefined,
+    },
+  });
   return res.data.data;
+};
+
+export const createAdminCategory = async (payload: AdminCategoryPayload): Promise<AdminCategory> => {
+  const res = await api.post('/admin/categories', payload);
+  return res.data.data;
+};
+
+export const updateAdminCategory = async (
+  id: string,
+  payload: AdminCategoryPayload
+): Promise<AdminCategory> => {
+  const res = await api.put(`/admin/categories/${id}`, payload);
+  return res.data.data;
+};
+
+export const deleteAdminCategory = async (id: string): Promise<void> => {
+  await api.delete(`/admin/categories/${id}`);
+};
+
+export const restoreAdminCategory = async (id: string): Promise<void> => {
+  await api.patch(`/admin/categories/${id}/restore`);
+};
+
+export const hardDeleteAdminCategory = async (id: string): Promise<void> => {
+  await api.delete(`/admin/categories/${id}/hard`);
 };
 
 const appendBookPayload = (formData: FormData, payload: AdminBookPayload) => {
