@@ -74,7 +74,7 @@ export function TrackOrderPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const initialState = location.state as { orderId?: string; orderCode?: string } | null;
+  const initialState = location.state as { orderId?: string; orderCode?: string; action?: 'cancel' | 'review' } | null;
 
   const [orderCode, setOrderCode] = useState(
     searchParams.get('orderCode') || searchParams.get('code') || initialState?.orderCode || initialState?.orderId || ''
@@ -89,6 +89,7 @@ export function TrackOrderPage() {
   const [reviewComment, setReviewComment] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewedBookIds, setReviewedBookIds] = useState<string[]>([]);
+  const [pendingAction, setPendingAction] = useState<'cancel' | 'review' | null>(initialState?.action || null);
 
   const trackingSteps = useMemo(
     () => [
@@ -106,7 +107,10 @@ export function TrackOrderPage() {
   const payment = selectedOrder?.payments?.[0];
   const displayOrderCode = selectedOrder?.orderCode || (selectedOrder?.id ? formatOrderCode(selectedOrder.id) : '');
   const subtotal = selectedOrder?.items.reduce((sum, item) => sum + Number(item.subTotal || 0), 0) || 0;
-  const canRequestCancel = selectedOrder ? ['PENDING', 'PROCESSING'].includes(selectedOrder.status) : false;
+  const hasCancelRequest = Boolean(
+    selectedOrder?.statusLogs?.some((log) => log.note?.startsWith('Khách yêu cầu hủy:') && log.fromStatus === log.toStatus)
+  );
+  const canRequestCancel = selectedOrder ? ['PENDING', 'PROCESSING'].includes(selectedOrder.status) && !hasCancelRequest : false;
   const canReviewOrder = selectedOrder?.status === 'COMPLETED';
   const shippingAddress = address
     ? [address.addressLine, address.wardName, address.districtName, address.provinceName, address.country]
@@ -119,6 +123,29 @@ export function TrackOrderPage() {
       void searchOrder(orderCode, false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!selectedOrder || !pendingAction) return;
+
+    if (pendingAction === 'cancel') {
+      if (canRequestCancel) {
+        openCancelModal();
+      } else {
+        toast.error('Đơn hàng hiện không đủ điều kiện hủy.');
+      }
+      setPendingAction(null);
+      return;
+    }
+
+    if (pendingAction === 'review') {
+      if (canReviewOrder && selectedOrder.items[0]?.bookId) {
+        openReviewModal(selectedOrder.items[0].bookId);
+      } else {
+        toast.error('Chỉ có thể đánh giá sau khi đơn hàng hoàn thành.');
+      }
+      setPendingAction(null);
+    }
+  }, [selectedOrder, pendingAction, canRequestCancel, canReviewOrder]);
 
   const searchOrder = async (code: string, showToast = true) => {
     const normalizedCode = code.trim();
@@ -475,7 +502,12 @@ export function TrackOrderPage() {
                   <h3 className="font-bold text-gray-900">Yêu cầu hủy đơn hàng</h3>
                 </div>
 
-                {canRequestCancel ? (
+                {hasCancelRequest ? (
+                  <div className="flex gap-2 rounded-xl bg-yellow-50 p-4 text-sm leading-6 text-yellow-700">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-600" />
+                    Yêu cầu hủy của bạn đã được gửi và đang chờ cửa hàng xử lý.
+                  </div>
+                ) : canRequestCancel ? (
                   <>
                     <p className="mb-4 text-sm leading-6 text-gray-600">
                       Bạn có thể gửi yêu cầu hủy khi đơn hàng còn ở trạng thái chờ xác nhận hoặc đang xử lý.

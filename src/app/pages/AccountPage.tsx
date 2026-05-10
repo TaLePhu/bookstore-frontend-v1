@@ -83,6 +83,8 @@ const getStatusConfig = (status: string) => {
 const formatOrderCode = (id: string) => `#${id.slice(0, 8).toUpperCase()}`;
 
 const getDisplayOrderCode = (order: OrderDto) => order.orderCode || formatOrderCode(order.id);
+const hasOrderCancelRequest = (order: OrderDto) =>
+  Boolean(order.statusLogs?.some((log) => log.fromStatus === log.toStatus && log.note?.includes('yêu cầu hủy')));
 
 const formatAddress = (address: AddressItem) =>
   [
@@ -758,6 +760,8 @@ export function AccountPage() {
                       const status = getStatusConfig(order.status);
                       const firstItem = order.items[0];
                       const displayOrderCode = getDisplayOrderCode(order);
+                      const orderLookupCode = order.orderCode || order.id;
+                      const cancelRequested = hasOrderCancelRequest(order);
                       return (
                         <div key={order.id} className="border-2 border-gray-200 rounded-xl p-6 hover:border-orange-300 transition-colors">
                           <div className="flex items-center justify-between mb-4">
@@ -783,13 +787,38 @@ export function AccountPage() {
                               <div className="text-2xl font-bold text-orange-600 mb-3">
                                 {formatCurrency(Number(order.totalAmount))}
                               </div>
-                              <button
-                                onClick={() => navigate('/track-order', { state: { orderCode: order.orderCode || order.id } })}
-                                className="flex items-center gap-2 text-orange-600 hover:text-orange-700 font-medium"
-                              >
-                                Xem chi tiết
-                                <ChevronRight className="w-4 h-4" />
-                              </button>
+                              <div className="flex flex-col items-end gap-2">
+                                <button
+                                  onClick={() => navigate('/track-order', { state: { orderCode: orderLookupCode } })}
+                                  className="flex items-center gap-2 text-orange-600 hover:text-orange-700 font-medium"
+                                >
+                                  Xem chi tiết
+                                  <ChevronRight className="w-4 h-4" />
+                                </button>
+                                {cancelRequested && ['PENDING', 'PROCESSING'].includes(order.status) && (
+                                  <span className="rounded-lg bg-yellow-100 px-3 py-1.5 text-sm font-semibold text-yellow-800">
+                                    Đang chờ xử lý hủy
+                                  </span>
+                                )}
+                                {!cancelRequested && ['PENDING', 'PROCESSING'].includes(order.status) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => navigate('/track-order', { state: { orderCode: orderLookupCode, action: 'cancel' } })}
+                                    className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                                  >
+                                    Yêu cầu hủy
+                                  </button>
+                                )}
+                                {order.status === 'COMPLETED' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => navigate('/track-order', { state: { orderCode: orderLookupCode, action: 'review' } })}
+                                    className="rounded-lg border border-yellow-300 px-3 py-1.5 text-sm font-semibold text-yellow-700 transition-colors hover:bg-yellow-50"
+                                  >
+                                    Đánh giá
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>

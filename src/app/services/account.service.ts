@@ -79,6 +79,13 @@ export interface OrderDto {
   addressId?: string;
   items: OrderItemDto[];
   payments?: PaymentDto[];
+  statusLogs?: Array<{
+    id: string;
+    fromStatus: string;
+    toStatus: string;
+    note?: string | null;
+    createdAt: string;
+  }>;
 }
 
 export interface MyOrdersResponse {

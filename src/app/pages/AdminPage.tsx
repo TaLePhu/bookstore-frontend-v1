@@ -55,8 +55,11 @@ import {
   hardDeleteAdminCategory,
   restoreAdminBook,
   restoreAdminCategory,
+  resetAdminUserPassword,
   updateAdminCategory,
   updateAdminBook,
+  updateAdminUserRole,
+  updateAdminUserStatus,
   updateAdminOrderStatus,
   type AdminBookPayload,
   type AdminCategory,
@@ -76,6 +79,9 @@ type BookVisibilityFilter = 'active' | 'deleted' | 'all';
 type BookStockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
 type CategoryVisibilityFilter = 'active' | 'deleted' | 'all';
 type CategoryBookFilter = 'all' | 'with_books' | 'empty';
+type UserRoleFilter = 'all' | 'CUSTOMER' | 'STAFF' | 'ADMIN' | 'GUEST';
+type UserLockFilter = 'all' | 'active' | 'locked';
+type UserVerifiedFilter = 'all' | 'verified' | 'unverified';
 type PopupMessage = { type: 'success' | 'error'; text: string } | null;
 type ConfirmDialog = {
   title: string;
@@ -130,6 +136,45 @@ const getNextStatuses = (status: AdminOrderStatus): AdminOrderStatus[] => {
   return transitions[status] || [];
 };
 
+const getPaymentMethodText = (method?: string) => {
+  const labels: Record<string, string> = {
+    COD: 'Thanh toán khi nhận hàng',
+    CREDIT_CARD: 'Thẻ tín dụng',
+    DEBIT_CARD: 'Thẻ ghi nợ',
+    BANK_TRANSFER: 'Chuyển khoản',
+    WALLET: 'Ví điện tử',
+  };
+  return labels[method || ''] || method || 'Đang cập nhật';
+};
+
+const getPaymentStatusText = (status?: string) => {
+  const labels: Record<string, string> = {
+    PENDING: 'Chờ thanh toán',
+    COMPLETED: 'Đã thanh toán',
+    FAILED: 'Thanh toán thất bại',
+    REFUNDED: 'Đã hoàn tiền',
+  };
+  return labels[status || ''] || status || 'Đang cập nhật';
+};
+
+const getLatestCancelNote = (order?: AdminOrderDetail | null) =>
+  [...(order?.statusLogs || [])]
+    .reverse()
+    .find(
+      (log) =>
+        (log.toStatus === 'CANCELLED' && log.note) ||
+        (log.fromStatus === log.toStatus && log.note?.includes('yêu cầu hủy'))
+    )?.note || '';
+
+const hasCustomerCancelRequest = (order?: Pick<AdminOrderDetail, 'status' | 'statusLogs'> | AdminOrder | null) =>
+  Boolean(
+    (order as AdminOrder)?.cancelRequested ||
+      ((order?.status === 'PENDING' || order?.status === 'PROCESSING') &&
+        (order as AdminOrderDetail)?.statusLogs?.some(
+          (log) => log.fromStatus === log.toStatus && Boolean(log.note?.includes('yêu cầu hủy'))
+        ))
+  );
+
 const getBookStatusMeta = (book: ApiBook) => {
   const stock = Number(book.stock || 0);
 
@@ -170,10 +215,14 @@ export function AdminPage() {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | AdminOrderStatus>('all');
+  const [showCancelRequestsOnly, setShowCancelRequestsOnly] = useState(false);
   const [bookVisibilityFilter, setBookVisibilityFilter] = useState<BookVisibilityFilter>('active');
   const [bookStockFilter, setBookStockFilter] = useState<BookStockFilter>('all');
   const [categoryVisibilityFilter, setCategoryVisibilityFilter] = useState<CategoryVisibilityFilter>('active');
   const [categoryBookFilter, setCategoryBookFilter] = useState<CategoryBookFilter>('all');
+  const [userRoleFilter, setUserRoleFilter] = useState<UserRoleFilter>('CUSTOMER');
+  const [userLockFilter, setUserLockFilter] = useState<UserLockFilter>('all');
+  const [userVerifiedFilter, setUserVerifiedFilter] = useState<UserVerifiedFilter>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [popupMessage, setPopupMessage] = useState<PopupMessage>(null);
@@ -214,6 +263,7 @@ export function AdminPage() {
   const [deletingBookId, setDeletingBookId] = useState<string | null>(null);
   const [deletedImageIds, setDeletedImageIds] = useState<string[]>([]);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
 
   const menuItems = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
@@ -240,7 +290,12 @@ export function AdminPage() {
           limit: 50,
           status: statusFilter === 'all' ? undefined : statusFilter,
         }),
-        getAdminCustomers({ limit: 50 }),
+        getAdminCustomers({
+          limit: 50,
+          role: userRoleFilter === 'all' ? undefined : userRoleFilter,
+          isLocked: userLockFilter === 'all' ? undefined : userLockFilter === 'locked',
+          isVerified: userVerifiedFilter === 'all' ? undefined : userVerifiedFilter === 'verified',
+        }),
       ]);
 
       setDashboard(dashboardData);
@@ -258,7 +313,7 @@ export function AdminPage() {
 
   useEffect(() => {
     loadData();
-  }, [statusFilter, bookVisibilityFilter]);
+  }, [statusFilter, bookVisibilityFilter, userRoleFilter, userLockFilter, userVerifiedFilter]);
 
   const filteredBooks = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -281,23 +336,38 @@ export function AdminPage() {
 
   const filteredOrders = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
-    if (currentView !== 'orders' || !keyword) return orders;
-    return orders.filter((order) =>
+    let result = showCancelRequestsOnly ? orders.filter((order) => hasCustomerCancelRequest(order)) : orders;
+    if (currentView !== 'orders' || !keyword) return result;
+    return result.filter((order) =>
       [order.orderCode, order.customerName, order.customerEmail, order.id]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
         .includes(keyword)
     );
-  }, [orders, currentView, searchQuery]);
+  }, [orders, currentView, searchQuery, showCancelRequestsOnly]);
 
   const filteredCustomers = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
-    if (currentView !== 'customers' || !keyword) return customers;
-    return customers.filter((customer) =>
+    let result = [...customers];
+
+    if (userRoleFilter !== 'all') {
+      result = result.filter((customer) => customer.role === userRoleFilter);
+    }
+
+    if (userLockFilter !== 'all') {
+      result = result.filter((customer) => customer.isLocked === (userLockFilter === 'locked'));
+    }
+
+    if (userVerifiedFilter !== 'all') {
+      result = result.filter((customer) => customer.isVerified === (userVerifiedFilter === 'verified'));
+    }
+
+    if (currentView !== 'customers' || !keyword) return result;
+    return result.filter((customer) =>
       [customer.fullName, customer.userName, customer.email].filter(Boolean).join(' ').toLowerCase().includes(keyword)
     );
-  }, [customers, currentView, searchQuery]);
+  }, [customers, currentView, searchQuery, userLockFilter, userRoleFilter, userVerifiedFilter]);
 
   const filteredCategories = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -336,6 +406,11 @@ export function AdminPage() {
     const stock = Number(book.stock || 0);
     return !isBookDeleted(book) && stock > 0 && stock <= LOW_STOCK_THRESHOLD;
   });
+  const cancelRequestOrders = orders.filter((order) => hasCustomerCancelRequest(order));
+  const activeUsers = customers.filter((customer) => !customer.isLocked);
+  const lockedUsers = customers.filter((customer) => customer.isLocked);
+  const verifiedUsers = customers.filter((customer) => customer.isVerified);
+  const unverifiedUsers = customers.filter((customer) => !customer.isVerified);
 
   const showPopup = (message: Exclude<PopupMessage, null>) => {
     setPopupMessage(message);
@@ -693,7 +768,15 @@ export function AdminPage() {
 
   const handleUpdateStatus = async (status: AdminOrderStatus) => {
     if (!selectedOrder) return;
-    const note = status === 'CANCELLED' ? 'Admin hủy đơn từ dashboard' : undefined;
+    const note =
+      status === 'CANCELLED'
+        ? window.prompt('Nhập lý do hủy đơn hàng:', 'Admin hủy đơn từ dashboard')?.trim()
+        : undefined;
+
+    if (status === 'CANCELLED' && !note) {
+      showPopup({ type: 'error', text: 'Vui lòng nhập lý do hủy đơn hàng.' });
+      return;
+    }
 
     try {
       setUpdatingStatus(true);
@@ -704,6 +787,55 @@ export function AdminPage() {
       setError(err?.response?.data?.message || 'Không thể cập nhật trạng thái đơn hàng');
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleToggleUserLock = async (customer: AdminUser) => {
+    try {
+      setUpdatingUserId(customer.id);
+      const updated = await updateAdminUserStatus(customer.id, !customer.isLocked);
+      setCustomers((prev) => prev.map((item) => (item.id === customer.id ? updated : item)));
+      showPopup({
+        type: 'success',
+        text: updated.isLocked ? 'Đã khóa tài khoản người dùng.' : 'Đã mở khóa tài khoản người dùng.',
+      });
+    } catch (err: any) {
+      showPopup({ type: 'error', text: err?.response?.data?.message || 'Không thể cập nhật trạng thái tài khoản.' });
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
+
+  const handleChangeUserRole = async (customer: AdminUser, role: string) => {
+    if (customer.role === role) return;
+    try {
+      setUpdatingUserId(customer.id);
+      const updated = await updateAdminUserRole(customer.id, role);
+      setCustomers((prev) => prev.map((item) => (item.id === customer.id ? updated : item)));
+      showPopup({ type: 'success', text: `Đã cập nhật quyền ${role} cho tài khoản.` });
+    } catch (err: any) {
+      showPopup({ type: 'error', text: err?.response?.data?.message || 'Không thể cập nhật quyền tài khoản.' });
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
+
+  const handleResetUserPassword = async (customer: AdminUser) => {
+    const newPassword = window.prompt('Nhập mật khẩu mới cho tài khoản này:');
+    if (!newPassword) return;
+    if (newPassword.length < 6) {
+      showPopup({ type: 'error', text: 'Mật khẩu mới cần ít nhất 6 ký tự.' });
+      return;
+    }
+
+    try {
+      setUpdatingUserId(customer.id);
+      await resetAdminUserPassword(customer.id, newPassword);
+      showPopup({ type: 'success', text: `Đã đặt lại mật khẩu cho ${customer.email}.` });
+    } catch (err: any) {
+      showPopup({ type: 'error', text: err?.response?.data?.message || 'Không thể đặt lại mật khẩu.' });
+    } finally {
+      setUpdatingUserId(null);
     }
   };
 
@@ -1337,6 +1469,42 @@ export function AdminPage() {
 
           {currentView === 'orders' && (
             <div className="space-y-6">
+              <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-1 h-6 w-6 text-yellow-700" />
+                    <div>
+                      <h3 className="text-lg font-bold text-yellow-900">Yêu cầu hủy từ khách hàng</h3>
+                      <p className="mt-1 text-sm text-yellow-800">
+                        Có {cancelRequestOrders.length.toLocaleString('vi-VN')} đơn đang chờ admin xử lý yêu cầu hủy.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowCancelRequestsOnly((value) => !value)}
+                      className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                        showCancelRequestsOnly
+                          ? 'bg-yellow-700 text-white hover:bg-yellow-800'
+                          : 'border border-yellow-300 bg-white text-yellow-800 hover:bg-yellow-100'
+                      }`}
+                    >
+                      {showCancelRequestsOnly ? 'Hiển thị tất cả đơn' : 'Chỉ xem yêu cầu hủy'}
+                    </button>
+                    {cancelRequestOrders[0] && (
+                      <button
+                        type="button"
+                        onClick={() => openOrderDetail(cancelRequestOrders[0])}
+                        className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+                      >
+                        Xử lý yêu cầu mới nhất
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm đơn theo mã, khách hàng, email..." />
                 <select
@@ -1383,15 +1551,30 @@ export function AdminPage() {
                           <span className={`text-xs px-2 py-1 rounded-full ${getOrderStatusColor(order.status)}`}>
                             {getOrderStatusText(order.status)}
                           </span>
+                          {hasCustomerCancelRequest(order) && (
+                            <span className="ml-2 inline-flex rounded-full bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800">
+                              Khách yêu cầu hủy
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell align="right">
-                          <button
-                            onClick={() => openOrderDetail(order)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Xem chi tiết"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                          <div className="flex justify-end gap-2">
+                            {hasCustomerCancelRequest(order) && (
+                              <button
+                                onClick={() => openOrderDetail(order)}
+                                className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+                              >
+                                Xử lý hủy
+                              </button>
+                            )}
+                            <button
+                              onClick={() => openOrderDetail(order)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Xem chi tiết"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
                         </TableCell>
                       </tr>
                     ))}
@@ -1404,16 +1587,78 @@ export function AdminPage() {
 
           {currentView === 'customers' && (
             <div className="space-y-6">
-              <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm khách hàng theo tên hoặc email..." />
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Tổng tài khoản</p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900">{customers.length}</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Đang hoạt động</p>
+                  <p className="mt-2 text-3xl font-bold text-emerald-600">{activeUsers.length}</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Đã khóa</p>
+                  <p className="mt-2 text-3xl font-bold text-red-600">{lockedUsers.length}</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Chưa xác thực</p>
+                  <p className="mt-2 text-3xl font-bold text-amber-600">{unverifiedUsers.length}</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="grid gap-3 lg:grid-cols-[1fr_180px_180px_180px]">
+                  <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm theo tên, username hoặc email..." />
+                  <select
+                    value={userRoleFilter}
+                    onChange={(event) => setUserRoleFilter(event.target.value as UserRoleFilter)}
+                    className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="all">Tất cả vai trò</option>
+                    <option value="CUSTOMER">Khách hàng</option>
+                    <option value="STAFF">Nhân viên</option>
+                    <option value="ADMIN">Admin</option>
+                    <option value="GUEST">Khách vãng lai</option>
+                  </select>
+                  <select
+                    value={userLockFilter}
+                    onChange={(event) => setUserLockFilter(event.target.value as UserLockFilter)}
+                    className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="active">Đang hoạt động</option>
+                    <option value="locked">Đã khóa</option>
+                  </select>
+                  <select
+                    value={userVerifiedFilter}
+                    onChange={(event) => setUserVerifiedFilter(event.target.value as UserVerifiedFilter)}
+                    className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="all">Tất cả xác thực</option>
+                    <option value="verified">Đã xác thực</option>
+                    <option value="unverified">Chưa xác thực</option>
+                  </select>
+                </div>
+              </div>
 
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <table className="w-full">
+                <div className="border-b border-gray-100 px-5 py-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Danh sách tài khoản</h3>
+                  <p className="text-sm text-gray-500">
+                    {filteredCustomers.length.toLocaleString('vi-VN')} tài khoản phù hợp với bộ lọc hiện tại
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[980px]">
                   <thead className="bg-gray-50">
                     <tr>
-                      <TableHead>Khách hàng</TableHead>
+                      <TableHead>Tài khoản</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Vai trò</TableHead>
+                      <TableHead>Xác thực</TableHead>
                       <TableHead>Ngày tham gia</TableHead>
                       <TableHead>Trạng thái</TableHead>
+                      <TableHead align="right">Thao tác</TableHead>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -1433,16 +1678,59 @@ export function AdminPage() {
                           </div>
                         </TableCell>
                         <TableCell>{customer.email}</TableCell>
+                        <TableCell>
+                          <select
+                            value={customer.role}
+                            disabled={updatingUserId === customer.id || customer.id === user?.id}
+                            onChange={(event) => handleChangeUserRole(customer, event.target.value)}
+                            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+                          >
+                            <option value="CUSTOMER">CUSTOMER</option>
+                            <option value="STAFF">STAFF</option>
+                            <option value="ADMIN">ADMIN</option>
+                            <option value="GUEST">GUEST</option>
+                          </select>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`text-xs px-2 py-1 rounded-full ${customer.isVerified ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {customer.isVerified ? 'Đã xác thực' : 'Chưa xác thực'}
+                          </span>
+                        </TableCell>
                         <TableCell>{formatDate(customer.createdAt)}</TableCell>
                         <TableCell>
                           <span className={`text-xs px-2 py-1 rounded-full ${customer.isLocked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                             {customer.isLocked ? 'Đã khóa' : 'Hoạt động'}
                           </span>
                         </TableCell>
+                        <TableCell align="right">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              disabled={updatingUserId === customer.id || customer.id === user?.id}
+                              onClick={() => handleToggleUserLock(customer)}
+                              className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors disabled:opacity-50 ${
+                                customer.isLocked
+                                  ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                  : 'bg-red-50 text-red-700 hover:bg-red-100'
+                              }`}
+                            >
+                              {customer.isLocked ? 'Mở khóa' : 'Khóa'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={updatingUserId === customer.id}
+                              onClick={() => handleResetUserPassword(customer)}
+                              className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
+                            >
+                              Reset MK
+                            </button>
+                          </div>
+                        </TableCell>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                </div>
                 {filteredCustomers.length === 0 && <EmptyState text="Không có khách hàng phù hợp." />}
               </div>
             </div>
@@ -1703,7 +1991,7 @@ export function AdminPage() {
 
       {selectedOrder && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-800">
                 Chi tiết đơn {selectedOrder.orderCode || selectedOrder.id.slice(0, 8)}
@@ -1736,13 +2024,93 @@ export function AdminPage() {
                 />
               </div>
 
+              {hasCustomerCancelRequest(selectedOrder) && (
+                <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-700" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-yellow-900">Khách hàng yêu cầu hủy đơn</h4>
+                      <p className="mt-1 text-sm leading-6 text-yellow-800">
+                        {getLatestCancelNote(selectedOrder) || 'Khách đã gửi yêu cầu hủy đơn hàng này.'}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={updatingStatus}
+                          onClick={() => handleUpdateStatus('CANCELLED')}
+                          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                        >
+                          Duyệt hủy đơn
+                        </button>
+                        {selectedOrder.status === 'PENDING' && (
+                          <button
+                            type="button"
+                            disabled={updatingStatus}
+                            onClick={() => handleUpdateStatus('PROCESSING')}
+                            className="rounded-lg border border-yellow-300 bg-white px-4 py-2 text-sm font-semibold text-yellow-800 transition-colors hover:bg-yellow-100 disabled:opacity-50"
+                          >
+                            Tiếp tục xử lý
+                          </button>
+                        )}
+                        {selectedOrder.status === 'PROCESSING' && (
+                          <button
+                            type="button"
+                            disabled={updatingStatus}
+                            onClick={() => handleUpdateStatus('SHIPPED')}
+                            className="rounded-lg border border-yellow-300 bg-white px-4 py-2 text-sm font-semibold text-yellow-800 transition-colors hover:bg-yellow-100 disabled:opacity-50"
+                          >
+                            Chuyển sang đang giao
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedOrder.status === 'CANCELLED' && getLatestCancelNote(selectedOrder) && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                    <div>
+                      <h4 className="font-semibold text-red-800">Lý do hủy đơn</h4>
+                      <p className="mt-1 text-sm leading-6 text-red-700">{getLatestCancelNote(selectedOrder)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h4 className="text-sm font-medium text-gray-500 mb-2">Địa chỉ giao hàng</h4>
                 <p className="text-gray-800">
-                  {[selectedOrder.address?.addressLine, selectedOrder.address?.ward, selectedOrder.address?.district, selectedOrder.address?.city]
+                  {[
+                    selectedOrder.address?.addressLine,
+                    selectedOrder.address?.wardName || selectedOrder.address?.ward,
+                    selectedOrder.address?.districtName || selectedOrder.address?.district,
+                    selectedOrder.address?.provinceName || selectedOrder.address?.city,
+                    selectedOrder.address?.country,
+                  ]
                     .filter(Boolean)
                     .join(', ') || 'Đang cập nhật'}
                 </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <InfoBlock
+                  title="Thanh toán"
+                  rows={[
+                    ['Phương thức', getPaymentMethodText(selectedOrder.payments?.[0]?.method)],
+                    ['Trạng thái', getPaymentStatusText(selectedOrder.payments?.[0]?.status)],
+                    ['Số tiền', formatCurrency(selectedOrder.payments?.[0]?.amount || selectedOrder.totalAmount)],
+                  ]}
+                />
+                <InfoBlock
+                  title="Xử lý đơn"
+                  rows={[
+                    ['Cập nhật lần cuối', formatDate(selectedOrder.updatedAt)],
+                    ['Bước tiếp theo', getNextStatuses(selectedOrder.status).map(getOrderStatusText).join(', ') || 'Không còn thao tác'],
+                  ]}
+                />
               </div>
 
               <div>
@@ -1775,6 +2143,31 @@ export function AdminPage() {
                 <span className="text-lg font-medium text-gray-600">Tổng cộng</span>
                 <span className="text-2xl font-bold text-orange-500">{formatCurrency(selectedOrder.totalAmount)}</span>
               </div>
+
+              {(selectedOrder.statusLogs || []).length > 0 && (
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <h4 className="font-medium text-gray-800 mb-4">Lịch sử xử lý</h4>
+                  <div className="space-y-3">
+                    {[...(selectedOrder.statusLogs || [])]
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .map((log) => (
+                        <div key={log.id} className="rounded-lg bg-gray-50 p-3">
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="text-sm font-semibold text-gray-800">
+                              {getOrderStatusText(log.fromStatus)} → {getOrderStatusText(log.toStatus)}
+                            </div>
+                            <div className="text-xs text-gray-500">{formatDate(log.createdAt)}</div>
+                          </div>
+                          <div className="mt-1 text-xs text-gray-500">
+                            Người cập nhật:{' '}
+                            {log.changedByUser?.fullName || log.changedByUser?.userName || log.changedByUser?.email || 'Khách hàng / hệ thống'}
+                          </div>
+                          {log.note && <p className="mt-2 text-sm leading-6 text-gray-700">{log.note}</p>}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
 
               {getNextStatuses(selectedOrder.status).length > 0 && (
                 <div className="rounded-xl bg-gray-50 p-4">

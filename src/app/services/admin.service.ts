@@ -29,9 +29,11 @@ export interface AdminOrder {
   customerName?: string;
   customerEmail?: string | null;
   createdAt: string;
+  updatedAt?: string;
   totalItems?: number;
   totalAmount: number;
   status: AdminOrderStatus;
+  cancelRequested?: boolean;
 }
 
 export interface AdminOrderDetail extends AdminOrder {
@@ -41,12 +43,17 @@ export interface AdminOrderDetail extends AdminOrder {
     email?: string | null;
   };
   address?: {
+    receiverName?: string | null;
     fullName?: string | null;
     phone?: string | null;
     addressLine?: string | null;
     ward?: string | null;
+    wardName?: string | null;
     district?: string | null;
+    districtName?: string | null;
     city?: string | null;
+    provinceName?: string | null;
+    country?: string | null;
   } | null;
   items?: Array<{
     id: string;
@@ -54,6 +61,24 @@ export interface AdminOrderDetail extends AdminOrder {
     price: number | string;
     subTotal: number | string;
     book?: ApiBook;
+  }>;
+  payments?: Array<{
+    id: string;
+    amount: number | string;
+    method: string;
+    status: string;
+  }>;
+  statusLogs?: Array<{
+    id: string;
+    fromStatus: AdminOrderStatus;
+    toStatus: AdminOrderStatus;
+    note?: string | null;
+    createdAt: string;
+    changedByUser?: {
+      fullName?: string | null;
+      userName?: string | null;
+      email?: string | null;
+    } | null;
   }>;
 }
 
@@ -274,14 +299,19 @@ export const getAdminCustomers = async (params?: {
   page?: number;
   limit?: number;
   q?: string;
+  role?: string;
+  isVerified?: boolean;
+  isLocked?: boolean;
 }): Promise<{ data: AdminUser[]; total: number }> => {
   const res = await api.get('/admin/users', {
     params: {
-      role: 'CUSTOMER',
+      role: params?.role || undefined,
       page: params?.page ?? 1,
       limit: params?.limit ?? 20,
       email: params?.q || undefined,
       full_name: params?.q || undefined,
+      is_verified: typeof params?.isVerified === 'boolean' ? String(params.isVerified) : undefined,
+      is_locked: typeof params?.isLocked === 'boolean' ? String(params.isLocked) : undefined,
     },
   });
 
@@ -290,4 +320,18 @@ export const getAdminCustomers = async (params?: {
     data: payload.users,
     total: payload.total,
   };
+};
+
+export const updateAdminUserStatus = async (id: string, isLocked: boolean): Promise<AdminUser> => {
+  const res = await api.patch(`/admin/users/${id}/status`, { isLocked });
+  return res.data.data;
+};
+
+export const updateAdminUserRole = async (id: string, role: string): Promise<AdminUser> => {
+  const res = await api.patch(`/admin/users/${id}/role`, { role });
+  return res.data.data;
+};
+
+export const resetAdminUserPassword = async (id: string, newPassword: string): Promise<void> => {
+  await api.post(`/admin/users/${id}/reset-password`, { newPassword });
 };
