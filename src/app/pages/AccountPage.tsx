@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import {
   User,
+  AlertCircle,
   Settings,
   Package,
   MapPin,
@@ -125,6 +126,13 @@ const toAddressForm = (address: AddressItem) => ({
   isDefault: Boolean(address.isDefault),
 });
 
+type ConfirmDialog = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => Promise<void>;
+} | null;
+
 export function AccountPage() {
   const navigate = useNavigate();
   const { user, logout, updateUser } = useAuth();
@@ -138,6 +146,8 @@ export function AccountPage() {
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null);
+  const [isConfirmingDialog, setIsConfirmingDialog] = useState(false);
   const [addressForm, setAddressForm] = useState(emptyAddressForm);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [isAddressFormOpen, setIsAddressFormOpen] = useState(false);
@@ -287,16 +297,32 @@ export function AccountPage() {
     }
   };
 
-  const handleDeleteAddress = async (addressId: string) => {
-    if (!window.confirm('Bạn có chắc muốn xóa địa chỉ này?')) return;
-
+  const handleConfirmDialog = async () => {
+    if (!confirmDialog) return;
     try {
-      await deleteMyAddress(addressId);
-      setAddresses((prev) => prev.filter((item) => item.id !== addressId));
-      showActionSuccess('Đã xóa địa chỉ.');
-    } catch (error: any) {
-      showActionError(error?.response?.data?.message || 'Không thể xóa địa chỉ.');
+      setIsConfirmingDialog(true);
+      await confirmDialog.onConfirm();
+      setConfirmDialog(null);
+    } finally {
+      setIsConfirmingDialog(false);
     }
+  };
+
+  const handleDeleteAddress = async (addressId: string) => {
+    setConfirmDialog({
+      title: 'Xóa địa chỉ',
+      message: 'Bạn có chắc muốn xóa địa chỉ này?',
+      confirmLabel: 'Xóa địa chỉ',
+      onConfirm: async () => {
+        try {
+          await deleteMyAddress(addressId);
+          setAddresses((prev) => prev.filter((item) => item.id !== addressId));
+          showActionSuccess('Đã xóa địa chỉ.');
+        } catch (error: any) {
+          showActionError(error?.response?.data?.message || 'Không thể xóa địa chỉ.');
+        }
+      },
+    });
   };
 
   const handleChangePassword = async (event: React.FormEvent) => {
@@ -894,6 +920,39 @@ export function AccountPage() {
           </div>
         </div>
       </div>
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-4">
+              <div className="rounded-full bg-red-100 p-3 text-red-600">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-gray-900">{confirmDialog.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-gray-600">{confirmDialog.message}</p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={isConfirmingDialog}
+                onClick={() => setConfirmDialog(null)}
+                className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={isConfirmingDialog}
+                onClick={handleConfirmDialog}
+                className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {isConfirmingDialog ? 'Đang xử lý...' : confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

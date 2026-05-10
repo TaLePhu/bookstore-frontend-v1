@@ -89,6 +89,7 @@ export interface AdminBookPayload {
   language?: string;
   releaseDate?: string;
   images?: FileList | File[];
+  deleteImageIds?: string[];
 }
 
 export const getAdminDashboard = async (): Promise<AdminDashboardResponse> => {
@@ -101,6 +102,8 @@ export const getAdminBooks = async (params?: {
   limit?: number;
   q?: string;
   status?: 'in_stock' | 'out_of_stock';
+  includeDeleted?: boolean;
+  onlyDeleted?: boolean;
 }): Promise<{ data: ApiBook[]; total: number }> => {
   const endpoint = params?.q ? '/admin/books/search' : '/admin/books';
   const res = await api.get(endpoint, {
@@ -109,6 +112,8 @@ export const getAdminBooks = async (params?: {
       limit: params?.limit ?? 20,
       q: params?.q || undefined,
       status: params?.status,
+      include_deleted: params?.includeDeleted ? 'true' : undefined,
+      only_deleted: params?.onlyDeleted ? 'true' : undefined,
     },
   });
 
@@ -155,6 +160,10 @@ const appendBookPayload = (formData: FormData, payload: AdminBookPayload) => {
   Array.from(payload.images || []).forEach((file) => {
     formData.append('images', file);
   });
+
+  if (payload.deleteImageIds && payload.deleteImageIds.length > 0) {
+    formData.append('deleteImageIds', JSON.stringify(payload.deleteImageIds));
+  }
 };
 
 export const createAdminBook = async (payload: AdminBookPayload): Promise<ApiBook> => {
@@ -177,6 +186,14 @@ export const updateAdminBook = async (id: string, payload: AdminBookPayload): Pr
 
 export const deleteAdminBook = async (id: string): Promise<void> => {
   await api.delete(`/admin/books/${id}`);
+};
+
+export const restoreAdminBook = async (id: string): Promise<void> => {
+  await api.patch(`/admin/books/${id}/restore`);
+};
+
+export const hardDeleteAdminBook = async (id: string): Promise<void> => {
+  await api.delete(`/admin/books/${id}/hard`);
 };
 
 export const getAdminOrders = async (params?: {

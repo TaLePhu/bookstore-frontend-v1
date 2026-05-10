@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   AlertCircle,
+  ArchiveX,
   BarChart3,
   BookOpen,
   CheckCircle2,
@@ -46,6 +47,8 @@ import {
   getAdminDashboard,
   getAdminOrderDetail,
   getAdminOrders,
+  hardDeleteAdminBook,
+  restoreAdminBook,
   updateAdminBook,
   updateAdminOrderStatus,
   type AdminBookPayload,
@@ -60,6 +63,16 @@ import type { ApiBook } from '../services/book.service';
 import { getBookImage } from '../utils/book-display';
 
 type AdminView = 'dashboard' | 'books' | 'orders' | 'customers' | 'settings';
+type ExistingBookImage = { id?: string; url: string; isPrimary?: boolean };
+type BookVisibilityFilter = 'active' | 'deleted' | 'all';
+type PopupMessage = { type: 'success' | 'error'; text: string } | null;
+type ConfirmDialog = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  variant?: 'danger' | 'warning';
+  onConfirm: () => Promise<void>;
+} | null;
 
 const COLORS = ['#F97316', '#3B82F6', '#8B5CF6', '#10B981', '#EF4444', '#14B8A6'];
 
@@ -111,8 +124,12 @@ export function AdminPage() {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | AdminOrderStatus>('all');
+  const [bookVisibilityFilter, setBookVisibilityFilter] = useState<BookVisibilityFilter>('active');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [popupMessage, setPopupMessage] = useState<PopupMessage>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null);
+  const [isConfirmingDialog, setIsConfirmingDialog] = useState(false);
   const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(null);
   const [books, setBooks] = useState<ApiBook[]>([]);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
@@ -138,6 +155,7 @@ export function AdminPage() {
   });
   const [savingBook, setSavingBook] = useState(false);
   const [deletingBookId, setDeletingBookId] = useState<string | null>(null);
+  const [deletedImageIds, setDeletedImageIds] = useState<string[]>([]);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const menuItems = [
@@ -154,7 +172,11 @@ export function AdminPage() {
     try {
       const [dashboardData, booksData, categoriesData, ordersData, customersData] = await Promise.all([
         getAdminDashboard(),
-        getAdminBooks({ limit: 50 }),
+        getAdminBooks({
+          limit: 50,
+          includeDeleted: bookVisibilityFilter === 'all' || bookVisibilityFilter === 'deleted',
+          onlyDeleted: bookVisibilityFilter === 'deleted',
+        }),
         getAdminCategories(),
         getAdminOrders({
           limit: 50,
@@ -178,7 +200,7 @@ export function AdminPage() {
 
   useEffect(() => {
     loadData();
-  }, [statusFilter]);
+  }, [statusFilter, bookVisibilityFilter]);
 
   const filteredBooks = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -208,7 +230,24 @@ export function AdminPage() {
     );
   }, [customers, currentView, searchQuery]);
 
-  const outOfStockBooks = books.filter((book) => Number(book.stock || 0) <= 0);
+  const isBookDeleted = (book: ApiBook) => Boolean(book.deletedAt || book.status === 'deleted');
+  const outOfStockBooks = books.filter((book) => !isBookDeleted(book) && Number(book.stock || 0) <= 0);
+
+  const showPopup = (message: Exclude<PopupMessage, null>) => {
+    setPopupMessage(message);
+    window.setTimeout(() => setPopupMessage(null), 3200);
+  };
+
+  const handleConfirmDialog = async () => {
+    if (!confirmDialog) return;
+    try {
+      setIsConfirmingDialog(true);
+      await confirmDialog.onConfirm();
+      setConfirmDialog(null);
+    } finally {
+      setIsConfirmingDialog(false);
+    }
+  };
 
   const stats = [
     {
@@ -267,6 +306,7 @@ export function AdminPage() {
       releaseDate: '',
     });
     setSelectedBook(null);
+    setDeletedImageIds([]);
   };
 
   const openCreateBook = () => {
@@ -293,6 +333,7 @@ export function AdminPage() {
         language: detail.language || 'Tiếng Việt',
         releaseDate: detail.releaseDate ? detail.releaseDate.slice(0, 10) : '',
       });
+      setDeletedImageIds([]);
       setBookModalMode(mode);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Không thể tải chi tiết sách');
@@ -306,34 +347,117 @@ export function AdminPage() {
   const handleSaveBook = async () => {
     try {
       setSavingBook(true);
+      const isEditing = bookModalMode === 'edit' && Boolean(selectedBook);
       if (bookModalMode === 'create') {
         await createAdminBook(bookForm);
-      } else if (bookModalMode === 'edit' && selectedBook) {
-        await updateAdminBook(selectedBook.id, bookForm);
+      } else if (isEditing && selectedBook) {
+        await updateAdminBook(selectedBook.id, {
+          ...bookForm,
+          deleteImageIds: deletedImageIds,
+        });
       }
       setBookModalMode(null);
       resetBookForm();
       await loadData();
+      showPopup({
+        type: 'success',
+        text: isEditing ? 'Đã cập nhật sách thành công.' : 'Đã thêm sách mới thành công.',
+      });
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Không thể lưu sách');
+      const message = err?.response?.data?.message || 'Không thể lưu sách';
+      setError(message);
+      showPopup({ type: 'error', text: message });
     } finally {
       setSavingBook(false);
     }
   };
 
-  const handleDeleteBook = async (book: ApiBook) => {
-    const confirmed = window.confirm(`Xóa sách "${book.title}"? Sách đã phát sinh đơn hàng sẽ không thể xóa.`);
-    if (!confirmed) return;
+  const handleSoftDeleteBook = async (book: ApiBook) => {
+    setConfirmDialog({
+      title: 'Xóa mềm sách',
+      message: `Xóa mềm sách "${book.title}"? Sách sẽ bị ẩn khỏi trang bán hàng và có thể khôi phục sau.`,
+      confirmLabel: 'Xóa mềm',
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          setDeletingBookId(book.id);
+          await deleteAdminBook(book.id);
+          await loadData();
+          showPopup({ type: 'success', text: `Đã xóa mềm sách "${book.title}".` });
+        } catch (err: any) {
+          const message = err?.response?.data?.message || 'Không thể xóa mềm sách';
+          setError(message);
+          showPopup({ type: 'error', text: message });
+        } finally {
+          setDeletingBookId(null);
+        }
+      },
+    });
+  };
 
+  const handleRestoreDeletedBook = async (book: ApiBook) => {
     try {
       setDeletingBookId(book.id);
-      await deleteAdminBook(book.id);
+      await restoreAdminBook(book.id);
       await loadData();
+      showPopup({ type: 'success', text: `Đã khôi phục sách "${book.title}".` });
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Không thể xóa sách');
+      const message = err?.response?.data?.message || 'Không thể khôi phục sách';
+      setError(message);
+      showPopup({ type: 'error', text: message });
     } finally {
       setDeletingBookId(null);
     }
+  };
+
+  const handlePermanentDeleteBook = async (book: ApiBook) => {
+    setConfirmDialog({
+      title: 'Xóa cứng sách',
+      message: `Xóa cứng sách "${book.title}"? Thao tác này không thể hoàn tác và chỉ thành công nếu sách chưa phát sinh đơn hàng.`,
+      confirmLabel: 'Xóa cứng',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          setDeletingBookId(book.id);
+          await hardDeleteAdminBook(book.id);
+          await loadData();
+          showPopup({ type: 'success', text: `Đã xóa cứng sách "${book.title}".` });
+        } catch (err: any) {
+          const message = err?.response?.data?.message || 'Không thể xóa cứng sách';
+          setError(message);
+          showPopup({ type: 'error', text: message });
+        } finally {
+          setDeletingBookId(null);
+        }
+      },
+    });
+  };
+
+  const getBookImageItems = (book: ApiBook | null): ExistingBookImage[] => {
+    if (!book) return [];
+    const images = (book.images || [])
+      .map((image) => {
+        if (typeof image === 'string') return { url: image };
+        return {
+          id: image.id,
+          url: image.imageUrl || image.url || '',
+          isPrimary: image.isPrimary,
+        };
+      })
+      .filter((image) => image.url);
+
+    return images.length > 0 ? images : [{ url: getBookImage(book), isPrimary: true }];
+  };
+
+  const getVisibleBookImageItems = (book: ApiBook | null) => {
+    return getBookImageItems(book).filter((image) => !image.id || !deletedImageIds.includes(image.id));
+  };
+
+  const toggleDeleteImage = (imageId?: string) => {
+    if (!imageId) return;
+    setDeletedImageIds((prev) =>
+      prev.includes(imageId) ? prev.filter((id) => id !== imageId) : [...prev, imageId]
+    );
   };
 
   const handleUpdateStatus = async (status: AdminOrderStatus) => {
@@ -437,6 +561,63 @@ export function AdminPage() {
         </header>
 
         <div className="p-8">
+          {popupMessage && (
+            <div className="fixed right-6 top-6 z-[60] max-w-sm rounded-xl border border-gray-200 bg-white p-4 shadow-2xl">
+              <div className="flex items-start gap-3">
+                {popupMessage.type === 'success' ? (
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 text-green-600" />
+                ) : (
+                  <AlertCircle className="mt-0.5 h-5 w-5 text-red-600" />
+                )}
+                <div className="flex-1 text-sm font-medium text-gray-800">{popupMessage.text}</div>
+                <button
+                  type="button"
+                  onClick={() => setPopupMessage(null)}
+                  className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  title="Đóng thông báo"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {confirmDialog && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+                <div className="flex items-start gap-4">
+                  <div className={`rounded-full p-3 ${confirmDialog.variant === 'danger' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
+                    <AlertCircle className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-gray-900">{confirmDialog.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">{confirmDialog.message}</p>
+                  </div>
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    disabled={isConfirmingDialog}
+                    onClick={() => setConfirmDialog(null)}
+                    className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isConfirmingDialog}
+                    onClick={handleConfirmDialog}
+                    className={`rounded-lg px-4 py-2 font-semibold text-white disabled:opacity-50 ${
+                      confirmDialog.variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600'
+                    }`}
+                  >
+                    {isConfirmingDialog ? 'Đang xử lý...' : confirmDialog.confirmLabel}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 mt-0.5" />
@@ -578,6 +759,15 @@ export function AdminPage() {
 
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm sách theo tên, tác giả, danh mục..." />
+                <select
+                  value={bookVisibilityFilter}
+                  onChange={(event) => setBookVisibilityFilter(event.target.value as BookVisibilityFilter)}
+                  className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="active">Sách đang bán</option>
+                  <option value="deleted">Sách đã xóa mềm</option>
+                  <option value="all">Tất cả sách</option>
+                </select>
                 <button
                   onClick={openCreateBook}
                   className="px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
@@ -602,7 +792,7 @@ export function AdminPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredBooks.map((book) => (
-                      <tr key={book.id} className="hover:bg-gray-50">
+                      <tr key={book.id} className={`hover:bg-gray-50 ${isBookDeleted(book) ? 'bg-gray-50 opacity-75' : ''}`}>
                         <TableCell>
                           <p className="font-medium text-gray-800">{book.title}</p>
                           <p className="text-sm text-gray-500">{book.author}</p>
@@ -612,9 +802,13 @@ export function AdminPage() {
                         <TableCell>{Number(book.stock || 0)}</TableCell>
                         <TableCell>{Number(book.soldCount || 0)}</TableCell>
                         <TableCell>
-                          <span className={`text-xs px-2 py-1 rounded-full ${Number(book.stock || 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {isBookDeleted(book) ? (
+                            <span className="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700">Đã xóa mềm</span>
+                          ) : (
+                          <span className={`text-xs px-2 py-1 rounded-full ${isBookDeleted(book) ? 'bg-gray-200 text-gray-700' : Number(book.stock || 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             {Number(book.stock || 0) > 0 ? 'Còn hàng' : 'Hết hàng'}
                           </span>
+                          )}
                         </TableCell>
                         <TableCell align="right">
                           <div className="flex justify-end gap-1">
@@ -627,16 +821,35 @@ export function AdminPage() {
                             </button>
                             <button
                               onClick={() => openBookDetail(book, 'edit')}
+                              disabled={isBookDeleted(book)}
                               className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
                               title="Chỉnh sửa"
                             >
                               <Edit className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleDeleteBook(book)}
-                              disabled={deletingBookId === book.id}
+                              onClick={() => handleSoftDeleteBook(book)}
+                              disabled={deletingBookId === book.id || isBookDeleted(book)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                              title="Xóa sách"
+                              title="Xóa mềm: ẩn sách khỏi trang bán hàng"
+                            >
+                              <ArchiveX className="w-4 h-4" />
+                            </button>
+                            {isBookDeleted(book) && (
+                              <button
+                                onClick={() => handleRestoreDeletedBook(book)}
+                                disabled={deletingBookId === book.id}
+                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                                title="Khôi phục sách đã xóa mềm"
+                              >
+                                <RefreshCcw className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handlePermanentDeleteBook(book)}
+                              disabled={deletingBookId === book.id}
+                              className="p-2 text-red-800 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50"
+                              title="Xóa cứng vĩnh viễn"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -827,6 +1040,7 @@ export function AdminPage() {
                     </div>
                   </div>
                 </div>
+                <BookImageGallery images={getBookImageItems(selectedBook)} />
                 <div>
                   <h4 className="text-sm font-medium text-gray-500 mb-2">Mô tả</h4>
                   <p className="text-gray-800 leading-6 whitespace-pre-line">{selectedBook.description}</p>
@@ -882,6 +1096,33 @@ export function AdminPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Ảnh sách {bookModalMode === 'create' && <span className="text-red-500">*</span>}
                   </label>
+                  {bookModalMode === 'edit' && selectedBook && (
+                    <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-gray-700">Ảnh hiện có</p>
+                        {deletedImageIds.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setDeletedImageIds([])}
+                            className="text-xs font-medium text-orange-600 hover:text-orange-700"
+                          >
+                            Hoàn tác xóa ảnh
+                          </button>
+                        )}
+                      </div>
+                      <BookImageGallery
+                        images={getBookImageItems(selectedBook)}
+                        compact
+                        deletedImageIds={deletedImageIds}
+                        onToggleDelete={toggleDeleteImage}
+                      />
+                      {getVisibleBookImageItems(selectedBook).length === 0 && (
+                        <p className="mt-2 text-xs text-red-600">
+                          Bạn đang chọn xóa toàn bộ ảnh hiện có. Hãy upload ít nhất một ảnh mới trước khi lưu.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
@@ -890,7 +1131,7 @@ export function AdminPage() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
                   <p className="text-xs text-gray-500 mt-2">
-                    Hỗ trợ jpg, png, webp. Tối đa 5 ảnh, mỗi ảnh 2MB. Khi sửa, chọn ảnh mới sẽ thay bộ ảnh cũ.
+                    Hỗ trợ jpg, png, webp. Tối đa 5 ảnh, mỗi ảnh 2MB. Khi sửa, ảnh mới sẽ được thêm vào bộ ảnh hiện có; các ảnh được đánh dấu xóa sẽ bị xóa khi lưu.
                   </p>
                 </div>
               </div>
@@ -1065,6 +1306,73 @@ function BookInput({
         onChange={(event) => onChange(event.target.value)}
         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
       />
+    </div>
+  );
+}
+
+function BookImageGallery({
+  images,
+  compact = false,
+  deletedImageIds = [],
+  onToggleDelete,
+}: {
+  images: ExistingBookImage[];
+  compact?: boolean;
+  deletedImageIds?: string[];
+  onToggleDelete?: (imageId?: string) => void;
+}) {
+  if (images.length === 0) {
+    return <p className="text-sm text-gray-500">Chưa có ảnh sách.</p>;
+  }
+
+  return (
+    <div className={`grid gap-3 ${compact ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4 md:grid-cols-5'}`}>
+      {images.map((image, index) => {
+        const isDeleted = Boolean(image.id && deletedImageIds.includes(image.id));
+
+        return (
+        <div
+          key={`${image.url}-${index}`}
+          className={`relative overflow-hidden rounded-lg border bg-white ${
+            isDeleted ? 'border-red-300 opacity-60' : 'border-gray-200'
+          }`}
+        >
+          <img
+            src={image.url}
+            alt={`Ảnh sách ${index + 1}`}
+            className={`${compact ? 'h-24' : 'h-32'} w-full object-cover`}
+          />
+          {onToggleDelete && image.id && (
+            <button
+              type="button"
+              onClick={() => onToggleDelete(image.id)}
+              className={`absolute right-2 top-2 rounded-md px-2 py-1 text-xs font-medium shadow-sm ${
+                isDeleted
+                  ? 'bg-white text-red-600 hover:bg-red-50'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              {isDeleted ? 'Hoàn tác' : 'Xóa'}
+            </button>
+          )}
+          {image.isPrimary && !isDeleted && (
+            <div className="absolute left-2 top-2 rounded-md bg-orange-500 px-2 py-1 text-xs font-medium text-white">
+              Chính
+            </div>
+          )}
+          {isDeleted && (
+            <div className="absolute inset-x-0 bottom-0 bg-red-600/90 px-2 py-1 text-center text-xs font-medium text-white">
+              Sẽ xóa khi lưu
+            </div>
+          )}
+          {!compact && (
+            <div className="px-2 py-1 text-center text-xs text-gray-500">
+              Ảnh {index + 1}
+            </div>
+          )}
+        </div>
+      );
+      })}
     </div>
   );
 }

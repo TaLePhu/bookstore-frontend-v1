@@ -9,8 +9,10 @@ export interface ApiBook {
   isbn?: string | null;
   stock?: number;
   soldCount?: number | string | null;
+  status?: 'in_stock' | 'out_of_stock' | 'deleted';
+  deletedAt?: string | null;
   image?: string;
-  images?: Array<string | { imageUrl?: string; url?: string }>;
+  images?: Array<string | { id?: string; imageUrl?: string; url?: string; isPrimary?: boolean }>;
   originalPrice?: number | string | null;
   discount?: number | null;
   rating?: number | null;
