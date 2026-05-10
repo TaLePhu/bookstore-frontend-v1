@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Bot, Sparkles, Search, TrendingUp, Heart, BookOpen, Star, ShoppingCart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-import { getBestSellerBooks, semanticSearchBooks } from '../services/book.service';
+import { getBestSellerBooks } from '../services/book.service';
 import { getCategories } from '../services/category.service';
+import { getAIAdvisorRecommendations } from '../services/advisor.service';
 import { formatCurrency, toDisplayBook, type DisplayBook } from '../utils/book-display';
 
 interface CategoryItem {
@@ -15,6 +16,8 @@ export function AIRecommendation() {
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [aiBooks, setAiBooks] = useState<DisplayBook[]>([]);
+  const [aiAnswer, setAiAnswer] = useState('');
+  const [bookReasons, setBookReasons] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const { addToCart } = useCart();
 
@@ -38,17 +41,22 @@ export function AIRecommendation() {
     categories.find((category) => category.id === categoryId)?.name || 'Gợi ý phù hợp';
 
   const runSearch = async (value: string) => {
+    const keyword = value.trim();
+    if (!keyword) return;
+
     setIsLoading(true);
     try {
-      const keyword = value.trim();
-      const result = keyword ? await semanticSearchBooks(keyword, 1, 8) : { data: [] };
-      const fallbackBooks = result.data.length > 0 ? result.data : await getBestSellerBooks();
-      setAiBooks(fallbackBooks.slice(0, 4).map((book, index) => toDisplayBook(book, index)));
+      const result = await getAIAdvisorRecommendations(keyword, 4);
+      setAiAnswer(result.answer);
+      setBookReasons(Object.fromEntries(result.books.map((book) => [book.id, book.reason])));
+      setAiBooks(result.books.map((book, index) => toDisplayBook(book, index)));
       setShowResults(true);
     } catch (error) {
       console.error('Fetch AI recommendation books error:', error);
       try {
         const fallbackBooks = await getBestSellerBooks();
+        setAiAnswer('AI tạm thời chưa phản hồi được, mình hiển thị các sách nổi bật để bạn tham khảo trước.');
+        setBookReasons({});
         setAiBooks(fallbackBooks.slice(0, 4).map((book, index) => toDisplayBook(book, index)));
         setShowResults(true);
       } catch (fallbackError) {
@@ -157,6 +165,11 @@ export function AIRecommendation() {
                   AI đã tìm thấy {aiBooks.length} cuốn sách phù hợp
                 </h3>
               </div>
+              {aiAnswer && (
+                <p className="mb-6 rounded-xl bg-indigo-50 px-4 py-3 text-sm leading-6 text-indigo-800">
+                  {aiAnswer}
+                </p>
+              )}
 
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
                 {aiBooks.map((book, index) => (
@@ -192,7 +205,7 @@ export function AIRecommendation() {
                       <div className="bg-indigo-50 rounded-lg p-2 mb-3">
                         <p className="text-xs text-indigo-700 flex items-start gap-1">
                           <Bot className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                          <span>Dựa trên nội dung bạn vừa tìm và dữ liệu sách thật trong kho</span>
+                          <span>{bookReasons[book.id] || 'Dựa trên nội dung bạn vừa tìm và dữ liệu sách thật trong kho'}</span>
                         </p>
                       </div>
 
