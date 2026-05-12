@@ -56,6 +56,7 @@ import {
   restoreAdminBook,
   restoreAdminCategory,
   resetAdminUserPassword,
+  rejectAdminCancelRequest,
   updateAdminCategory,
   updateAdminBook,
   updateAdminUserRole,
@@ -89,6 +90,10 @@ type ConfirmDialog = {
   confirmLabel: string;
   variant?: 'danger' | 'warning';
   onConfirm: () => Promise<void>;
+} | null;
+type CancelDecisionDialog = {
+  action: 'approve' | 'reject';
+  order: AdminOrderDetail;
 } | null;
 
 const COLORS = ['#F97316', '#3B82F6', '#8B5CF6', '#10B981', '#EF4444', '#14B8A6'];
@@ -175,6 +180,46 @@ const hasCustomerCancelRequest = (order?: Pick<AdminOrderDetail, 'status' | 'sta
         ))
   );
 
+const isCustomerCancelRequestLog = (log: NonNullable<AdminOrderDetail['statusLogs']>[number]) =>
+  log.fromStatus === log.toStatus &&
+  !log.changedByUser &&
+  Boolean(
+    log.note?.includes('yêu cầu hủy') ||
+      log.note?.includes('yĂªu cáº§u há»§y') ||
+      log.note?.startsWith('Khách yêu cầu hủy:') ||
+      log.note?.startsWith('KhĂ¡ch yĂªu cáº§u há»§y:')
+  );
+
+const isCancelRequestResolutionLog = (log: NonNullable<AdminOrderDetail['statusLogs']>[number]) =>
+  Boolean(
+    log.changedByUser &&
+      (log.toStatus === 'CANCELLED' ||
+        (log.fromStatus === log.toStatus &&
+          (log.note?.startsWith('Admin từ chối yêu cầu hủy:') ||
+            log.note?.startsWith('Admin tu choi yeu cau huy:'))))
+  );
+
+const hasPendingCustomerCancelRequest = (
+  order?: Pick<AdminOrderDetail, 'status' | 'statusLogs'> | AdminOrder | null
+) => {
+  if (!order || !['PENDING', 'PROCESSING'].includes(order.status)) return false;
+
+  const statusLogs = (order as AdminOrderDetail).statusLogs;
+  if (!statusLogs) return Boolean((order as AdminOrder).cancelRequested);
+
+  const sortedLogs = [...statusLogs].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  const latestRequest = sortedLogs.find(isCustomerCancelRequestLog);
+  const latestResolution = sortedLogs.find(isCancelRequestResolutionLog);
+
+  return Boolean(
+    latestRequest &&
+      (!latestResolution ||
+        new Date(latestRequest.createdAt).getTime() > new Date(latestResolution.createdAt).getTime())
+  );
+};
+
 const getBookStatusMeta = (book: ApiBook) => {
   const stock = Number(book.stock || 0);
 
@@ -228,6 +273,8 @@ export function AdminPage() {
   const [popupMessage, setPopupMessage] = useState<PopupMessage>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null);
   const [isConfirmingDialog, setIsConfirmingDialog] = useState(false);
+  const [cancelDecisionDialog, setCancelDecisionDialog] = useState<CancelDecisionDialog>(null);
+  const [cancelDecisionNote, setCancelDecisionNote] = useState('');
   const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(null);
   const [books, setBooks] = useState<ApiBook[]>([]);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
@@ -336,7 +383,7 @@ export function AdminPage() {
 
   const filteredOrders = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
-    let result = showCancelRequestsOnly ? orders.filter((order) => hasCustomerCancelRequest(order)) : orders;
+    let result = showCancelRequestsOnly ? orders.filter((order) => hasPendingCustomerCancelRequest(order)) : orders;
     if (currentView !== 'orders' || !keyword) return result;
     return result.filter((order) =>
       [order.orderCode, order.customerName, order.customerEmail, order.id]
@@ -406,7 +453,7 @@ export function AdminPage() {
     const stock = Number(book.stock || 0);
     return !isBookDeleted(book) && stock > 0 && stock <= LOW_STOCK_THRESHOLD;
   });
-  const cancelRequestOrders = orders.filter((order) => hasCustomerCancelRequest(order));
+  const cancelRequestOrders = orders.filter((order) => hasPendingCustomerCancelRequest(order));
   const activeUsers = customers.filter((customer) => !customer.isLocked);
   const lockedUsers = customers.filter((customer) => customer.isLocked);
   const verifiedUsers = customers.filter((customer) => customer.isVerified);
@@ -768,23 +815,74 @@ export function AdminPage() {
 
   const handleUpdateStatus = async (status: AdminOrderStatus) => {
     if (!selectedOrder) return;
-    const note =
-      status === 'CANCELLED'
-        ? window.prompt('Nhập lý do hủy đơn hàng:', 'Admin hủy đơn từ dashboard')?.trim()
-        : undefined;
-
-    if (status === 'CANCELLED' && !note) {
-      showPopup({ type: 'error', text: 'Vui lòng nhập lý do hủy đơn hàng.' });
+    if (status === 'CANCELLED') {
+      openCancelDecisionDialog('approve');
       return;
     }
 
     try {
       setUpdatingStatus(true);
-      const updatedOrder = await updateAdminOrderStatus(selectedOrder.id, status, note);
+      const updatedOrder = await updateAdminOrderStatus(selectedOrder.id, status);
       setSelectedOrder(updatedOrder);
       await loadData();
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Không thể cập nhật trạng thái đơn hàng');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const openCancelDecisionDialog = (action: 'approve' | 'reject') => {
+    if (!selectedOrder) return;
+    setCancelDecisionDialog({ action, order: selectedOrder });
+    setCancelDecisionNote(action === 'approve' ? 'Admin duyệt yêu cầu hủy đơn' : '');
+  };
+
+  const closeCancelDecisionDialog = () => {
+    if (updatingStatus) return;
+    setCancelDecisionDialog(null);
+    setCancelDecisionNote('');
+  };
+
+  const handleCancelDecisionSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!cancelDecisionDialog) return;
+
+    const note = cancelDecisionNote.trim();
+    if (!note) {
+      showPopup({
+        type: 'error',
+        text:
+          cancelDecisionDialog.action === 'approve'
+            ? 'Vui lòng nhập lý do hủy đơn hàng.'
+            : 'Vui lòng nhập lý do từ chối yêu cầu hủy.',
+      });
+      return;
+    }
+
+    try {
+      setUpdatingStatus(true);
+      const updatedOrder =
+        cancelDecisionDialog.action === 'approve'
+          ? await updateAdminOrderStatus(cancelDecisionDialog.order.id, 'CANCELLED', note)
+          : await rejectAdminCancelRequest(cancelDecisionDialog.order.id, note);
+
+      setSelectedOrder(updatedOrder);
+      setCancelDecisionDialog(null);
+      setCancelDecisionNote('');
+      await loadData();
+      showPopup({
+        type: 'success',
+        text:
+          cancelDecisionDialog.action === 'approve'
+            ? 'Đã duyệt yêu cầu hủy đơn hàng.'
+            : 'Đã từ chối yêu cầu hủy, đơn hàng tiếp tục được xử lý.',
+      });
+    } catch (err: any) {
+      showPopup({
+        type: 'error',
+        text: err?.response?.data?.message || 'Không thể xử lý yêu cầu hủy đơn hàng.',
+      });
     } finally {
       setUpdatingStatus(false);
     }
@@ -985,6 +1083,91 @@ export function AdminPage() {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {cancelDecisionDialog && (
+            <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/50 p-4">
+              <form
+                onSubmit={handleCancelDecisionSubmit}
+                className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+              >
+                <div
+                  className={`px-6 py-5 text-white ${
+                    cancelDecisionDialog.action === 'approve' ? 'bg-red-600' : 'bg-orange-500'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-xl font-bold">
+                        {cancelDecisionDialog.action === 'approve'
+                          ? 'Duyệt hủy đơn hàng'
+                          : 'Từ chối yêu cầu hủy'}
+                      </h3>
+                      <p className="mt-1 text-sm text-white/90">
+                        Đơn {cancelDecisionDialog.order.orderCode || cancelDecisionDialog.order.id.slice(0, 8)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeCancelDecisionDialog}
+                      disabled={updatingStatus}
+                      className="rounded-lg p-1.5 text-white/80 hover:bg-white/15 hover:text-white disabled:opacity-50"
+                      title="Đóng"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-4 p-6">
+                  <label className="block">
+                    <span className="text-sm font-semibold text-gray-800">
+                      {cancelDecisionDialog.action === 'approve'
+                        ? 'Lý do hủy đơn'
+                        : 'Lý do từ chối yêu cầu hủy'}
+                    </span>
+                    <textarea
+                      value={cancelDecisionNote}
+                      onChange={(event) => setCancelDecisionNote(event.target.value.slice(0, 500))}
+                      rows={4}
+                      className="mt-2 w-full resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                      placeholder={
+                        cancelDecisionDialog.action === 'approve'
+                          ? 'Nhập lý do hủy đơn hàng...'
+                          : 'Nhập lý do từ chối yêu cầu hủy...'
+                      }
+                    />
+                  </label>
+                  <div className="text-right text-xs text-gray-500">{cancelDecisionNote.length}/500</div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={closeCancelDecisionDialog}
+                      disabled={updatingStatus}
+                      className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Đóng
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={updatingStatus || cancelDecisionNote.trim().length === 0}
+                      className={`rounded-lg px-4 py-2 font-semibold text-white disabled:opacity-50 ${
+                        cancelDecisionDialog.action === 'approve'
+                          ? 'bg-red-600 hover:bg-red-700'
+                          : 'bg-orange-500 hover:bg-orange-600'
+                      }`}
+                    >
+                      {updatingStatus
+                        ? 'Đang xử lý...'
+                        : cancelDecisionDialog.action === 'approve'
+                          ? 'Duyệt hủy'
+                          : 'Từ chối yêu cầu'}
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
           )}
 
@@ -1551,7 +1734,7 @@ export function AdminPage() {
                           <span className={`text-xs px-2 py-1 rounded-full ${getOrderStatusColor(order.status)}`}>
                             {getOrderStatusText(order.status)}
                           </span>
-                          {hasCustomerCancelRequest(order) && (
+                          {hasPendingCustomerCancelRequest(order) && (
                             <span className="ml-2 inline-flex rounded-full bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800">
                               Khách yêu cầu hủy
                             </span>
@@ -1559,7 +1742,7 @@ export function AdminPage() {
                         </TableCell>
                         <TableCell align="right">
                           <div className="flex justify-end gap-2">
-                            {hasCustomerCancelRequest(order) && (
+                            {hasPendingCustomerCancelRequest(order) && (
                               <button
                                 onClick={() => openOrderDetail(order)}
                                 className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
@@ -2024,7 +2207,7 @@ export function AdminPage() {
                 />
               </div>
 
-              {hasCustomerCancelRequest(selectedOrder) && (
+              {hasPendingCustomerCancelRequest(selectedOrder) && (
                 <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-700" />
@@ -2041,6 +2224,14 @@ export function AdminPage() {
                           className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
                         >
                           Duyệt hủy đơn
+                        </button>
+                        <button
+                          type="button"
+                          disabled={updatingStatus}
+                          onClick={() => openCancelDecisionDialog('reject')}
+                          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Từ chối yêu cầu
                         </button>
                         {selectedOrder.status === 'PENDING' && (
                           <button

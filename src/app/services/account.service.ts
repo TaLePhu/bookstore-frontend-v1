@@ -85,6 +85,8 @@ export interface OrderDto {
     toStatus: string;
     note?: string | null;
     createdAt: string;
+    changedBy?: string | null;
+    changedByUser?: unknown;
   }>;
 }
 
@@ -94,6 +96,82 @@ export interface MyOrdersResponse {
   page: number;
   limit: number;
 }
+
+export const isCancelRequestLog = (log?: { fromStatus?: string; toStatus?: string; note?: string | null }) =>
+  Boolean(
+    log?.fromStatus === log?.toStatus &&
+      (log.note?.includes('yêu cầu hủy') ||
+        log.note?.includes('yĂªu cáº§u há»§y') ||
+        log.note?.startsWith('Khách yêu cầu hủy:') ||
+        log.note?.startsWith('KhĂ¡ch yĂªu cáº§u há»§y:'))
+  );
+
+export const hasPendingCancelRequest = (order?: Pick<OrderDto, 'status' | 'statusLogs'> | null) =>
+  getCancelRequestState(order).status === 'pending';
+
+export type OrderStatusLogDto = NonNullable<OrderDto['statusLogs']>[number];
+export type CancelRequestState = {
+  status: 'none' | 'pending' | 'rejected' | 'cancelled';
+  requestLog?: OrderStatusLogDto;
+  resolutionLog?: OrderStatusLogDto;
+};
+
+const isCustomerCancelRequestLog = (log?: OrderStatusLogDto) =>
+  Boolean(
+    log?.fromStatus === log?.toStatus &&
+      !log.changedBy &&
+      !log.changedByUser &&
+      (log.note?.includes('yêu cầu hủy') ||
+        log.note?.includes('yĂªu cáº§u há»§y') ||
+        log.note?.includes('yÄ‚Âªu cĂ¡ÂºÂ§u hĂ¡Â»Â§y') ||
+        log.note?.startsWith('Khách yêu cầu hủy:') ||
+        log.note?.startsWith('KhĂ¡ch yĂªu cáº§u há»§y:') ||
+        log.note?.startsWith('KhÄ‚Â¡ch yÄ‚Âªu cĂ¡ÂºÂ§u hĂ¡Â»Â§y:'))
+  );
+
+const isCancelRequestResolvedLog = (log?: OrderStatusLogDto) =>
+  Boolean(
+    log &&
+      (log.toStatus === 'CANCELLED' ||
+        (log.fromStatus === log.toStatus &&
+          (log.note?.startsWith('Admin từ chối yêu cầu hủy:') ||
+            log.note?.startsWith('Admin tu choi yeu cau huy:'))))
+  );
+
+export const getCancelRequestState = (order?: Pick<OrderDto, 'status' | 'statusLogs'> | null): CancelRequestState => {
+  if (!order) return { status: 'none' };
+
+  const logs = [...(order.statusLogs || [])].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  const requestLog = logs.find(isCustomerCancelRequestLog);
+  const resolutionLog = logs.find(isCancelRequestResolvedLog);
+
+  if (order.status === 'CANCELLED') {
+    return { status: 'cancelled', requestLog, resolutionLog };
+  }
+
+  if (!requestLog) {
+    return { status: 'none' };
+  }
+
+  if (resolutionLog && new Date(resolutionLog.createdAt).getTime() > new Date(requestLog.createdAt).getTime()) {
+    return { status: 'rejected', requestLog, resolutionLog };
+  }
+
+  return ['PENDING', 'PROCESSING'].includes(order.status)
+    ? { status: 'pending', requestLog, resolutionLog }
+    : { status: 'none', requestLog, resolutionLog };
+};
+
+export const getCancelLogMessage = (log?: { note?: string | null }) =>
+  (log?.note || '')
+    .replace(/^Khách yêu cầu hủy:\s*/i, '')
+    .replace(/^KhĂ¡ch yĂªu cáº§u há»§y:\s*/i, '')
+    .replace(/^KhÄ‚Â¡ch yÄ‚Âªu cĂ¡ÂºÂ§u hĂ¡Â»Â§y:\s*/i, '')
+    .replace(/^Admin từ chối yêu cầu hủy:\s*/i, '')
+    .replace(/^Admin tu choi yeu cau huy:\s*/i, '')
+    .trim();
 
 export const getMyProfile = async (): Promise<UserProfile> => {
   const res = await api.get('/users/me');

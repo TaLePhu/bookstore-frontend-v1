@@ -13,6 +13,12 @@ const AUTH_ERROR_HANDLED_ENDPOINTS = [
   'auth/verify-email',
   '/auth/resend-code',
   'auth/resend-code',
+  '/auth/forgot-password',
+  'auth/forgot-password',
+  '/auth/verify-reset-code',
+  'auth/verify-reset-code',
+  '/auth/reset-password',
+  'auth/reset-password',
 ];
 
 const api = axios.create({

@@ -21,7 +21,14 @@ import {
   XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { requestCancelOrder, submitOrderReview, trackOrderPublic, type OrderDto } from '../services/account.service';
+import {
+  getCancelLogMessage,
+  getCancelRequestState,
+  requestCancelOrder,
+  submitOrderReview,
+  trackOrderPublic,
+  type OrderDto,
+} from '../services/account.service';
 import { formatCurrency, getBookImage } from '../utils/book-display';
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
@@ -50,6 +57,12 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
 const formatOrderCode = (id: string) => `#${id.slice(0, 8).toUpperCase()}`;
 const formatDateTime = (value?: string) => (value ? new Date(value).toLocaleString('vi-VN') : 'Đang cập nhật');
 const getStatusLabel = (status?: string) => ORDER_STATUS_LABELS[status || ''] || status || 'Đang cập nhật';
+const getDisplayStatusLabel = (order?: OrderDto | null) => {
+  const cancelState = getCancelRequestState(order);
+  if (cancelState.status === 'pending') return 'Đã gửi yêu cầu hủy';
+  if (cancelState.status === 'rejected') return 'Yêu cầu hủy bị từ chối';
+  return getStatusLabel(order?.status);
+};
 const getPaymentMethodLabel = (method?: string) => PAYMENT_METHOD_LABELS[method || ''] || method || 'Đang cập nhật';
 const getPaymentStatusLabel = (status?: string) => PAYMENT_STATUS_LABELS[status || ''] || status || 'Đang cập nhật';
 
@@ -91,25 +104,91 @@ export function TrackOrderPage() {
   const [reviewedBookIds, setReviewedBookIds] = useState<string[]>([]);
   const [pendingAction, setPendingAction] = useState<'cancel' | 'review' | null>(initialState?.action || null);
 
-  const trackingSteps = useMemo(
-    () => [
-      { id: 0, title: 'Đơn hàng đã đặt', description: 'Đơn hàng đã được tạo thành công', icon: ClipboardCheck },
-      { id: 1, title: 'Đã xác nhận', description: 'Đơn hàng đang chờ cửa hàng xác nhận', icon: CheckCircle2 },
-      { id: 2, title: 'Đang xử lý', description: 'Sách đang được chuẩn bị và đóng gói', icon: Box },
-      { id: 3, title: 'Đang giao hàng', description: 'Đơn hàng đang trên đường giao đến bạn', icon: Truck },
-      { id: 4, title: 'Giao hàng thành công', description: 'Đơn hàng đã được giao thành công', icon: PackageCheck },
-    ],
-    []
-  );
-
-  const currentStatus = selectedOrder ? statusToStep(selectedOrder.status) : 0;
   const address = selectedOrder?.address;
   const payment = selectedOrder?.payments?.[0];
   const displayOrderCode = selectedOrder?.orderCode || (selectedOrder?.id ? formatOrderCode(selectedOrder.id) : '');
   const subtotal = selectedOrder?.items.reduce((sum, item) => sum + Number(item.subTotal || 0), 0) || 0;
-  const hasCancelRequest = Boolean(
-    selectedOrder?.statusLogs?.some((log) => log.note?.startsWith('Khách yêu cầu hủy:') && log.fromStatus === log.toStatus)
-  );
+  const cancelRequestState = getCancelRequestState(selectedOrder);
+  const hasCancelRequest = cancelRequestState.status === 'pending';
+  const trackingSteps = useMemo(() => {
+    const baseSteps = [
+      { id: 0, title: 'Đơn hàng đã đặt', description: 'Đơn hàng đã được tạo thành công', icon: ClipboardCheck, date: selectedOrder?.createdAt },
+      { id: 1, title: 'Đã xác nhận', description: 'Đơn hàng đang chờ cửa hàng xác nhận', icon: CheckCircle2, date: selectedOrder?.updatedAt },
+      { id: 2, title: 'Đang xử lý', description: 'Sách đang được chuẩn bị và đóng gói', icon: Box, date: selectedOrder?.updatedAt },
+      { id: 3, title: 'Đang giao hàng', description: 'Đơn hàng đang trên đường giao đến bạn', icon: Truck, date: selectedOrder?.updatedAt },
+      { id: 4, title: 'Giao hàng thành công', description: 'Đơn hàng đã được giao thành công', icon: PackageCheck, date: selectedOrder?.updatedAt },
+    ];
+
+    if (cancelRequestState.status === 'pending') {
+      return [
+        baseSteps[0],
+        {
+          id: 0.5,
+          title: 'Đã gửi yêu cầu hủy',
+          description: 'Yêu cầu hủy đang chờ cửa hàng xử lý',
+          icon: AlertCircle,
+          date: cancelRequestState.requestLog?.createdAt,
+        },
+        ...baseSteps.slice(1),
+      ];
+    }
+
+    if (cancelRequestState.status === 'rejected') {
+      return [
+        baseSteps[0],
+        {
+          id: 0.5,
+          title: 'Đã gửi yêu cầu hủy',
+          description: getCancelLogMessage(cancelRequestState.requestLog) || 'Khách đã gửi yêu cầu hủy đơn hàng',
+          icon: AlertCircle,
+          date: cancelRequestState.requestLog?.createdAt,
+        },
+        {
+          id: 0.75,
+          title: 'Yêu cầu hủy bị từ chối',
+          description: getCancelLogMessage(cancelRequestState.resolutionLog) || 'Cửa hàng từ chối yêu cầu hủy',
+          icon: XCircle,
+          date: cancelRequestState.resolutionLog?.createdAt,
+        },
+        ...baseSteps.slice(1),
+      ];
+    }
+
+    if (cancelRequestState.status === 'cancelled') {
+      return [
+        baseSteps[0],
+        ...(cancelRequestState.requestLog
+          ? [
+              {
+                id: 0.5,
+                title: 'Đã gửi yêu cầu hủy',
+                description: getCancelLogMessage(cancelRequestState.requestLog) || 'Khách đã gửi yêu cầu hủy đơn hàng',
+                icon: AlertCircle,
+                date: cancelRequestState.requestLog.createdAt,
+              },
+            ]
+          : []),
+        {
+          id: 1,
+          title: 'Đã hủy đơn hàng',
+          description: getCancelLogMessage(cancelRequestState.resolutionLog) || 'Đơn hàng đã được cửa hàng hủy',
+          icon: XCircle,
+          date: cancelRequestState.resolutionLog?.createdAt || selectedOrder?.updatedAt,
+        },
+      ];
+    }
+
+    return baseSteps;
+  }, [cancelRequestState, selectedOrder?.createdAt, selectedOrder?.updatedAt]);
+  const currentStatus =
+    cancelRequestState.status === 'pending'
+      ? 0.5
+      : cancelRequestState.status === 'rejected'
+        ? 0.75
+        : selectedOrder
+          ? statusToStep(selectedOrder.status)
+          : 0;
+  const currentStepIndex = trackingSteps.reduce((latestIndex, step, index) => (step.id <= currentStatus ? index : latestIndex), 0);
   const canRequestCancel = selectedOrder ? ['PENDING', 'PROCESSING'].includes(selectedOrder.status) && !hasCancelRequest : false;
   const canReviewOrder = selectedOrder?.status === 'COMPLETED';
   const shippingAddress = address
@@ -348,12 +427,45 @@ export function TrackOrderPage() {
                   </div>
                   <div className="rounded-xl bg-white/15 p-4 md:text-right">
                     <div className="text-sm opacity-90">Trạng thái</div>
-                    <div className="text-xl font-bold">{getStatusLabel(selectedOrder.status)}</div>
+                    <div className="text-xl font-bold">{getDisplayStatusLabel(selectedOrder)}</div>
                     <div className="mt-2 text-sm opacity-90">Tổng tiền</div>
                     <div className="text-xl font-bold">{formatCurrency(Number(selectedOrder.totalAmount))}</div>
                   </div>
                 </div>
               </div>
+
+              {cancelRequestState.status !== 'none' && (
+                <div
+                  className={`rounded-2xl border p-5 shadow-sm ${
+                    cancelRequestState.status === 'pending'
+                      ? 'border-yellow-200 bg-yellow-50 text-yellow-800'
+                      : cancelRequestState.status === 'rejected'
+                        ? 'border-orange-200 bg-orange-50 text-orange-800'
+                        : 'border-red-200 bg-red-50 text-red-800'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                    <div className="space-y-1 text-sm leading-6">
+                      <div className="font-bold">
+                        {cancelRequestState.status === 'pending'
+                          ? 'Yêu cầu hủy đang chờ cửa hàng xử lý'
+                          : cancelRequestState.status === 'rejected'
+                            ? 'Yêu cầu hủy đã bị từ chối'
+                            : 'Đơn hàng đã được hủy'}
+                      </div>
+                      {cancelRequestState.requestLog && (
+                        <div>Lý do khách yêu cầu: {getCancelLogMessage(cancelRequestState.requestLog) || 'Không có ghi chú'}</div>
+                      )}
+                      {cancelRequestState.resolutionLog && (
+                        <div>
+                          Phản hồi cửa hàng: {getCancelLogMessage(cancelRequestState.resolutionLog) || getStatusLabel(selectedOrder.status)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="rounded-2xl bg-white p-6 shadow-lg">
                 <h2 className="mb-6 text-2xl font-bold text-gray-900">Lộ trình đơn hàng</h2>
@@ -361,7 +473,7 @@ export function TrackOrderPage() {
                   <div className="absolute bottom-0 left-6 top-0 w-1 bg-gray-200" />
                   <div
                     className="absolute left-6 top-0 w-1 bg-orange-500 transition-all"
-                    style={{ height: `${(currentStatus / (trackingSteps.length - 1)) * 100}%` }}
+                    style={{ height: `${(currentStepIndex / Math.max(trackingSteps.length - 1, 1)) * 100}%` }}
                   />
 
                   <div className="space-y-7">
@@ -385,7 +497,7 @@ export function TrackOrderPage() {
                               </h3>
                               {isActive && (
                                 <div className="text-sm text-gray-500">
-                                  {formatDateTime(step.id === 0 ? selectedOrder.createdAt : selectedOrder.updatedAt)}
+                                  {formatDateTime(step.date)}
                                 </div>
                               )}
                             </div>
@@ -507,6 +619,30 @@ export function TrackOrderPage() {
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-600" />
                     Yêu cầu hủy của bạn đã được gửi và đang chờ cửa hàng xử lý.
                   </div>
+                ) : cancelRequestState.status === 'rejected' ? (
+                  <>
+                    <div className="mb-4 flex gap-2 rounded-xl bg-orange-50 p-4 text-sm leading-6 text-orange-700">
+                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
+                      <div>
+                        Yêu cầu hủy trước đó đã bị từ chối.
+                        {cancelRequestState.resolutionLog && (
+                          <div className="mt-1 font-medium">
+                            {getCancelLogMessage(cancelRequestState.resolutionLog)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {canRequestCancel && (
+                      <button
+                        type="button"
+                        onClick={openCancelModal}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 font-bold text-white transition-colors hover:bg-red-700"
+                      >
+                        <XCircle className="h-5 w-5" />
+                        Gửi lại yêu cầu hủy
+                      </button>
+                    )}
+                  </>
                 ) : canRequestCancel ? (
                   <>
                     <p className="mb-4 text-sm leading-6 text-gray-600">

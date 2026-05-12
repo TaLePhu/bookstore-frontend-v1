@@ -29,9 +29,18 @@ const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 type EmailCheckStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error';
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
-  const { login, register, checkEmailExists, verifyEmail, resendVerificationCode } = useAuth();
+  const {
+    login,
+    register,
+    checkEmailExists,
+    verifyEmail,
+    resendVerificationCode,
+    requestPasswordReset,
+    verifyPasswordResetCode,
+    resetPassword,
+  } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<'login' | 'register' | 'verify' | 'forgot'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'verify' | 'forgot' | 'resetVerify' | 'resetPassword'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [isResendingCode, setIsResendingCode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -234,19 +243,88 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setSuccessMessage('Chúng tôi đã ghi nhận yêu cầu đặt lại mật khẩu.');
-    } catch {
-      setError('Đã có lỗi xảy ra. Vui lòng thử lại.');
+      const message = await requestPasswordReset(form.email.trim());
+      setVerificationCode('');
+      setMode('resetVerify');
+      setSuccessMessage(message);
+    } catch (err: any) {
+      setError(getAuthErrorMessage(err, 'Không thể gửi mã đặt lại mật khẩu. Vui lòng thử lại.'));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const title = mode === 'forgot' ? 'Quên mật khẩu' : mode === 'verify' ? 'Xác thực email' : mode === 'login' ? 'Đăng nhập' : 'Đăng ký';
+  const handleVerifyPasswordResetCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    resetMessages();
+
+    if (verificationCode.trim().length !== 6) {
+      setError('Vui lòng nhập mã xác thực gồm 6 chữ số.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const message = await verifyPasswordResetCode(form.email.trim(), verificationCode.trim());
+      updateField('password', '');
+      updateField('confirmPassword', '');
+      setMode('resetPassword');
+      setSuccessMessage(message);
+    } catch (err: any) {
+      setError(getAuthErrorMessage(err, 'Mã xác thực không hợp lệ hoặc đã hết hạn.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    resetMessages();
+
+    if (!isStrongPassword(form.password)) {
+      setError('Mật khẩu cần ít nhất 8 ký tự, có chữ hoa, chữ thường và số.');
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      setError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const message = await resetPassword(form.email.trim(), verificationCode.trim(), form.password);
+      setMode('login');
+      setSuccessMessage(message);
+      updateField('password', '');
+      updateField('confirmPassword', '');
+      setVerificationCode('');
+    } catch (err: any) {
+      setError(getAuthErrorMessage(err, 'Không thể đặt lại mật khẩu. Vui lòng thử lại.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const title =
+    mode === 'forgot'
+      ? 'Quên mật khẩu'
+      : mode === 'resetVerify'
+      ? 'Nhập mã xác thực'
+      : mode === 'resetPassword'
+      ? 'Đặt mật khẩu mới'
+      : mode === 'verify'
+      ? 'Xác thực email'
+      : mode === 'login'
+      ? 'Đăng nhập'
+      : 'Đăng ký';
   const subtitle =
     mode === 'forgot'
       ? 'Nhập email để nhận hướng dẫn đặt lại mật khẩu'
+      : mode === 'resetVerify'
+      ? `Nhập mã 6 số đã gửi đến ${form.email}`
+      : mode === 'resetPassword'
+      ? 'Tạo mật khẩu mới cho tài khoản của bạn'
       : mode === 'verify'
       ? `Nhập mã 6 số đã gửi đến ${form.email}`
       : mode === 'login'
@@ -263,6 +341,10 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     form.password === form.confirmPassword;
   const isVerifyReady = verificationCode.trim().length === 6;
   const isForgotReady = isValidEmail(form.email.trim());
+  const isResetPasswordReady =
+    verificationCode.trim().length === 6 &&
+    isStrongPassword(form.password) &&
+    form.password === form.confirmPassword;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -270,7 +352,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
       <div className="relative mx-4 max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
         <div className="relative bg-gradient-to-r from-orange-500 to-orange-600 p-6 text-white">
-          {(mode === 'forgot' || mode === 'verify') && (
+          {mode === 'verify' && (
             <button type="button" onClick={backToLogin} className="absolute left-4 top-4 rounded-full p-2 hover:bg-white/20">
               <ArrowLeft className="h-5 w-5" />
             </button>
@@ -287,6 +369,59 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             <Message error={error} successMessage={successMessage} />
             <TextField label="Email" type="email" icon={Mail} value={form.email} onChange={(value) => updateField('email', value)} placeholder="example@email.com" />
             <SubmitButton loading={isLoading} disabled={!isForgotReady} label="Gửi hướng dẫn" loadingLabel="Đang gửi..." />
+            <BackToLoginLink onClick={backToLogin} />
+          </form>
+        ) : mode === 'resetVerify' ? (
+          <form onSubmit={handleVerifyPasswordResetCode} className="space-y-4 p-6">
+            <Message error={error} successMessage={successMessage} />
+            <TextField
+              label="Mã xác thực"
+              icon={ShieldCheck}
+              value={verificationCode}
+              onChange={(value) => setVerificationCode(value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="000000"
+              inputMode="numeric"
+              maxLength={6}
+              centered
+            />
+            <SubmitButton loading={isLoading} disabled={!isVerifyReady} label="Tiếp tục" loadingLabel="Đang kiểm tra..." />
+            <button
+              type="button"
+              onClick={async () => {
+                resetMessages();
+                setIsResendingCode(true);
+                try {
+                  const message = await requestPasswordReset(form.email.trim());
+                  setSuccessMessage(message);
+                } catch (err: any) {
+                  setError(getAuthErrorMessage(err, 'Không thể gửi lại mã. Vui lòng thử lại.'));
+                } finally {
+                  setIsResendingCode(false);
+                }
+              }}
+              disabled={isResendingCode}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-orange-300 py-3 font-medium text-orange-600 hover:bg-orange-50 disabled:opacity-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {isResendingCode ? 'Đang gửi...' : 'Gửi lại mã'}
+            </button>
+            <BackToLoginLink onClick={backToLogin} />
+          </form>
+        ) : mode === 'resetPassword' ? (
+          <form onSubmit={handleResetPassword} className="space-y-4 p-6">
+            <Message error={error} successMessage={successMessage} />
+            <PasswordField value={form.password} onChange={(value) => updateField('password', value)} showPassword={showPassword} setShowPassword={setShowPassword} />
+            <TextField
+              label="Xác nhận mật khẩu"
+              type="password"
+              icon={Lock}
+              value={form.confirmPassword}
+              onChange={(value) => updateField('confirmPassword', value)}
+              placeholder="Aa123456"
+            />
+            <p className="text-xs text-gray-500">Mật khẩu cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.</p>
+            <SubmitButton loading={isLoading} disabled={!isResetPasswordReady} label="Đặt lại mật khẩu" loadingLabel="Đang cập nhật..." />
+            <BackToLoginLink onClick={backToLogin} />
           </form>
         ) : mode === 'verify' ? (
           <form onSubmit={handleVerifyEmail} className="space-y-4 p-6">
@@ -386,6 +521,17 @@ function Message({ error, successMessage }: { error: string; successMessage: str
         </div>
       )}
     </>
+  );
+}
+
+function BackToLoginLink({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="text-center text-sm text-gray-600">
+      Đã nhớ mật khẩu?{' '}
+      <button type="button" onClick={onClick} className="font-medium text-orange-500 hover:text-orange-600">
+        Quay lại đăng nhập
+      </button>
+    </div>
   );
 }
 

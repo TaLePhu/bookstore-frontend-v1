@@ -20,6 +20,9 @@ interface AuthContextType {
   checkEmailExists: (email: string) => Promise<boolean>;
   verifyEmail: (email: string, code: string) => Promise<User>;
   resendVerificationCode: (email: string) => Promise<string>;
+  requestPasswordReset: (email: string) => Promise<string>;
+  verifyPasswordResetCode: (email: string, code: string) => Promise<string>;
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<string>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
 }
@@ -116,6 +119,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return getResponseData(response)?.message || response.data?.message || 'Đã gửi lại mã xác thực.';
   };
 
+  const requestPasswordReset = async (email: string) => {
+    const response = await api.post('auth/forgot-password', { email });
+    return getResponseData(response)?.message || response.data?.message || 'Đã gửi mã đặt lại mật khẩu. Vui lòng kiểm tra email.';
+  };
+
+  const verifyPasswordResetCode = async (email: string, code: string) => {
+    const response = await api.post('auth/verify-reset-code', { email, code });
+    return getResponseData(response)?.message || response.data?.message || 'Mã xác thực hợp lệ. Vui lòng đặt mật khẩu mới.';
+  };
+
+  const resetPassword = async (email: string, code: string, newPassword: string) => {
+    const response = await api.post('auth/reset-password', { email, code, newPassword });
+    return getResponseData(response)?.message || response.data?.message || 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.';
+  };
+
   const logout = async () => {
     try {
       if (localStorage.getItem('accessToken')) {
@@ -145,6 +163,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         checkEmailExists,
         verifyEmail,
         resendVerificationCode,
+        requestPasswordReset,
+        verifyPasswordResetCode,
+        resetPassword,
         logout,
         updateUser,
       }}

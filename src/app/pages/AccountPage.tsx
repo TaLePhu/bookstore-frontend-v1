@@ -36,6 +36,7 @@ import {
   getMyAddresses,
   getMyOrders,
   getMyProfile,
+  getCancelRequestState,
   updateMyAddress,
   updateMyProfile,
   type AddressItem,
@@ -84,7 +85,19 @@ const formatOrderCode = (id: string) => `#${id.slice(0, 8).toUpperCase()}`;
 
 const getDisplayOrderCode = (order: OrderDto) => order.orderCode || formatOrderCode(order.id);
 const hasOrderCancelRequest = (order: OrderDto) =>
-  Boolean(order.statusLogs?.some((log) => log.fromStatus === log.toStatus && log.note?.includes('yêu cầu hủy')));
+  getCancelRequestState(order).status === 'pending';
+
+const getOrderDisplayStatusConfig = (order: OrderDto) => {
+  if (getCancelRequestState(order).status === 'pending') {
+    return {
+      icon: <AlertCircle className="w-5 h-5 text-yellow-500" />,
+      className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      label: 'Đã gửi yêu cầu hủy',
+    };
+  }
+
+  return getStatusConfig(order.status);
+};
 
 const formatAddress = (address: AddressItem) =>
   [
@@ -757,10 +770,11 @@ export function AccountPage() {
                     <div className="text-gray-500">Bạn chưa có đơn hàng nào.</div>
                   ) : (
                     orders.map((order) => {
-                      const status = getStatusConfig(order.status);
+                      const status = getOrderDisplayStatusConfig(order);
                       const firstItem = order.items[0];
                       const displayOrderCode = getDisplayOrderCode(order);
                       const orderLookupCode = order.orderCode || order.id;
+                      const cancelState = getCancelRequestState(order);
                       const cancelRequested = hasOrderCancelRequest(order);
                       return (
                         <div key={order.id} className="border-2 border-gray-200 rounded-xl p-6 hover:border-orange-300 transition-colors">
@@ -798,6 +812,11 @@ export function AccountPage() {
                                 {cancelRequested && ['PENDING', 'PROCESSING'].includes(order.status) && (
                                   <span className="rounded-lg bg-yellow-100 px-3 py-1.5 text-sm font-semibold text-yellow-800">
                                     Đang chờ xử lý hủy
+                                  </span>
+                                )}
+                                {cancelState.status === 'rejected' && ['PENDING', 'PROCESSING'].includes(order.status) && (
+                                  <span className="rounded-lg bg-orange-100 px-3 py-1.5 text-sm font-semibold text-orange-700">
+                                    Yêu cầu hủy bị từ chối
                                   </span>
                                 )}
                                 {!cancelRequested && ['PENDING', 'PROCESSING'].includes(order.status) && (

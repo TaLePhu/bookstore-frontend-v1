@@ -295,6 +295,14 @@ export const updateAdminOrderStatus = async (
   return res.data.data;
 };
 
+export const rejectAdminCancelRequest = async (
+  id: string,
+  note?: string
+): Promise<AdminOrderDetail> => {
+  const res = await api.post(`/management/orders/${id}/cancel-request/reject`, { note });
+  return res.data.data;
+};
+
 export const getAdminCustomers = async (params?: {
   page?: number;
   limit?: number;
