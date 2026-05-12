@@ -42,6 +42,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   createAdminBook,
   createAdminCategory,
+  createAdminUser,
   deleteAdminBook,
   deleteAdminCategory,
   getAdminBooks,
@@ -70,6 +71,7 @@ import {
   type AdminOrderDetail,
   type AdminOrderStatus,
   type AdminUser,
+  type AdminUserPayload,
 } from '../services/admin.service';
 import type { ApiBook } from '../services/book.service';
 import { getBookImage } from '../utils/book-display';
@@ -98,6 +100,23 @@ type CancelDecisionDialog = {
 
 const COLORS = ['#F97316', '#3B82F6', '#8B5CF6', '#10B981', '#EF4444', '#14B8A6'];
 const LOW_STOCK_THRESHOLD = 5;
+const ORDER_STATUS_OPTIONS: AdminOrderStatus[] = ['PENDING', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
+const EMPTY_ORDER_STATUS_TOTALS: Record<AdminOrderStatus, number> = {
+  PENDING: 0,
+  PROCESSING: 0,
+  SHIPPED: 0,
+  COMPLETED: 0,
+  CANCELLED: 0,
+};
+const emptyUserForm: AdminUserPayload = {
+  userName: '',
+  fullName: '',
+  email: '',
+  phone: '',
+  password: '',
+  role: 'CUSTOMER',
+  isVerified: true,
+};
 
 const formatCurrency = (value: number | string | null | undefined) =>
   `${Number(value || 0).toLocaleString('vi-VN')}đ`;
@@ -279,7 +298,11 @@ export function AdminPage() {
   const [books, setBooks] = useState<ApiBook[]>([]);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [orderStatusTotals, setOrderStatusTotals] = useState<Record<AdminOrderStatus, number>>(EMPTY_ORDER_STATUS_TOTALS);
   const [customers, setCustomers] = useState<AdminUser[]>([]);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [userForm, setUserForm] = useState<AdminUserPayload>(emptyUserForm);
+  const [savingUser, setSavingUser] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<AdminOrderDetail | null>(null);
   const [selectedBook, setSelectedBook] = useState<ApiBook | null>(null);
   const [bookModalMode, setBookModalMode] = useState<'create' | 'edit' | 'detail' | null>(null);
@@ -344,11 +367,23 @@ export function AdminPage() {
           isVerified: userVerifiedFilter === 'all' ? undefined : userVerifiedFilter === 'verified',
         }),
       ]);
+      const orderStatusResults = await Promise.all(
+        ORDER_STATUS_OPTIONS.map((status) => getAdminOrders({ limit: 1, status }))
+      );
 
       setDashboard(dashboardData);
       setBooks(booksData.data);
       setCategories(categoriesData);
       setOrders(ordersData.data);
+      setOrderStatusTotals(
+        ORDER_STATUS_OPTIONS.reduce(
+          (acc, status, index) => ({
+            ...acc,
+            [status]: orderStatusResults[index]?.total ?? 0,
+          }),
+          { ...EMPTY_ORDER_STATUS_TOTALS }
+        )
+      );
       setCustomers(customersData.data);
     } catch (err: any) {
       console.error('Load admin data error:', err);
@@ -454,10 +489,22 @@ export function AdminPage() {
     return !isBookDeleted(book) && stock > 0 && stock <= LOW_STOCK_THRESHOLD;
   });
   const cancelRequestOrders = orders.filter((order) => hasPendingCustomerCancelRequest(order));
+  const orderStatusSummary = ORDER_STATUS_OPTIONS.map((status) => ({
+    status,
+    label: getOrderStatusText(status),
+    count: orderStatusTotals[status] || 0,
+    className: getOrderStatusColor(status),
+  }));
   const activeUsers = customers.filter((customer) => !customer.isLocked);
   const lockedUsers = customers.filter((customer) => customer.isLocked);
   const verifiedUsers = customers.filter((customer) => customer.isVerified);
   const unverifiedUsers = customers.filter((customer) => !customer.isVerified);
+
+  useEffect(() => {
+    if (showCancelRequestsOnly && cancelRequestOrders.length === 0) {
+      setShowCancelRequestsOnly(false);
+    }
+  }, [cancelRequestOrders.length, showCancelRequestsOnly]);
 
   const showPopup = (message: Exclude<PopupMessage, null>) => {
     setPopupMessage(message);
@@ -885,6 +932,51 @@ export function AdminPage() {
       });
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const resetUserForm = () => {
+    setUserForm(emptyUserForm);
+  };
+
+  const openCreateUserModal = (role: 'CUSTOMER' | 'STAFF' = 'CUSTOMER') => {
+    setUserForm({ ...emptyUserForm, role });
+    setShowUserModal(true);
+  };
+
+  const handleCreateUser = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const payload: AdminUserPayload = {
+      ...userForm,
+      userName: userForm.userName.trim(),
+      fullName: userForm.fullName?.trim() || undefined,
+      email: userForm.email.trim(),
+      phone: userForm.phone?.trim() || undefined,
+      password: userForm.password,
+    };
+
+    if (!payload.userName || !payload.email || !payload.password) {
+      showPopup({ type: 'error', text: 'Vui lòng nhập đầy đủ tên đăng nhập, email và mật khẩu.' });
+      return;
+    }
+
+    if (payload.password.length < 8) {
+      showPopup({ type: 'error', text: 'Mật khẩu cần ít nhất 8 ký tự.' });
+      return;
+    }
+
+    try {
+      setSavingUser(true);
+      const created = await createAdminUser(payload);
+      setCustomers((prev) => [created, ...prev]);
+      setShowUserModal(false);
+      resetUserForm();
+      showPopup({ type: 'success', text: `Đã tạo tài khoản ${created.email}.` });
+      await loadData();
+    } catch (err: any) {
+      showPopup({ type: 'error', text: err?.response?.data?.message || 'Không thể tạo tài khoản.' });
+    } finally {
+      setSavingUser(false);
     }
   };
 
@@ -1652,6 +1744,31 @@ export function AdminPage() {
 
           {currentView === 'orders' && (
             <div className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                {orderStatusSummary.map((item) => (
+                  <button
+                    key={item.status}
+                    type="button"
+                    onClick={() => setStatusFilter(item.status)}
+                    className={`rounded-2xl border p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                      statusFilter === item.status ? 'border-orange-300 bg-orange-50' : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.className}`}>
+                        {item.label}
+                      </span>
+                      <ShoppingCart className="h-5 w-5 text-gray-300" />
+                    </div>
+                    <div className="mt-4 text-3xl font-bold text-gray-900">
+                      {item.count.toLocaleString('vi-VN')}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500">Đơn hàng</div>
+                  </button>
+                ))}
+              </div>
+
+              {cancelRequestOrders.length > 0 && (
               <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-start gap-3">
@@ -1687,6 +1804,7 @@ export function AdminPage() {
                   </div>
                 </div>
               </div>
+              )}
 
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm đơn theo mã, khách hàng, email..." />
@@ -1786,6 +1904,31 @@ export function AdminPage() {
                 <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                   <p className="text-sm text-gray-500">Chưa xác thực</p>
                   <p className="mt-2 text-3xl font-bold text-amber-600">{unverifiedUsers.length}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Tạo tài khoản mới</h3>
+                  <p className="mt-1 text-sm text-gray-500">Admin có thể tạo tài khoản khách hàng hoặc nhân viên để sử dụng hệ thống.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openCreateUserModal('CUSTOMER')}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-orange-200 px-4 py-2 font-semibold text-orange-600 transition-colors hover:bg-orange-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Tạo khách hàng
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openCreateUserModal('STAFF')}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-semibold text-white transition-colors hover:bg-orange-600"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Tạo nhân viên
+                  </button>
                 </div>
               </div>
 
@@ -1927,6 +2070,109 @@ export function AdminPage() {
           )}
         </div>
       </main>
+
+      {showUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={handleCreateUser} className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Tạo tài khoản</h3>
+                <p className="text-sm text-gray-500">Tạo tài khoản khách hàng hoặc nhân viên mới.</p>
+              </div>
+              <button
+                type="button"
+                disabled={savingUser}
+                onClick={() => {
+                  setShowUserModal(false);
+                  resetUserForm();
+                }}
+                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-4 p-6 md:grid-cols-2">
+              <UserInput
+                label="Tên đăng nhập"
+                required
+                value={userForm.userName}
+                onChange={(value) => setUserForm((prev) => ({ ...prev, userName: value }))}
+              />
+              <UserInput
+                label="Họ và tên"
+                value={userForm.fullName || ''}
+                onChange={(value) => setUserForm((prev) => ({ ...prev, fullName: value }))}
+              />
+              <UserInput
+                label="Email"
+                type="email"
+                required
+                value={userForm.email}
+                onChange={(value) => setUserForm((prev) => ({ ...prev, email: value }))}
+              />
+              <UserInput
+                label="Số điện thoại"
+                value={userForm.phone || ''}
+                onChange={(value) => setUserForm((prev) => ({ ...prev, phone: value }))}
+              />
+              <UserInput
+                label="Mật khẩu"
+                type="password"
+                required
+                value={userForm.password}
+                onChange={(value) => setUserForm((prev) => ({ ...prev, password: value }))}
+              />
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Vai trò <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={userForm.role}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, role: event.target.value as 'CUSTOMER' | 'STAFF' }))}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="CUSTOMER">Khách hàng</option>
+                  <option value="STAFF">Nhân viên</option>
+                </select>
+              </div>
+              <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={Boolean(userForm.isVerified)}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, isVerified: event.target.checked }))}
+                  className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Đánh dấu email đã xác thực</span>
+              </label>
+              <div className="rounded-xl bg-orange-50 p-4 text-sm leading-6 text-orange-700 md:col-span-2">
+                Mật khẩu cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+              <button
+                type="button"
+                disabled={savingUser}
+                onClick={() => {
+                  setShowUserModal(false);
+                  resetUserForm();
+                }}
+                className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Đóng
+              </button>
+              <button
+                type="submit"
+                disabled={savingUser}
+                className="rounded-lg bg-orange-500 px-5 py-2 font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+              >
+                {savingUser ? 'Đang tạo...' : 'Tạo tài khoản'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {categoryModalMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -2431,6 +2677,35 @@ function BookInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+      />
+    </div>
+  );
+}
+
+function UserInput({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  required = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  required?: boolean;
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-medium text-gray-700">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type={type}
+        value={value}
+        required={required}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
       />
     </div>
   );

@@ -93,6 +93,16 @@ export interface AdminUser {
   createdAt: string;
 }
 
+export interface AdminUserPayload {
+  userName: string;
+  fullName?: string;
+  email: string;
+  phone?: string;
+  password: string;
+  role: 'CUSTOMER' | 'STAFF';
+  isVerified?: boolean;
+}
+
 export interface AdminCategory {
   id: string;
   name: string;
@@ -328,6 +338,11 @@ export const getAdminCustomers = async (params?: {
     data: payload.users,
     total: payload.total,
   };
+};
+
+export const createAdminUser = async (payload: AdminUserPayload): Promise<AdminUser> => {
+  const res = await api.post('/admin/users', payload);
+  return res.data.data;
 };
 
 export const updateAdminUserStatus = async (id: string, isLocked: boolean): Promise<AdminUser> => {
