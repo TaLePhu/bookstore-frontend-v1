@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { LoginModal } from './LoginModal';
 import { searchBooks } from '../services/book.service';
 import { getBookImage } from '../utils/book-display';
+import logoUrl from '../../assets/logo.png';
 
 interface SearchResult {
   id: string;
@@ -71,14 +72,15 @@ export function Header() {
         <div className="flex flex-wrap items-center gap-3 lg:flex-nowrap lg:gap-6">
           <button
             onClick={() => navigate('/')}
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-dashed border-orange-400 px-4 py-2.5 transition-colors hover:bg-orange-50 sm:px-6 lg:w-auto lg:flex-none"
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-4 py-2.5 transition-colors hover:bg-orange-50 sm:px-6 lg:w-auto lg:flex-none"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-orange-500 sm:h-12 sm:w-12">
+            {/* <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-orange-500 sm:h-12 sm:w-12">
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M16 4C16 4 12 6 12 10V12C12 12 12 16 8 16C8 16 12 16 12 20V22C12 26 16 28 16 28C16 28 20 26 20 22V20C20 16 24 16 24 16C20 16 20 12 20 12V10C20 6 16 4 16 4Z" fill="white"/>
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-orange-500">Trạm Sách</h1>
+            <h1 className="text-2xl font-bold text-orange-500">Trạm Sách</h1> */}
+            <img src={logoUrl} alt="Trạm Sách" className="h-10 w-auto sm:h-12" />
           </button>
 
           <div className="order-3 w-full basis-full lg:order-none lg:basis-auto lg:flex-1 lg:max-w-2xl">

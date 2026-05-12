@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { AlertCircle, BookOpen, Lock, Mail, Phone, RefreshCw, ShieldCheck, User, type LucideIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-const getErrorMessage = (err: any, fallback: string) =>
-  err?.response?.data?.message || err?.response?.data?.errors?.[0]?.message || fallback;
+import { getAuthErrorMessage } from '../utils/auth-error';
 
 const isStrongPassword = (value: string) =>
   value.length >= 8 && /[a-z]/.test(value) && /[A-Z]/.test(value) && /[0-9]/.test(value);
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+type EmailCheckStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error';
 
 export function RegisterPage() {
   const [form, setForm] = useState({
@@ -24,8 +24,42 @@ export function RegisterPage() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const { register, verifyEmail, resendVerificationCode } = useAuth();
+  const [emailCheckStatus, setEmailCheckStatus] = useState<EmailCheckStatus>('idle');
+  const { register, checkEmailExists, verifyEmail, resendVerificationCode } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (step !== 'register') {
+      setEmailCheckStatus('idle');
+      return;
+    }
+
+    const email = form.email.trim();
+    if (!email || !isValidEmail(email)) {
+      setEmailCheckStatus('idle');
+      return;
+    }
+
+    let isCurrent = true;
+    setEmailCheckStatus('checking');
+    const timer = window.setTimeout(async () => {
+      try {
+        const exists = await checkEmailExists(email);
+        if (isCurrent) {
+          setEmailCheckStatus(exists ? 'taken' : 'available');
+        }
+      } catch {
+        if (isCurrent) {
+          setEmailCheckStatus('idle');
+        }
+      }
+    }, 450);
+
+    return () => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+    };
+  }, [checkEmailExists, form.email, step]);
 
   const updateField = (field: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -38,6 +72,11 @@ export function RegisterPage() {
 
     if (form.password !== form.confirmPassword) {
       setError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    if (emailCheckStatus === 'taken' || emailCheckStatus === 'checking') {
+      setError('Vui lòng dùng email chưa tồn tại trong hệ thống.');
       return;
     }
 
@@ -58,7 +97,7 @@ export function RegisterPage() {
       setSuccess(message);
       setStep('verify');
     } catch (err: any) {
-      setError(getErrorMessage(err, 'Đăng ký thất bại. Bạn vui lòng thử lại.'));
+      setError(getAuthErrorMessage(err, 'Đăng ký thất bại. Bạn vui lòng thử lại.'));
     } finally {
       setLoading(false);
     }
@@ -79,7 +118,7 @@ export function RegisterPage() {
       const verifiedUser = await verifyEmail(form.email.trim(), verificationCode.trim());
       navigate(verifiedUser.role?.toUpperCase() === 'ADMIN' ? '/admin' : '/');
     } catch (err: any) {
-      setError(getErrorMessage(err, 'Mã xác thực không hợp lệ hoặc đã hết hạn.'));
+      setError(getAuthErrorMessage(err, 'Mã xác thực không hợp lệ hoặc đã hết hạn.'));
     } finally {
       setLoading(false);
     }
@@ -93,11 +132,21 @@ export function RegisterPage() {
       const message = await resendVerificationCode(form.email.trim());
       setSuccess(message);
     } catch (err: any) {
-      setError(getErrorMessage(err, 'Không thể gửi lại mã xác thực. Vui lòng thử lại.'));
+      setError(getAuthErrorMessage(err, 'Không thể gửi lại mã xác thực. Vui lòng thử lại.'));
     } finally {
       setResending(false);
     }
   };
+
+  const isRegisterReady =
+    Boolean(form.fullName.trim()) &&
+    Boolean(form.userName.trim()) &&
+    isValidEmail(form.email.trim()) &&
+    emailCheckStatus !== 'taken' &&
+    emailCheckStatus !== 'checking' &&
+    isStrongPassword(form.password) &&
+    form.password === form.confirmPassword;
+  const isVerifyReady = verificationCode.trim().length === 6;
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
@@ -172,6 +221,7 @@ export function RegisterPage() {
                   placeholder="nguyenvana@example.com"
                   required
                 />
+                <EmailCheckMessage status={emailCheckStatus} email={form.email} />
                 <TextField
                   id="phone"
                   label="Số điện thoại"
@@ -209,7 +259,7 @@ export function RegisterPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !isRegisterReady}
                 className="flex w-full justify-center rounded-md bg-orange-600 px-4 py-3 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
               >
                 {loading ? 'Đang gửi mã xác thực...' : 'Đăng ký tài khoản'}
@@ -239,7 +289,7 @@ export function RegisterPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !isVerifyReady}
                 className="flex w-full justify-center rounded-md bg-orange-600 px-4 py-3 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
               >
                 {loading ? 'Đang xác thực...' : 'Xác thực và đăng nhập'}
@@ -309,4 +359,30 @@ function TextField({
       </div>
     </div>
   );
+}
+
+function EmailCheckMessage({ status, email }: { status: EmailCheckStatus; email: string }) {
+  const className = 'md:col-span-2 -mt-4 text-xs';
+
+  if (!email.trim() || !isValidEmail(email.trim())) {
+    return <p className={`${className} text-gray-500`}>Nhập email hợp lệ để kiểm tra trước khi đăng ký.</p>;
+  }
+
+  if (status === 'checking') {
+    return <p className={`${className} text-gray-500`}>Đang kiểm tra email...</p>;
+  }
+
+  if (status === 'available') {
+    return <p className={`${className} text-green-600`}>Email này có thể sử dụng.</p>;
+  }
+
+  if (status === 'taken') {
+    return <p className={`${className} text-red-600`}>Email này đã tồn tại trong hệ thống.</p>;
+  }
+
+  if (status === 'error') {
+    return null;
+  }
+
+  return null;
 }

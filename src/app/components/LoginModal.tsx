@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { HTMLAttributes } from 'react';
 import { useNavigate } from 'react-router';
 import {
@@ -16,18 +16,20 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getAuthErrorMessage } from '../utils/auth-error';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const getErrorMessage = (err: any, fallback: string) => err?.response?.data?.message || fallback;
 const isStrongPassword = (value: string) =>
   value.length >= 8 && /[a-z]/.test(value) && /[A-Z]/.test(value) && /[0-9]/.test(value);
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+type EmailCheckStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error';
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
-  const { login, register, verifyEmail, resendVerificationCode } = useAuth();
+  const { login, register, checkEmailExists, verifyEmail, resendVerificationCode } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'register' | 'verify' | 'forgot'>('login');
   const [isLoading, setIsLoading] = useState(false);
@@ -35,6 +37,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [emailCheckStatus, setEmailCheckStatus] = useState<EmailCheckStatus>('idle');
   const [form, setForm] = useState({
     fullName: '',
     userName: '',
@@ -44,6 +47,39 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     confirmPassword: '',
   });
   const [verificationCode, setVerificationCode] = useState('');
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'register') {
+      setEmailCheckStatus('idle');
+      return;
+    }
+
+    const email = form.email.trim();
+    if (!email || !isValidEmail(email)) {
+      setEmailCheckStatus('idle');
+      return;
+    }
+
+    let isCurrent = true;
+    setEmailCheckStatus('checking');
+    const timer = window.setTimeout(async () => {
+      try {
+        const exists = await checkEmailExists(email);
+        if (isCurrent) {
+          setEmailCheckStatus(exists ? 'taken' : 'available');
+        }
+      } catch {
+        if (isCurrent) {
+          setEmailCheckStatus('idle');
+        }
+      }
+    }, 450);
+
+    return () => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+    };
+  }, [checkEmailExists, form.email, isOpen, mode]);
 
   if (!isOpen) return null;
 
@@ -67,6 +103,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     });
     setVerificationCode('');
     setShowPassword(false);
+    setEmailCheckStatus('idle');
   };
 
   const closeModal = () => {
@@ -100,7 +137,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     try {
       if (mode === 'login') {
         if (!form.email || !form.password) {
-          setError('Vui lòng điền đầy đủ thông tin');
+          setError('Vui lòng điền đầy đủ thông tin.');
           return;
         }
 
@@ -113,17 +150,22 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       }
 
       if (!form.fullName || !form.userName || !form.email || !form.password || !form.confirmPassword) {
-        setError('Vui lòng điền đầy đủ thông tin bắt buộc');
+        setError('Vui lòng điền đầy đủ thông tin bắt buộc.');
+        return;
+      }
+
+      if (emailCheckStatus === 'taken' || emailCheckStatus === 'checking') {
+        setError('Vui lòng dùng email chưa tồn tại trong hệ thống.');
         return;
       }
 
       if (form.password !== form.confirmPassword) {
-        setError('Mật khẩu xác nhận không khớp');
+        setError('Mật khẩu xác nhận không khớp.');
         return;
       }
 
       if (!isStrongPassword(form.password)) {
-        setError('Mật khẩu cần ít nhất 8 ký tự, có chữ hoa, chữ thường và số');
+        setError('Mật khẩu cần ít nhất 8 ký tự, có chữ hoa, chữ thường và số.');
         return;
       }
 
@@ -139,7 +181,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       setMode('verify');
       setSuccessMessage(message);
     } catch (err: any) {
-      setError(getErrorMessage(err, 'Đã có lỗi xảy ra. Vui lòng thử lại.'));
+      setError(getAuthErrorMessage(err, 'Đã có lỗi xảy ra. Vui lòng thử lại.'));
     } finally {
       setIsLoading(false);
     }
@@ -150,7 +192,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     resetMessages();
 
     if (verificationCode.trim().length !== 6) {
-      setError('Vui lòng nhập mã xác thực gồm 6 chữ số');
+      setError('Vui lòng nhập mã xác thực gồm 6 chữ số.');
       return;
     }
 
@@ -162,7 +204,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         navigate('/admin');
       }
     } catch (err: any) {
-      setError(getErrorMessage(err, 'Mã xác thực không hợp lệ hoặc đã hết hạn.'));
+      setError(getAuthErrorMessage(err, 'Mã xác thực không hợp lệ hoặc đã hết hạn.'));
     } finally {
       setIsLoading(false);
     }
@@ -175,7 +217,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       const message = await resendVerificationCode(form.email.trim());
       setSuccessMessage(message);
     } catch (err: any) {
-      setError(getErrorMessage(err, 'Không thể gửi lại mã xác thực. Vui lòng thử lại.'));
+      setError(getAuthErrorMessage(err, 'Không thể gửi lại mã xác thực. Vui lòng thử lại.'));
     } finally {
       setIsResendingCode(false);
     }
@@ -188,7 +230,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
     try {
       if (!form.email) {
-        setError('Vui lòng nhập địa chỉ email');
+        setError('Vui lòng nhập địa chỉ email.');
         return;
       }
 
@@ -210,6 +252,17 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       : mode === 'login'
       ? 'Chào mừng bạn quay trở lại Trạm Sách!'
       : 'Điền thông tin để tạo tài khoản mới';
+  const isLoginReady = isValidEmail(form.email.trim()) && form.password.length > 0;
+  const isRegisterReady =
+    Boolean(form.fullName.trim()) &&
+    Boolean(form.userName.trim()) &&
+    isValidEmail(form.email.trim()) &&
+    emailCheckStatus !== 'taken' &&
+    emailCheckStatus !== 'checking' &&
+    isStrongPassword(form.password) &&
+    form.password === form.confirmPassword;
+  const isVerifyReady = verificationCode.trim().length === 6;
+  const isForgotReady = isValidEmail(form.email.trim());
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -233,7 +286,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           <form onSubmit={handleForgotPassword} className="space-y-4 p-6">
             <Message error={error} successMessage={successMessage} />
             <TextField label="Email" type="email" icon={Mail} value={form.email} onChange={(value) => updateField('email', value)} placeholder="example@email.com" />
-            <SubmitButton loading={isLoading} label="Gửi hướng dẫn" loadingLabel="Đang gửi..." />
+            <SubmitButton loading={isLoading} disabled={!isForgotReady} label="Gửi hướng dẫn" loadingLabel="Đang gửi..." />
           </form>
         ) : mode === 'verify' ? (
           <form onSubmit={handleVerifyEmail} className="space-y-4 p-6">
@@ -248,7 +301,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               maxLength={6}
               centered
             />
-            <SubmitButton loading={isLoading} label="Xác thực và đăng nhập" loadingLabel="Đang xác thực..." />
+            <SubmitButton loading={isLoading} disabled={!isVerifyReady} label="Xác thực và đăng nhập" loadingLabel="Đang xác thực..." />
             <button
               type="button"
               onClick={handleResendCode}
@@ -272,6 +325,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             )}
 
             <TextField label="Email" type="email" icon={Mail} value={form.email} onChange={(value) => updateField('email', value)} placeholder="example@email.com" />
+            {mode === 'register' && <EmailCheckMessage status={emailCheckStatus} email={form.email} />}
 
             <PasswordField value={form.password} onChange={(value) => updateField('password', value)} showPassword={showPassword} setShowPassword={setShowPassword} />
 
@@ -301,7 +355,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </div>
             )}
 
-            <SubmitButton loading={isLoading} label={mode === 'login' ? 'Đăng nhập' : 'Đăng ký'} loadingLabel="Đang xử lý..." />
+            <SubmitButton
+              loading={isLoading}
+              disabled={mode === 'login' ? !isLoginReady : !isRegisterReady}
+              label={mode === 'login' ? 'Đăng nhập' : 'Đăng ký'}
+              loadingLabel="Đang xử lý..."
+            />
 
             <div className="mt-6 text-center text-sm text-gray-600">
               {mode === 'login' ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}{' '}
@@ -328,6 +387,30 @@ function Message({ error, successMessage }: { error: string; successMessage: str
       )}
     </>
   );
+}
+
+function EmailCheckMessage({ status, email }: { status: EmailCheckStatus; email: string }) {
+  if (!email.trim() || !isValidEmail(email.trim())) {
+    return <p className="text-xs text-gray-500">Nhập email hợp lệ để kiểm tra trước khi đăng ký.</p>;
+  }
+
+  if (status === 'checking') {
+    return <p className="text-xs text-gray-500">Đang kiểm tra email...</p>;
+  }
+
+  if (status === 'available') {
+    return <p className="text-xs text-green-600">Email này có thể sử dụng.</p>;
+  }
+
+  if (status === 'taken') {
+    return <p className="text-xs text-red-600">Email này đã tồn tại trong hệ thống.</p>;
+  }
+
+  if (status === 'error') {
+    return null;
+  }
+
+  return null;
 }
 
 function TextField({
@@ -405,11 +488,11 @@ function PasswordField({
   );
 }
 
-function SubmitButton({ loading, label, loadingLabel }: { loading: boolean; label: string; loadingLabel: string }) {
+function SubmitButton({ loading, disabled = false, label, loadingLabel }: { loading: boolean; disabled?: boolean; label: string; loadingLabel: string }) {
   return (
     <button
       type="submit"
-      disabled={loading}
+      disabled={loading || disabled}
       className="w-full rounded-lg bg-orange-500 py-3 font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
     >
       {loading ? loadingLabel : label}

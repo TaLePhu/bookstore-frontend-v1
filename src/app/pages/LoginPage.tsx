@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { BookOpen, Mail, Lock, AlertCircle } from 'lucide-react';
+import { getAuthErrorMessage } from '../utils/auth-error';
+
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -10,6 +13,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const isLoginReady = isValidEmail(email.trim()) && password.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +23,7 @@ export function LoginPage() {
       const loggedInUser = await login(email, password);
       navigate(loggedInUser.role?.toUpperCase() === 'ADMIN' ? '/admin' : '/');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+      setError(getAuthErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.'));
     } finally {
       setLoading(false);
     }
@@ -122,7 +126,7 @@ export function LoginPage() {
             <div>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !isLoginReady}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
               >
                 {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}

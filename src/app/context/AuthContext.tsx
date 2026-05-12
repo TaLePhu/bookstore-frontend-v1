@@ -17,6 +17,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<User>;
   register: (payload: RegisterPayload) => Promise<string>;
+  checkEmailExists: (email: string) => Promise<boolean>;
   verifyEmail: (email: string, code: string) => Promise<User>;
   resendVerificationCode: (email: string) => Promise<string>;
   logout: () => Promise<void>;
@@ -92,6 +93,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return getResponseData(response)?.message || response.data?.message || 'Đăng ký thành công. Vui lòng kiểm tra email để lấy mã xác thực.';
   };
 
+  const checkEmailExists = async (email: string) => {
+    const response = await api.get('/auth/check-email', { params: { email } });
+    return Boolean(getResponseData(response)?.exists);
+  };
+
   const verifyEmail = async (email: string, code: string) => {
     const response = await api.post('auth/verify-email', { email, code });
     const data = getResponseData(response);
@@ -136,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         login,
         register,
+        checkEmailExists,
         verifyEmail,
         resendVerificationCode,
         logout,
