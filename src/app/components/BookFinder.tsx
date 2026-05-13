@@ -130,6 +130,12 @@ export function BookFinder() {
                     </div>
                   )}
 
+                  {book.discount > 0 && (
+                    <div className="absolute right-3 top-3 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow">
+                      Khuyến mãi -{book.discount}%
+                    </div>
+                  )}
+
                   {book.isOutOfStock && (
                     <div className="absolute bottom-3 left-3 rounded-full bg-gray-900/85 px-3 py-1 text-xs font-bold text-white">
                       Hết hàng
@@ -174,6 +180,11 @@ export function BookFinder() {
 
                   <div className="flex items-center justify-between">
                     <div>
+                      {book.discount > 0 && (
+                        <div className="mb-1 w-fit rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
+                          Đang khuyến mãi
+                        </div>
+                      )}
                       <div className="text-red-600 font-bold text-lg">
                         {formatCurrency(book.price)}
                       </div>

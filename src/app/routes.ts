@@ -10,6 +10,7 @@ import { TrackOrderPage } from './pages/TrackOrderPage';
 import { BestSellersPage } from './pages/BestSellersPage';
 import { CategoryPage } from './pages/CategoryPage';
 import { PromotionsPage } from './pages/PromotionsPage';
+import { PromotionBooksPage } from './pages/PromotionBooksPage';
 import { NewBooksPage } from './pages/NewBooksPage';
 import { AIAdvisorPage } from './pages/AIAdvisorPage';
 import { AdminPage } from './pages/AdminPage';
@@ -19,12 +20,13 @@ import { useAuth } from './context/AuthContext';
 
 function AdminRoute() {
   const { user, isAuthenticated } = useAuth();
+  const role = user?.role?.toUpperCase();
 
   if (!isAuthenticated) {
     return createElement(Navigate, { to: '/login', replace: true });
   }
 
-  if (user?.role?.toUpperCase() !== 'ADMIN') {
+  if (role !== 'ADMIN' && role !== 'STAFF') {
     return createElement(Navigate, { to: '/', replace: true });
   }
 
@@ -47,6 +49,7 @@ export const router = createBrowserRouter([
       { path: 'ai-advisor', Component: AIAdvisorPage },
       { path: 'category/:category', Component: CategoryPage },
       { path: 'promotions', Component: PromotionsPage },
+      { path: 'promotions/books', Component: PromotionBooksPage },
     ],
   },
   {

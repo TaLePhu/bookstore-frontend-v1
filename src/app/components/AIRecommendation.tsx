@@ -175,7 +175,7 @@ export function AIRecommendation() {
                 {aiBooks.map((book, index) => (
                   <div
                     key={book.id}
-                    className="bg-gradient-to-br from-gray-50 to-white rounded-xl overflow-hidden border-2 border-gray-100 hover:border-indigo-300 transition-all hover:shadow-xl group"
+                    className="relative bg-gradient-to-br from-gray-50 to-white rounded-xl overflow-hidden border-2 border-gray-100 hover:border-indigo-300 transition-all hover:shadow-xl group"
                   >
                     {/* Image */}
                     <div className="relative aspect-[3/4] overflow-hidden">
@@ -191,6 +191,11 @@ export function AIRecommendation() {
                       </div>
                     </div>
 
+                      {book.discount > 0 && (
+                        <div className="absolute right-3 top-3 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white shadow">
+                          Khuyến mãi -{book.discount}%
+                        </div>
+                      )}
                     {/* Info */}
                     <div className="p-4">
                       <div className="text-xs text-indigo-600 font-semibold mb-1">
@@ -229,6 +234,11 @@ export function AIRecommendation() {
                       {/* Price & Cart */}
                       <div className="flex items-center justify-between">
                         <div>
+                          {book.discount > 0 && (
+                            <div className="mb-1 w-fit rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
+                              Đang khuyến mãi
+                            </div>
+                          )}
                           <div className="text-red-600 font-bold">
                             {formatCurrency(book.price)}
                           </div>

@@ -13,6 +13,7 @@ import {
   TrendingUp,
   MessageCircle,
   ChevronLeft,
+  ChevronRight,
   Plus,
   Minus,
 } from 'lucide-react';
@@ -60,6 +61,7 @@ export function BookDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [mainImage, setMainImage] = useState('');
+  const [galleryStartIndex, setGalleryStartIndex] = useState(0);
 
   useEffect(() => {
     const fetchBook = async () => {
@@ -70,6 +72,7 @@ export function BookDetailPage() {
         setError('');
         setQuantity(1);
         setSelectedTab('description');
+        setGalleryStartIndex(0);
 
         const data = await getBookById(id);
         setBook(data);
@@ -90,6 +93,10 @@ export function BookDetailPage() {
 
   const displayBook = useMemo(() => (book ? toDisplayBook(book, 0) : null), [book]);
   const galleryImages = useMemo(() => (book ? getBookGalleryImages(book) : []), [book]);
+  const visibleGalleryImages = useMemo(
+    () => galleryImages.slice(galleryStartIndex, galleryStartIndex + 3),
+    [galleryImages, galleryStartIndex]
+  );
   const reviews = useMemo(() => (book ? buildReviews(book) : []), [book]);
   const maxQuantity = Math.max(1, Number(book?.stock) || 1);
 
@@ -102,6 +109,17 @@ export function BookDetailPage() {
   }
 
   const isOutOfStock = displayBook.isOutOfStock;
+  const canSlideGallery = galleryImages.length > 3;
+  const canSlideGalleryPrev = galleryStartIndex > 0;
+  const canSlideGalleryNext = galleryStartIndex + 3 < galleryImages.length;
+
+  const handleGalleryPrev = () => {
+    setGalleryStartIndex((prev) => Math.max(0, prev - 1));
+  };
+
+  const handleGalleryNext = () => {
+    setGalleryStartIndex((prev) => Math.min(Math.max(0, galleryImages.length - 3), prev + 1));
+  };
 
   const specs = [
     ['Danh mục', book.category?.name],
@@ -141,9 +159,14 @@ export function BookDetailPage() {
               <div className="relative aspect-[3/4] mb-4 rounded-xl overflow-hidden bg-gray-100">
                 <img src={mainImage || displayBook.image} alt={book.title} className="w-full h-full object-cover" />
                 {displayBook.discount > 0 && (
-                  <div className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-full font-bold text-lg">
-                    -{displayBook.discount}%
-                  </div>
+                  <>
+                    <div className="absolute left-4 top-4 rounded-full bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-lg">
+                      Đang khuyến mãi
+                    </div>
+                    <div className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-full font-bold text-lg">
+                      -{displayBook.discount}%
+                    </div>
+                  </>
                 )}
                 {isOutOfStock && (
                   <div className="absolute bottom-4 left-4 rounded-full bg-gray-900/85 px-4 py-2 text-sm font-bold text-white">
@@ -152,20 +175,48 @@ export function BookDetailPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                {galleryImages.map((image, index) => (
+              <div className="relative">
+                {canSlideGallery && (
                   <button
-                    key={`${image}-${index}`}
-                    onClick={() => setMainImage(image)}
-                    className={`aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
-                      (mainImage || displayBook.image) === image
-                        ? 'border-orange-500 scale-95'
-                        : 'border-gray-200 hover:border-orange-300'
-                    }`}
+                    type="button"
+                    onClick={handleGalleryPrev}
+                    disabled={!canSlideGalleryPrev}
+                    className="absolute left-0 top-1/2 z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-gray-700 shadow-md ring-1 ring-gray-200 transition hover:bg-orange-50 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Xem ảnh trước"
                   >
-                    <img src={image} alt={`${book.title} ${index + 1}`} className="w-full h-full object-cover" />
+                    <ChevronLeft className="h-5 w-5" />
                   </button>
-                ))}
+                )}
+                <div className="grid grid-cols-3 gap-3">
+                  {visibleGalleryImages.map((image, index) => {
+                    const imageIndex = galleryStartIndex + index;
+
+                    return (
+                      <button
+                        key={`${image}-${imageIndex}`}
+                        onClick={() => setMainImage(image)}
+                        className={`aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                          (mainImage || displayBook.image) === image
+                            ? 'border-orange-500 scale-95'
+                            : 'border-gray-200 hover:border-orange-300'
+                        }`}
+                      >
+                        <img src={image} alt={`${book.title} ${imageIndex + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    );
+                  })}
+                </div>
+                {canSlideGallery && (
+                  <button
+                    type="button"
+                    onClick={handleGalleryNext}
+                    disabled={!canSlideGalleryNext}
+                    className="absolute right-0 top-1/2 z-10 flex h-9 w-9 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-gray-700 shadow-md ring-1 ring-gray-200 transition hover:bg-orange-50 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Xem ảnh tiếp theo"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3 mt-4">
@@ -223,6 +274,11 @@ export function BookDetailPage() {
               </div>
 
               <div className="py-6 border-b">
+                {displayBook.discount > 0 && (
+                  <div className="mb-3 inline-flex rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-600 ring-1 ring-red-100">
+                    Sách đang khuyến mãi
+                  </div>
+                )}
                 <div className="mb-2 flex flex-wrap items-baseline gap-3 sm:gap-4">
                   <span className="text-4xl font-bold text-red-600">{formatCurrency(displayBook.price)}</span>
                   {displayBook.originalPrice && (
@@ -449,6 +505,11 @@ export function BookDetailPage() {
                   >
                     <div className="relative aspect-[3/4] overflow-hidden">
                       <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                      {item.discount > 0 && (
+                        <div className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-1 text-[11px] font-bold text-white">
+                          Khuyến mãi -{item.discount}%
+                        </div>
+                      )}
                     </div>
                     <div className="p-4">
                       <h3 className="font-bold text-gray-900 mb-1 line-clamp-2">{item.title}</h3>
@@ -459,7 +520,7 @@ export function BookDetailPage() {
                         ))}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-orange-500 font-bold">{formatCurrency(item.price)}</span>
+                        <span className={`font-bold ${item.discount > 0 ? 'text-red-600' : 'text-orange-500'}`}>{formatCurrency(item.price)}</span>
                         {item.originalPrice && <span className="text-gray-400 line-through text-sm">{formatCurrency(item.originalPrice)}</span>}
                       </div>
                     </div>

@@ -152,7 +152,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
         const loggedInUser = await login(form.email.trim(), form.password);
         closeModal();
-        if (loggedInUser.role?.toUpperCase() === 'ADMIN') {
+        const role = loggedInUser.role?.toUpperCase();
+        if (role === 'ADMIN' || role === 'STAFF') {
           navigate('/admin');
         }
         return;
@@ -209,7 +210,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     try {
       const verifiedUser = await verifyEmail(form.email.trim(), verificationCode.trim());
       closeModal();
-      if (verifiedUser.role?.toUpperCase() === 'ADMIN') {
+      const role = verifiedUser.role?.toUpperCase();
+      if (role === 'ADMIN' || role === 'STAFF') {
         navigate('/admin');
       }
     } catch (err: any) {

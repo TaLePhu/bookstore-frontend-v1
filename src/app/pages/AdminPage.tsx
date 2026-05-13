@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   AlertCircle,
@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
+  Percent,
   Plus,
   RefreshCcw,
   Search,
@@ -42,9 +43,11 @@ import { useAuth } from '../context/AuthContext';
 import {
   createAdminBook,
   createAdminCategory,
+  createAdminPromotion,
   createAdminUser,
   deleteAdminBook,
   deleteAdminCategory,
+  deleteAdminPromotion,
   getAdminBooks,
   getAdminBookDetail,
   getAdminCategories,
@@ -52,6 +55,7 @@ import {
   getAdminDashboard,
   getAdminOrderDetail,
   getAdminOrders,
+  getAdminPromotions,
   hardDeleteAdminBook,
   hardDeleteAdminCategory,
   restoreAdminBook,
@@ -60,6 +64,7 @@ import {
   rejectAdminCancelRequest,
   updateAdminCategory,
   updateAdminBook,
+  updateAdminPromotion,
   updateAdminUserRole,
   updateAdminUserStatus,
   updateAdminOrderStatus,
@@ -70,22 +75,29 @@ import {
   type AdminOrder,
   type AdminOrderDetail,
   type AdminOrderStatus,
+  type AdminPromotion,
+  type AdminPromotionPayload,
   type AdminUser,
   type AdminUserPayload,
 } from '../services/admin.service';
 import type { ApiBook } from '../services/book.service';
 import { getBookImage } from '../utils/book-display';
+import logoUrl from '../../assets/logo.png';
 
-type AdminView = 'dashboard' | 'books' | 'categories' | 'orders' | 'customers' | 'settings';
+type AdminView = 'dashboard' | 'books' | 'promotions' | 'categories' | 'orders' | 'customers' | 'settings';
 type ExistingBookImage = { id?: string; url: string; isPrimary?: boolean };
+type PromotionDraft = { price: string; originalPrice: string; discount: string };
 type BookVisibilityFilter = 'active' | 'deleted' | 'all';
 type BookStockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
+type PromotionBookStockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
 type CategoryVisibilityFilter = 'active' | 'deleted' | 'all';
 type CategoryBookFilter = 'all' | 'with_books' | 'empty';
 type UserRoleFilter = 'all' | 'CUSTOMER' | 'STAFF' | 'ADMIN' | 'GUEST';
 type UserLockFilter = 'all' | 'active' | 'locked';
 type UserVerifiedFilter = 'all' | 'verified' | 'unverified';
 type PopupMessage = { type: 'success' | 'error'; text: string } | null;
+type BookImagePreview = { name: string; url: string; size: number };
+type PromotionModalMode = 'create' | 'edit' | null;
 type ConfirmDialog = {
   title: string;
   message: string;
@@ -100,6 +112,9 @@ type CancelDecisionDialog = {
 
 const COLORS = ['#F97316', '#3B82F6', '#8B5CF6', '#10B981', '#EF4444', '#14B8A6'];
 const LOW_STOCK_THRESHOLD = 5;
+const MAX_BOOK_IMAGES = 5;
+const MAX_BOOK_IMAGE_SIZE = 2 * 1024 * 1024;
+const ACCEPTED_BOOK_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ORDER_STATUS_OPTIONS: AdminOrderStatus[] = ['PENDING', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
 const EMPTY_ORDER_STATUS_TOTALS: Record<AdminOrderStatus, number> = {
   PENDING: 0,
@@ -204,9 +219,9 @@ const isCustomerCancelRequestLog = (log: NonNullable<AdminOrderDetail['statusLog
   !log.changedByUser &&
   Boolean(
     log.note?.includes('yêu cầu hủy') ||
-      log.note?.includes('yĂªu cáº§u há»§y') ||
+      log.note?.includes('yêu cầu hủy') ||
       log.note?.startsWith('Khách yêu cầu hủy:') ||
-      log.note?.startsWith('KhĂ¡ch yĂªu cáº§u há»§y:')
+      log.note?.startsWith('Khách yêu cầu hủy:')
   );
 
 const isCancelRequestResolutionLog = (log: NonNullable<AdminOrderDetail['statusLogs']>[number]) =>
@@ -276,7 +291,11 @@ const getBookStatusMeta = (book: ApiBook) => {
 export function AdminPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [currentView, setCurrentView] = useState<AdminView>('dashboard');
+  const bookImageInputRef = useRef<HTMLInputElement | null>(null);
+  const promotionBannerInputRef = useRef<HTMLInputElement | null>(null);
+  const userRole = user?.role?.toUpperCase();
+  const isAdmin = userRole === 'ADMIN';
+  const [currentView, setCurrentView] = useState<AdminView>(isAdmin ? 'dashboard' : 'orders');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | AdminOrderStatus>('all');
   const [showCancelRequestsOnly, setShowCancelRequestsOnly] = useState(false);
@@ -296,6 +315,7 @@ export function AdminPage() {
   const [cancelDecisionNote, setCancelDecisionNote] = useState('');
   const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(null);
   const [books, setBooks] = useState<ApiBook[]>([]);
+  const [promotions, setPromotions] = useState<AdminPromotion[]>([]);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [orderStatusTotals, setOrderStatusTotals] = useState<Record<AdminOrderStatus, number>>(EMPTY_ORDER_STATUS_TOTALS);
@@ -318,6 +338,7 @@ export function AdminPage() {
     categoryId: '',
     price: '',
     originalPrice: '',
+    discount: '',
     stock: '',
     isbn: '',
     description: '',
@@ -332,11 +353,35 @@ export function AdminPage() {
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
   const [deletingBookId, setDeletingBookId] = useState<string | null>(null);
   const [deletedImageIds, setDeletedImageIds] = useState<string[]>([]);
+  const [bookImagePreviews, setBookImagePreviews] = useState<BookImagePreview[]>([]);
+  const [bookFormError, setBookFormError] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [promotionDrafts, setPromotionDrafts] = useState<Record<string, PromotionDraft>>({});
+  const [updatingPromotionBookId, setUpdatingPromotionBookId] = useState<string | null>(null);
+  const [promotionModalMode, setPromotionModalMode] = useState<PromotionModalMode>(null);
+  const [selectedPromotion, setSelectedPromotion] = useState<AdminPromotion | null>(null);
+  const [savingPromotion, setSavingPromotion] = useState(false);
+  const [deletingPromotionId, setDeletingPromotionId] = useState<string | null>(null);
+  const [promotionBannerPreview, setPromotionBannerPreview] = useState('');
+  const [promotionFormError, setPromotionFormError] = useState('');
+  const [promotionBookSearch, setPromotionBookSearch] = useState('');
+  const [promotionCategoryFilter, setPromotionCategoryFilter] = useState('all');
+  const [promotionStockFilter, setPromotionStockFilter] = useState<PromotionBookStockFilter>('all');
+  const [showSelectedPromotionBooksOnly, setShowSelectedPromotionBooksOnly] = useState(false);
+  const [promotionForm, setPromotionForm] = useState<AdminPromotionPayload>({
+    name: '',
+    description: '',
+    discountPercent: '10',
+    startsAt: '',
+    endsAt: '',
+    status: 'ACTIVE',
+    bookIds: [],
+  });
 
   const menuItems = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'promotions' as const, label: 'Khuyến mãi', icon: Percent },
     { id: 'categories' as const, label: 'Danh mục', icon: FolderTree },
     { id: 'books' as const, label: 'Quản lý sách', icon: BookOpen },
     { id: 'orders' as const, label: 'Đơn hàng', icon: ShoppingCart },
@@ -344,17 +389,50 @@ export function AdminPage() {
     { id: 'settings' as const, label: 'Cài đặt', icon: Settings },
   ];
 
+  const visibleMenuItems = useMemo(
+    () => (isAdmin ? menuItems : menuItems.filter((item) => item.id === 'orders')),
+    [isAdmin]
+  );
+
   const loadData = async () => {
     setIsLoading(true);
     setError('');
     try {
-      const [dashboardData, booksData, categoriesData, ordersData, customersData] = await Promise.all([
+      if (!isAdmin) {
+        const [ordersData, orderStatusResults] = await Promise.all([
+          getAdminOrders({
+            limit: 50,
+            status: statusFilter === 'all' ? undefined : statusFilter,
+          }),
+          Promise.all(ORDER_STATUS_OPTIONS.map((status) => getAdminOrders({ limit: 1, status }))),
+        ]);
+
+        setDashboard(null);
+        setBooks([]);
+        setPromotions([]);
+        setCategories([]);
+        setCustomers([]);
+        setOrders(ordersData.data);
+        setOrderStatusTotals(
+          ORDER_STATUS_OPTIONS.reduce(
+            (acc, status, index) => ({
+              ...acc,
+              [status]: orderStatusResults[index]?.total ?? 0,
+            }),
+            { ...EMPTY_ORDER_STATUS_TOTALS }
+          )
+        );
+        return;
+      }
+
+      const [dashboardData, booksData, promotionsData, categoriesData, ordersData, customersData] = await Promise.all([
         getAdminDashboard(),
         getAdminBooks({
           limit: 50,
           includeDeleted: bookVisibilityFilter === 'all' || bookVisibilityFilter === 'deleted',
           onlyDeleted: bookVisibilityFilter === 'deleted',
         }),
+        getAdminPromotions(),
         getAdminCategories({ includeDeleted: true }),
         getAdminOrders({
           limit: 50,
@@ -373,6 +451,7 @@ export function AdminPage() {
 
       setDashboard(dashboardData);
       setBooks(booksData.data);
+      setPromotions(promotionsData);
       setCategories(categoriesData);
       setOrders(ordersData.data);
       setOrderStatusTotals(
@@ -395,7 +474,40 @@ export function AdminPage() {
 
   useEffect(() => {
     loadData();
-  }, [statusFilter, bookVisibilityFilter, userRoleFilter, userLockFilter, userVerifiedFilter]);
+  }, [isAdmin, statusFilter, bookVisibilityFilter, userRoleFilter, userLockFilter, userVerifiedFilter]);
+
+  useEffect(() => {
+    if (!visibleMenuItems.some((item) => item.id === currentView)) {
+      setCurrentView(visibleMenuItems[0].id);
+      setSearchQuery('');
+    }
+  }, [currentView, visibleMenuItems]);
+
+  useEffect(() => {
+    setPromotionDrafts((prev) => {
+      const next: Record<string, PromotionDraft> = {};
+      books.forEach((book) => {
+        next[book.id] = prev[book.id] || {
+          price: String(book.price ?? ''),
+          originalPrice: String(book.originalPrice ?? book.price ?? ''),
+          discount: String(book.discount ?? 0),
+        };
+      });
+      return next;
+    });
+  }, [books]);
+
+  useEffect(() => {
+    return () => {
+      bookImagePreviews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    };
+  }, [bookImagePreviews]);
+
+  useEffect(() => {
+    return () => {
+      if (promotionBannerPreview) URL.revokeObjectURL(promotionBannerPreview);
+    };
+  }, [promotionBannerPreview]);
 
   const filteredBooks = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -415,6 +527,38 @@ export function AdminPage() {
       [book.title, book.author, book.category?.name].filter(Boolean).join(' ').toLowerCase().includes(keyword)
     );
   }, [books, bookStockFilter, currentView, searchQuery]);
+
+  const filteredPromotionBooks = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+    const result = books.filter((book) => !Boolean(book.deletedAt || book.status === 'deleted')).filter((book) => {
+      if (!keyword) return true;
+      return [book.title, book.author, book.category?.name]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword);
+    });
+
+    return result.sort((left, right) => Number(right.discount || 0) - Number(left.discount || 0));
+  }, [books, searchQuery]);
+
+  const filteredPromotions = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+    if (currentView !== 'promotions' || !keyword) return promotions;
+
+    return promotions.filter((promotion) =>
+      [
+        promotion.name,
+        promotion.description,
+        promotion.status,
+        ...(promotion.books || []).map((book) => book.title),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword)
+    );
+  }, [currentView, promotions, searchQuery]);
 
   const filteredOrders = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -499,6 +643,58 @@ export function AdminPage() {
   const lockedUsers = customers.filter((customer) => customer.isLocked);
   const verifiedUsers = customers.filter((customer) => customer.isVerified);
   const unverifiedUsers = customers.filter((customer) => !customer.isVerified);
+  const promotionBooks = books.filter((book) => !isBookDeleted(book));
+  const activePromotionBooks = promotionBooks.filter((book) => Number(book.discount || 0) > 0);
+  const maxPromotionDiscount = Math.max(...activePromotionBooks.map((book) => Number(book.discount || 0)), 0);
+  const activePromotions = promotions.filter((promotion) => promotion.status === 'ACTIVE');
+  const promotionBookTotal = promotions.reduce((sum, promotion) => sum + (promotion.bookCount || promotion.books?.length || 0), 0);
+  const getPromotionForBook = (bookId?: string | null) =>
+    bookId
+      ? promotions.find((promotion) => (promotion.books || []).some((book) => book.id === bookId))
+      : undefined;
+
+  const getPromotionStatusLabel = (promotion?: AdminPromotion) => {
+    if (!promotion) return '';
+    const now = Date.now();
+    const startsAt = promotion.startsAt ? new Date(promotion.startsAt).getTime() : null;
+    const endsAt = promotion.endsAt ? new Date(promotion.endsAt).getTime() : null;
+
+    if (promotion.status !== 'ACTIVE') return 'Tạm tắt';
+    if (startsAt && startsAt > now) return 'Sắp áp dụng';
+    if (endsAt && endsAt < now) return 'Đã hết hạn';
+    return 'Đang áp dụng';
+  };
+
+  const isPromotionCurrentlyActive = (promotion?: AdminPromotion) => getPromotionStatusLabel(promotion) === 'Đang áp dụng';
+  const filteredPromotionModalBooks = useMemo(() => {
+    const keyword = promotionBookSearch.trim().toLowerCase();
+
+    return promotionBooks.filter((book) => {
+      if (showSelectedPromotionBooksOnly && !promotionForm.bookIds.includes(book.id)) return false;
+      if (promotionCategoryFilter !== 'all' && (book.categoryId || book.category?.id) !== promotionCategoryFilter) {
+        return false;
+      }
+
+      const stock = Number(book.stock || 0);
+      if (promotionStockFilter === 'in_stock' && stock <= LOW_STOCK_THRESHOLD) return false;
+      if (promotionStockFilter === 'low_stock' && (stock <= 0 || stock > LOW_STOCK_THRESHOLD)) return false;
+      if (promotionStockFilter === 'out_of_stock' && stock > 0) return false;
+
+      if (!keyword) return true;
+      return [book.title, book.author, book.isbn, book.category?.name]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword);
+    });
+  }, [
+    promotionBookSearch,
+    promotionBooks,
+    promotionCategoryFilter,
+    promotionForm.bookIds,
+    promotionStockFilter,
+    showSelectedPromotionBooksOnly,
+  ]);
 
   useEffect(() => {
     if (showCancelRequestsOnly && cancelRequestOrders.length === 0) {
@@ -562,6 +758,85 @@ export function AdminPage() {
     }
   };
 
+  const formatFileSize = (size: number) => `${(size / 1024 / 1024).toFixed(1)}MB`;
+
+  const clearSelectedBookImages = () => {
+    setBookForm((prev) => ({ ...prev, images: undefined }));
+    setBookImagePreviews([]);
+    if (bookImageInputRef.current) bookImageInputRef.current.value = '';
+  };
+
+  const getSelectedBookImageFiles = () => Array.from(bookForm.images || []);
+
+  const getBookImageValidationMessage = (files: File[], existingImageCount = 0) => {
+    if (existingImageCount + files.length > MAX_BOOK_IMAGES) {
+      return `Mỗi sách chỉ được tối đa ${MAX_BOOK_IMAGES} ảnh. Vui lòng bớt ảnh trước khi lưu.`;
+    }
+
+    const invalidType = files.find((file) => !ACCEPTED_BOOK_IMAGE_TYPES.includes(file.type));
+    if (invalidType) {
+      return `File "${invalidType.name}" không đúng định dạng. Chỉ hỗ trợ JPG, PNG hoặc WEBP.`;
+    }
+
+    const invalidSize = files.find((file) => file.size > MAX_BOOK_IMAGE_SIZE);
+    if (invalidSize) {
+      return `File "${invalidSize.name}" quá lớn (${formatFileSize(invalidSize.size)}). Mỗi ảnh tối đa 2MB.`;
+    }
+
+    return '';
+  };
+
+  const validateBookForm = () => {
+    const requiredFields: Array<[keyof AdminBookPayload, string]> = [
+      ['title', 'Tên sách'],
+      ['author', 'Tác giả'],
+      ['categoryId', 'Danh mục'],
+      ['isbn', 'ISBN'],
+      ['originalPrice', 'Giá gốc'],
+      ['stock', 'Tồn kho'],
+      ['description', 'Mô tả'],
+    ];
+    const missingField = requiredFields.find(([field]) => !String(bookForm[field] || '').trim());
+    if (missingField) return `Vui lòng nhập ${missingField[1].toLowerCase()}.`;
+
+    const originalPrice = Number(bookForm.originalPrice);
+    if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
+      return 'Giá gốc phải là số lớn hơn 0.';
+    }
+
+    const stock = Number(bookForm.stock);
+    if (!Number.isInteger(stock) || stock < 0) {
+      return 'Tồn kho phải là số nguyên không âm.';
+    }
+
+    if (bookForm.publishYear) {
+      const publishYear = Number(bookForm.publishYear);
+      const maxYear = new Date().getFullYear() + 1;
+      if (!Number.isInteger(publishYear) || publishYear < 1000 || publishYear > maxYear) {
+        return `Năm xuất bản phải nằm trong khoảng 1000-${maxYear}.`;
+      }
+    }
+
+    if (bookForm.pages) {
+      const pages = Number(bookForm.pages);
+      if (!Number.isInteger(pages) || pages <= 0) {
+        return 'Số trang phải là số nguyên lớn hơn 0.';
+      }
+    }
+
+    const selectedFiles = getSelectedBookImageFiles();
+    const existingImageCount =
+      bookModalMode === 'edit' && selectedBook ? getVisibleBookImageItems(selectedBook).length : 0;
+    if (bookModalMode === 'create' && selectedFiles.length === 0) {
+      return 'Vui lòng chọn ít nhất một ảnh sách.';
+    }
+    if (bookModalMode === 'edit' && existingImageCount === 0 && selectedFiles.length === 0) {
+      return 'Sách cần có ít nhất một ảnh. Hãy upload ảnh mới hoặc hoàn tác xóa ảnh.';
+    }
+
+    return getBookImageValidationMessage(selectedFiles, existingImageCount);
+  };
+
   const resetBookForm = () => {
     setBookForm({
       title: '',
@@ -569,6 +844,7 @@ export function AdminPage() {
       categoryId: activeCategories[0]?.id || '',
       price: '',
       originalPrice: '',
+      discount: '',
       stock: '',
       isbn: '',
       description: '',
@@ -580,11 +856,18 @@ export function AdminPage() {
     });
     setSelectedBook(null);
     setDeletedImageIds([]);
+    setBookImagePreviews([]);
+    setBookFormError('');
   };
 
   const openCreateBook = () => {
     resetBookForm();
     setBookModalMode('create');
+  };
+
+  const closeBookModal = () => {
+    setBookModalMode(null);
+    resetBookForm();
   };
 
   const openBookDetail = async (book: ApiBook, mode: 'detail' | 'edit') => {
@@ -597,6 +880,7 @@ export function AdminPage() {
         categoryId: detail.categoryId || detail.category?.id || '',
         price: String(detail.price ?? ''),
         originalPrice: String(detail.originalPrice ?? ''),
+        discount: String(detail.discount ?? ''),
         stock: String(detail.stock ?? ''),
         isbn: detail.isbn || '',
         description: detail.description || '',
@@ -607,6 +891,8 @@ export function AdminPage() {
         releaseDate: detail.releaseDate ? detail.releaseDate.slice(0, 10) : '',
       });
       setDeletedImageIds([]);
+      setBookImagePreviews([]);
+      setBookFormError('');
       setBookModalMode(mode);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Không thể tải chi tiết sách');
@@ -614,10 +900,47 @@ export function AdminPage() {
   };
 
   const handleBookInput = (field: keyof AdminBookPayload, value: string | FileList) => {
+    setBookFormError('');
     setBookForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleBookImagesChange = (files: FileList | null) => {
+    setBookFormError('');
+    if (!files || files.length === 0) {
+      clearSelectedBookImages();
+      return true;
+    }
+
+    const selectedFiles = Array.from(files);
+    const existingImageCount =
+      bookModalMode === 'edit' && selectedBook ? getVisibleBookImageItems(selectedBook).length : 0;
+    const validationMessage = getBookImageValidationMessage(selectedFiles, existingImageCount);
+    if (validationMessage) {
+      clearSelectedBookImages();
+      setBookFormError(validationMessage);
+      showPopup({ type: 'error', text: validationMessage });
+      return false;
+    }
+
+    setBookForm((prev) => ({ ...prev, images: files }));
+    setBookImagePreviews(
+      selectedFiles.map((file) => ({
+        name: file.name,
+        size: file.size,
+        url: URL.createObjectURL(file),
+      }))
+    );
+    return true;
+  };
+
   const handleSaveBook = async () => {
+    const validationMessage = validateBookForm();
+    if (validationMessage) {
+      setBookFormError(validationMessage);
+      showPopup({ type: 'error', text: validationMessage });
+      return;
+    }
+
     try {
       setSavingBook(true);
       const isEditing = bookModalMode === 'edit' && Boolean(selectedBook);
@@ -643,6 +966,358 @@ export function AdminPage() {
     } finally {
       setSavingBook(false);
     }
+  };
+
+  const getBookPayloadFromBook = (book: ApiBook, draft?: PromotionDraft): AdminBookPayload => ({
+    title: book.title || '',
+    author: book.author || '',
+    categoryId: book.categoryId || book.category?.id || '',
+    price: draft?.price ?? String(book.price ?? ''),
+    originalPrice: draft?.originalPrice ?? String(book.originalPrice ?? book.price ?? ''),
+    discount: draft?.discount ?? String(book.discount ?? 0),
+    stock: String(book.stock ?? 0),
+    isbn: book.isbn || '',
+    description: book.description || '',
+    publisher: book.publisher || '',
+    publishYear: book.publishYear ? String(book.publishYear) : '',
+    pages: book.pages ? String(book.pages) : '',
+    language: book.language || 'Tiếng Việt',
+    releaseDate: book.releaseDate ? book.releaseDate.slice(0, 10) : '',
+  });
+
+  const handlePromotionDraftChange = (bookId: string, field: keyof PromotionDraft, value: string) => {
+    setPromotionDrafts((prev) => ({
+      ...prev,
+      [bookId]: {
+        price: prev[bookId]?.price || '',
+        originalPrice: prev[bookId]?.originalPrice || '',
+        discount: prev[bookId]?.discount || '0',
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSavePromotion = async (book: ApiBook) => {
+    const draft = promotionDrafts[book.id] || {
+      price: String(book.price ?? ''),
+      originalPrice: String(book.originalPrice ?? book.price ?? ''),
+      discount: String(book.discount ?? 0),
+    };
+    const price = Number(draft.price);
+    const originalPrice = Number(draft.originalPrice);
+    const discount = Number(draft.discount);
+
+    if (!Number.isFinite(price) || price < 0 || !Number.isFinite(originalPrice) || originalPrice < 0) {
+      showPopup({ type: 'error', text: 'Giá bán và giá gốc phải là số không âm.' });
+      return;
+    }
+
+    if (!Number.isFinite(discount) || discount < 0 || discount > 100) {
+      showPopup({ type: 'error', text: 'Phần trăm giảm phải nằm trong khoảng 0 - 100.' });
+      return;
+    }
+
+    try {
+      setUpdatingPromotionBookId(book.id);
+      await updateAdminBook(book.id, getBookPayloadFromBook(book, draft));
+      await loadData();
+      showPopup({ type: 'success', text: `Đã cập nhật khuyến mãi cho "${book.title}".` });
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Không thể cập nhật khuyến mãi.';
+      setError(message);
+      showPopup({ type: 'error', text: message });
+    } finally {
+      setUpdatingPromotionBookId(null);
+    }
+  };
+
+  const handleClearPromotion = async (book: ApiBook) => {
+    const draft: PromotionDraft = {
+      price: String(book.price ?? ''),
+      originalPrice: String(book.price ?? ''),
+      discount: '0',
+    };
+    setPromotionDrafts((prev) => ({ ...prev, [book.id]: draft }));
+
+    try {
+      setUpdatingPromotionBookId(book.id);
+      await updateAdminBook(book.id, getBookPayloadFromBook(book, draft));
+      await loadData();
+      showPopup({ type: 'success', text: `Đã tắt khuyến mãi cho "${book.title}".` });
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Không thể tắt khuyến mãi.';
+      setError(message);
+      showPopup({ type: 'error', text: message });
+    } finally {
+      setUpdatingPromotionBookId(null);
+    }
+  };
+
+  const resetPromotionForm = () => {
+    setSelectedPromotion(null);
+    setPromotionBannerPreview('');
+    setPromotionFormError('');
+    setPromotionBookSearch('');
+    setPromotionCategoryFilter('all');
+    setPromotionStockFilter('all');
+    setShowSelectedPromotionBooksOnly(false);
+    if (promotionBannerInputRef.current) promotionBannerInputRef.current.value = '';
+    setPromotionForm({
+      name: '',
+      description: '',
+      discountPercent: '10',
+      startsAt: '',
+      endsAt: '',
+      status: 'ACTIVE',
+      bookIds: [],
+      bannerImage: null,
+    });
+  };
+
+  const openCreatePromotion = () => {
+    resetPromotionForm();
+    setPromotionModalMode('create');
+  };
+
+  const openEditPromotion = (promotion: AdminPromotion) => {
+    setSelectedPromotion(promotion);
+    setPromotionForm({
+      name: promotion.name || '',
+      description: promotion.description || '',
+      bannerImageUrl: promotion.bannerImageUrl || undefined,
+      discountPercent: String(promotion.discountPercent ?? 10),
+      startsAt: promotion.startsAt ? promotion.startsAt.slice(0, 10) : '',
+      endsAt: promotion.endsAt ? promotion.endsAt.slice(0, 10) : '',
+      status: promotion.status || 'ACTIVE',
+      bookIds: (promotion.books || []).map((book) => book.id),
+      bannerImage: null,
+    });
+    setPromotionBannerPreview('');
+    setPromotionFormError('');
+    setPromotionBookSearch('');
+    setPromotionCategoryFilter('all');
+    setPromotionStockFilter('all');
+    setShowSelectedPromotionBooksOnly(false);
+    if (promotionBannerInputRef.current) promotionBannerInputRef.current.value = '';
+    setPromotionModalMode('edit');
+  };
+
+  const handlePromotionFormInput = (
+    field: keyof AdminPromotionPayload,
+    value: AdminPromotionPayload[keyof AdminPromotionPayload]
+  ) => {
+    setPromotionFormError('');
+    setPromotionForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handlePromotionBannerChange = (fileList: FileList | null) => {
+    setPromotionFormError('');
+    const file = fileList?.[0];
+    if (!file) {
+      setPromotionForm((prev) => ({ ...prev, bannerImage: null }));
+      setPromotionBannerPreview('');
+      return true;
+    }
+
+    const message = getBookImageValidationMessage([file]);
+    if (message) {
+      setPromotionForm((prev) => ({ ...prev, bannerImage: null }));
+      setPromotionBannerPreview('');
+      setPromotionFormError(message);
+      showPopup({ type: 'error', text: message });
+      return false;
+    }
+
+    setPromotionForm((prev) => ({ ...prev, bannerImage: file, bannerImageUrl: undefined }));
+    setPromotionBannerPreview(URL.createObjectURL(file));
+    return true;
+  };
+
+  const clearPromotionBanner = () => {
+    setPromotionForm((prev) => ({ ...prev, bannerImage: null, bannerImageUrl: '' }));
+    setPromotionBannerPreview('');
+    if (promotionBannerInputRef.current) promotionBannerInputRef.current.value = '';
+  };
+
+  const showPromotionFormError = (message: string) => {
+    setPromotionFormError(message);
+    showPopup({ type: 'error', text: message });
+  };
+
+  const parseDateInput = (value?: string) => {
+    if (!value) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+  };
+
+  const getTodayStart = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  };
+
+  const formatDateInput = (value: Date) => value.toLocaleDateString('vi-VN');
+
+  const getPromotionApiErrorMessage = (err: any) => {
+    const responseData = err?.response?.data;
+    const validationData = responseData?.data;
+    const fallback = responseData?.message || 'Không thể lưu chương trình khuyến mãi.';
+    const fieldLabels: Record<string, string> = {
+      name: 'Tên chương trình',
+      description: 'Mô tả',
+      bannerImageUrl: 'Ảnh banner',
+      discountPercent: 'Phần trăm giảm',
+      startsAt: 'Ngày bắt đầu',
+      endsAt: 'Ngày kết thúc',
+      status: 'Trạng thái',
+      bookIds: 'Sách áp dụng',
+    };
+    const translateValidationMessage = (message: string) => {
+      const translations: Array<[string, string]> = [
+        ['name must be a string', 'Tên chương trình không hợp lệ. Vui lòng nhập chữ.'],
+        ['discountPercent must not be greater than 100', 'Phần trăm giảm không được lớn hơn 100.'],
+        ['discountPercent must not be less than 0', 'Phần trăm giảm không được nhỏ hơn 0.'],
+        ['discountPercent must be an integer number', 'Phần trăm giảm phải là số nguyên.'],
+        ['discountPercent must be an integer', 'Phần trăm giảm phải là số nguyên.'],
+        ['bookIds must be an array', 'Danh sách sách áp dụng không hợp lệ.'],
+      ];
+      return translations.find(([source]) => message.includes(source))?.[1] || message;
+    };
+
+    if (validationData?.bookIds && Array.isArray(validationData.bookIds)) {
+      const conflictedBooks = validationData.bookIds
+        .map((bookId: string) => books.find((book) => book.id === bookId)?.title || bookId)
+        .slice(0, 5);
+      return `Một số sách đã thuộc chương trình khuyến mãi khác: ${conflictedBooks.join(', ')}. Vui lòng bỏ các sách này hoặc chỉnh chương trình hiện có.`;
+    }
+
+    if (validationData && typeof validationData === 'object') {
+      const details = Object.entries(validationData)
+        .flatMap(([field, messages]) => {
+          const label = fieldLabels[field] || field;
+          const list = Array.isArray(messages) ? messages : [String(messages)];
+          return list.map((message) => translateValidationMessage(`${message}`)).map((message) => `${label}: ${message}`);
+        })
+        .filter(Boolean);
+
+      if (details.length > 0) {
+        return details.join(' ');
+      }
+    }
+
+    if (fallback === 'Validation failed') {
+      return 'Thông tin chương trình khuyến mãi chưa hợp lệ. Vui lòng kiểm tra tên, phần trăm giảm, ngày áp dụng, ảnh banner và sách đã chọn.';
+    }
+
+    return fallback;
+  };
+
+  const togglePromotionBook = (bookId: string) => {
+    setPromotionForm((prev) => ({
+      ...prev,
+      bookIds: prev.bookIds.includes(bookId)
+        ? prev.bookIds.filter((id) => id !== bookId)
+        : [...prev.bookIds, bookId],
+    }));
+  };
+
+  const handleSavePromotionProgram = async () => {
+    const discountPercent = Number(promotionForm.discountPercent);
+    const startsAtDate = parseDateInput(promotionForm.startsAt);
+    const endsAtDate = parseDateInput(promotionForm.endsAt);
+    const todayStart = getTodayStart();
+    setPromotionFormError('');
+    if (!promotionForm.name.trim()) {
+      showPromotionFormError('Vui lòng nhập tên chương trình khuyến mãi.');
+      return;
+    }
+    if (promotionForm.name.trim().length < 3) {
+      showPromotionFormError('Tên chương trình khuyến mãi cần ít nhất 3 ký tự.');
+      return;
+    }
+    if (!Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
+      showPromotionFormError('Phần trăm giảm phải là số từ 1 đến 100.');
+      return;
+    }
+    if (
+      startsAtDate &&
+      endsAtDate &&
+      startsAtDate.getTime() > endsAtDate.getTime()
+    ) {
+      showPromotionFormError('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');
+      return;
+    }
+    if (promotionModalMode === 'create' && endsAtDate && endsAtDate.getTime() < todayStart.getTime()) {
+      showPromotionFormError(`Ngày kết thúc không được trước hôm nay (${formatDateInput(todayStart)}).`);
+      return;
+    }
+    if (promotionForm.bookIds.length === 0) {
+      showPromotionFormError('Vui lòng chọn ít nhất một sách cho chương trình khuyến mãi.');
+      return;
+    }
+
+    if (promotionModalMode === 'create' && !promotionForm.bannerImage) {
+      const message = 'Vui lòng chọn ảnh banner để hiển thị trên slider trang chủ.';
+      showPromotionFormError(message);
+      return;
+    }
+
+    const payload: AdminPromotionPayload = {
+      ...promotionForm,
+      name: promotionForm.name.trim(),
+      description: promotionForm.description?.trim() || '',
+      discountPercent,
+      startsAt: promotionForm.startsAt || undefined,
+      endsAt: promotionForm.endsAt || undefined,
+    };
+
+    try {
+      setSavingPromotion(true);
+      if (promotionModalMode === 'edit' && selectedPromotion) {
+        await updateAdminPromotion(selectedPromotion.id, payload);
+      } else {
+        await createAdminPromotion(payload);
+      }
+      setPromotionModalMode(null);
+      resetPromotionForm();
+      await loadData();
+      showPopup({
+        type: 'success',
+        text: promotionModalMode === 'edit'
+          ? 'Đã cập nhật chương trình khuyến mãi.'
+          : 'Đã tạo chương trình khuyến mãi.',
+      });
+    } catch (err: any) {
+      const message = getPromotionApiErrorMessage(err);
+      setError(message);
+      showPromotionFormError(message);
+    } finally {
+      setSavingPromotion(false);
+    }
+  };
+
+  const handleDeletePromotionProgram = (promotion: AdminPromotion) => {
+    setConfirmDialog({
+      title: 'Xóa chương trình khuyến mãi?',
+      message: `Chương trình "${promotion.name}" sẽ bị xóa và các sách trong chương trình sẽ được trả về giá gốc.`,
+      confirmLabel: 'Xóa chương trình',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          setDeletingPromotionId(promotion.id);
+          await deleteAdminPromotion(promotion.id);
+          await loadData();
+          showPopup({ type: 'success', text: 'Đã xóa chương trình khuyến mãi.' });
+        } catch (err: any) {
+          const message = err?.response?.data?.message || 'Không thể xóa chương trình khuyến mãi.';
+          setError(message);
+          showPopup({ type: 'error', text: message });
+        } finally {
+          setDeletingPromotionId(null);
+        }
+      },
+    });
   };
 
   const resetCategoryForm = () => {
@@ -1034,23 +1709,28 @@ export function AdminPage() {
     navigate('/');
   };
 
+  const handleAdminLogoClick = () => {
+    setCurrentView(isAdmin ? 'dashboard' : 'orders');
+    setSearchQuery('');
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 flex">
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-200">
-          <button onClick={() => navigate('/')} className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold">
-              TS
-            </div>
-            <div className="text-left">
-              <h1 className="text-lg font-bold text-orange-500">Trạm Sách</h1>
-              <p className="text-xs text-gray-500">Admin Panel</p>
+        <div className="border-b border-gray-200 p-5">
+          <button
+            onClick={handleAdminLogoClick}
+            className="flex w-full flex-col items-start rounded-xl p-2 text-left transition-colors hover:bg-orange-50"
+          >
+            <img src={logoUrl} alt="Trạm Sách" className="h-12 max-w-full object-contain" />
+            <div className="mt-3 inline-flex rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-600 ring-1 ring-orange-100">
+              {isAdmin ? 'Admin Panel' : 'Staff Panel'}
             </div>
           </button>
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
             return (
@@ -1105,7 +1785,7 @@ export function AdminPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-2xl font-bold text-gray-800">
-                {menuItems.find((item) => item.id === currentView)?.label}
+                {visibleMenuItems.find((item) => item.id === currentView)?.label}
               </h2>
               <p className="text-sm text-gray-500 mt-1">Dữ liệu được lấy trực tiếp từ backend</p>
             </div>
@@ -1483,6 +2163,9 @@ export function AdminPage() {
                     {filteredBooks.map((book) => {
                       const statusMeta = getBookStatusMeta(book);
                       const stock = Number(book.stock || 0);
+                      const bookPromotion = getPromotionForBook(book.id);
+                      const promotionActive = isPromotionCurrentlyActive(bookPromotion);
+                      const hasDiscount = Number(book.discount || 0) > 0;
 
                       return (
                       <tr key={book.id} title={statusMeta.label} className={`transition-colors hover:bg-orange-50/30 ${isBookDeleted(book) ? 'bg-gray-50/80' : 'bg-white'}`}>
@@ -1505,13 +2188,38 @@ export function AdminPage() {
                                 {book.publisher && (
                                   <span className="rounded-full bg-gray-100 px-2 py-1">{book.publisher}</span>
                                 )}
+                                {bookPromotion && (
+                                  <span
+                                    className={`rounded-full px-2 py-1 font-semibold ${
+                                      promotionActive
+                                        ? 'bg-orange-100 text-orange-700'
+                                        : 'bg-gray-100 text-gray-600'
+                                    }`}
+                                  >
+                                    KM {bookPromotion.discountPercent}% - {getPromotionStatusLabel(bookPromotion)}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>{book.category?.name || 'Chưa phân loại'}</TableCell>
                         <TableCell>
-                          <span className="font-semibold text-gray-900">{formatCurrency(book.price)}</span>
+                          <div className="space-y-1">
+                            <span className={`font-semibold ${hasDiscount ? 'text-red-600' : 'text-gray-900'}`}>
+                              {formatCurrency(book.price)}
+                            </span>
+                            {hasDiscount && (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-xs text-gray-400 line-through">
+                                  {formatCurrency(book.originalPrice)}
+                                </span>
+                                <span className="w-fit rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
+                                  -{Number(book.discount || 0)}%
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <span className={`font-semibold ${stock <= 0 ? 'text-red-600' : stock <= LOW_STOCK_THRESHOLD ? 'text-amber-600' : 'text-gray-900'}`}>
@@ -1582,6 +2290,160 @@ export function AdminPage() {
                 </table>
                 </div>
                 {filteredBooks.length === 0 && <EmptyState text="Không có sách phù hợp." />}
+              </div>
+            </div>
+          )}
+
+          {currentView === 'promotions' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Chương trình</p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900">{promotions.length}</p>
+                </div>
+                <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Đang áp dụng</p>
+                  <p className="mt-2 text-3xl font-bold text-orange-600">{activePromotions.length}</p>
+                </div>
+                <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Sách trong chương trình</p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900">{promotionBookTotal}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm chương trình hoặc sách..." />
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => navigate('/promotions')} className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 font-semibold text-orange-700 transition-colors hover:bg-orange-100">
+                    Xem trang khuyến mãi
+                  </button>
+                  <button onClick={openCreatePromotion} className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-3 font-semibold text-white transition-colors hover:bg-orange-600">
+                    <Plus className="h-5 w-5" />
+                    Tạo chương trình
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-4">
+                {filteredPromotions.map((promotion) => (
+                  <div key={promotion.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-lg font-bold text-gray-900">{promotion.name}</h3>
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${promotion.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {promotion.status === 'ACTIVE' ? 'Đang áp dụng' : 'Tạm tắt'}
+                          </span>
+                          <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
+                            Giảm {promotion.discountPercent}%
+                          </span>
+                        </div>
+                        {promotion.description && <p className="mt-2 text-sm text-gray-600">{promotion.description}</p>}
+                        <div className="mt-3 flex flex-wrap gap-3 text-sm text-gray-500">
+                          <span>Bắt đầu: {formatDate(promotion.startsAt)}</span>
+                          <span>Kết thúc: {formatDate(promotion.endsAt)}</span>
+                          <span>{promotion.bookCount || promotion.books?.length || 0} sách</span>
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {(promotion.books || []).slice(0, 5).map((book) => (
+                            <div key={book.id} className="flex max-w-[220px] items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-2 py-2">
+                              <img src={getBookImage(book)} alt={book.title} className="h-10 w-8 rounded object-cover ring-1 ring-gray-200" />
+                              <span className="line-clamp-2 text-xs font-medium text-gray-700">{book.title}</span>
+                            </div>
+                          ))}
+                          {(promotion.books?.length || 0) > 5 && (
+                            <span className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-600">
+                              +{(promotion.books?.length || 0) - 5} sách
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <button onClick={() => openEditPromotion(promotion)} className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100 transition-colors hover:bg-blue-100" title="Sửa chương trình">
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => handleDeletePromotionProgram(promotion)} disabled={deletingPromotionId === promotion.id} className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 text-red-700 ring-1 ring-red-100 transition-colors hover:bg-red-100 disabled:opacity-50" title="Xóa chương trình">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {filteredPromotions.length === 0 && <EmptyState text="Chưa có chương trình khuyến mãi phù hợp." />}
+              </div>
+            </div>
+          )}
+
+          {false && currentView === 'promotions' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Sách đang khuyến mãi</p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900">{activePromotionBooks.length}</p>
+                </div>
+                <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Mức giảm cao nhất</p>
+                  <p className="mt-2 text-3xl font-bold text-orange-600">{maxPromotionDiscount}%</p>
+                </div>
+                <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Tổng sách có thể áp dụng</p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900">{promotionBooks.length}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm sách để cấu hình khuyến mãi..." />
+                <button onClick={() => navigate('/promotions')} className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 font-semibold text-orange-700 transition-colors hover:bg-orange-100">
+                  Xem trang khuyến mãi
+                </button>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-100 px-5 py-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Cấu hình khuyến mãi theo sách</h3>
+                  <p className="text-sm text-gray-500">Cập nhật giá bán, giá gốc và phần trăm giảm. Sách có % giảm lớn hơn 0 sẽ hiển thị ở trang khuyến mãi.</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1000px]">
+                    <thead className="bg-slate-50/80">
+                      <tr>
+                        <TableHead>Sách</TableHead>
+                        <TableHead>Giá bán</TableHead>
+                        <TableHead>Giá gốc</TableHead>
+                        <TableHead>% giảm</TableHead>
+                        <TableHead>Hiện trạng</TableHead>
+                        <TableHead align="right">Thao tác</TableHead>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredPromotionBooks.map((book) => {
+                        const draft = promotionDrafts[book.id] || { price: String(book.price ?? ''), originalPrice: String(book.originalPrice ?? book.price ?? ''), discount: String(book.discount ?? 0) };
+                        const isUpdating = updatingPromotionBookId === book.id;
+                        const isActivePromotion = Number(book.discount || 0) > 0;
+                        return (
+                          <tr key={book.id} className="hover:bg-orange-50/30">
+                            <TableCell>
+                              <div className="flex items-center gap-4">
+                                <img src={getBookImage(book)} alt={book.title} className="h-16 w-12 rounded-lg object-cover ring-1 ring-gray-200" />
+                                <div>
+                                  <p className="line-clamp-2 font-semibold text-gray-900">{book.title}</p>
+                                  <p className="text-sm text-gray-500">{book.author}</p>
+                                  <p className="text-xs text-gray-400">{book.category?.name || 'Chưa phân loại'}</p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell><input type="number" min="0" value={draft.price} onChange={(event) => handlePromotionDraftChange(book.id, 'price', event.target.value)} className="w-32 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500" /></TableCell>
+                            <TableCell><input type="number" min="0" value={draft.originalPrice} onChange={(event) => handlePromotionDraftChange(book.id, 'originalPrice', event.target.value)} className="w-32 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500" /></TableCell>
+                            <TableCell><input type="number" min="0" max="100" value={draft.discount} onChange={(event) => handlePromotionDraftChange(book.id, 'discount', event.target.value)} className="w-24 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500" /></TableCell>
+                            <TableCell>{isActivePromotion ? (<span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">Đang giảm {Number(book.discount || 0)}%</span>) : (<span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">Chưa áp dụng</span>)}</TableCell>
+                            <TableCell align="right"><div className="flex justify-end gap-2"><button onClick={() => handleSavePromotion(book)} disabled={isUpdating} className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50">{isUpdating ? 'Đang lưu...' : 'Lưu'}</button><button onClick={() => handleClearPromotion(book)} disabled={isUpdating || !isActivePromotion} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50">Tắt sale</button></div></TableCell>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {filteredPromotionBooks.length === 0 && <EmptyState text="Không có sách phù hợp." />}
               </div>
             </div>
           )}
@@ -2256,7 +3118,7 @@ export function AdminPage() {
               </h3>
               <button
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                onClick={() => setBookModalMode(null)}
+                onClick={closeBookModal}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2264,6 +3126,34 @@ export function AdminPage() {
 
             {bookModalMode === 'detail' && selectedBook ? (
               <div className="p-6 space-y-6">
+                {getPromotionForBook(selectedBook.id) && (
+                  <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Percent className="h-5 w-5 text-orange-600" />
+                          <h4 className="font-bold text-orange-900">Sách đang thuộc chương trình khuyến mãi</h4>
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-orange-700 ring-1 ring-orange-200">
+                            {getPromotionStatusLabel(getPromotionForBook(selectedBook.id))}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-orange-800">
+                          {getPromotionForBook(selectedBook.id)?.name} - giảm {getPromotionForBook(selectedBook.id)?.discountPercent}%.
+                        </p>
+                        <p className="mt-1 text-xs text-orange-700">
+                          Thời gian: {formatDate(getPromotionForBook(selectedBook.id)?.startsAt)} - {formatDate(getPromotionForBook(selectedBook.id)?.endsAt)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-white px-4 py-3 text-right ring-1 ring-orange-100">
+                        <p className="text-xs font-medium text-gray-500">Giá sau khuyến mãi</p>
+                        <p className="text-xl font-bold text-red-600">{formatCurrency(selectedBook.price)}</p>
+                        {Number(selectedBook.discount || 0) > 0 && (
+                          <p className="text-xs text-gray-400 line-through">{formatCurrency(selectedBook.originalPrice)}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="flex flex-col gap-6 md:flex-row">
                   <img
                     src={getBookImage(selectedBook)}
@@ -2328,8 +3218,14 @@ export function AdminPage() {
                     </select>
                   </div>
                   <BookInput label="ISBN" value={bookForm.isbn} onChange={(value) => handleBookInput('isbn', value)} required />
-                  <BookInput label="Giá bán" type="number" value={bookForm.price} onChange={(value) => handleBookInput('price', value)} required />
                   <BookInput label="Giá gốc" type="number" value={bookForm.originalPrice} onChange={(value) => handleBookInput('originalPrice', value)} required />
+                  {bookModalMode === 'edit' && selectedBook && (
+                    <div className="rounded-lg border border-orange-100 bg-orange-50 px-4 py-3">
+                      <p className="text-sm font-medium text-gray-700">Giá bán hiện tại</p>
+                      <p className="mt-1 text-lg font-bold text-orange-600">{formatCurrency(selectedBook.price)}</p>
+                      <p className="mt-1 text-xs text-gray-500">Tự cập nhật theo chương trình khuyến mãi.</p>
+                    </div>
+                  )}
                   <BookInput label="Tồn kho" type="number" value={bookForm.stock} onChange={(value) => handleBookInput('stock', value)} required />
                   <BookInput label="Nhà xuất bản" value={bookForm.publisher || ''} onChange={(value) => handleBookInput('publisher', value)} />
                   <BookInput label="Năm xuất bản" type="number" value={bookForm.publishYear || ''} onChange={(value) => handleBookInput('publishYear', value)} />
@@ -2383,12 +3279,53 @@ export function AdminPage() {
                     </div>
                   )}
                   <input
+                    ref={bookImageInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     multiple
-                    onChange={(event) => event.target.files && handleBookInput('images', event.target.files)}
+                    onChange={(event) => {
+                      const isValid = handleBookImagesChange(event.target.files);
+                      if (!isValid) event.currentTarget.value = '';
+                    }}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
+                  {bookFormError && (
+                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{bookFormError}</span>
+                    </div>
+                  )}
+                  {bookImagePreviews.length > 0 && (
+                    <div className="mt-4">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-gray-700">Ảnh vừa chọn</p>
+                        <button
+                          type="button"
+                          onClick={clearSelectedBookImages}
+                          className="text-xs font-medium text-orange-600 hover:text-orange-700"
+                        >
+                          Bỏ chọn ảnh
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                        {bookImagePreviews.map((preview, index) => (
+                          <div key={preview.url} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                            <img
+                              src={preview.url}
+                              alt={`Ảnh vừa chọn ${index + 1}`}
+                              className="h-32 w-full object-cover"
+                            />
+                            <div className="space-y-0.5 px-2 py-1.5">
+                              <p className="truncate text-xs font-medium text-gray-700" title={preview.name}>
+                                {preview.name}
+                              </p>
+                              <p className="text-xs text-gray-500">{formatFileSize(preview.size)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <p className="text-xs text-gray-500 mt-2">
                     Hỗ trợ jpg, png, webp. Tối đa 5 ảnh, mỗi ảnh 2MB. Khi sửa, ảnh mới sẽ được thêm vào bộ ảnh hiện có; các ảnh được đánh dấu xóa sẽ bị xóa khi lưu.
                   </p>
@@ -2399,7 +3336,7 @@ export function AdminPage() {
             <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3">
               <button
                 className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-                onClick={() => setBookModalMode(null)}
+                onClick={closeBookModal}
               >
                 {bookModalMode === 'detail' ? 'Đóng' : 'Hủy'}
               </button>
@@ -2413,6 +3350,234 @@ export function AdminPage() {
                   {savingBook ? 'Đang lưu...' : 'Lưu sách'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {promotionModalMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {promotionModalMode === 'edit' ? 'Sửa chương trình khuyến mãi' : 'Tạo chương trình khuyến mãi'}
+                </h3>
+                <p className="text-sm text-gray-500">Chọn sách để áp dụng giá khuyến mãi tự động.</p>
+              </div>
+              <button
+                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                onClick={() => setPromotionModalMode(null)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-6 p-6">
+              {promotionFormError && (
+                <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{promotionFormError}</span>
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Tên chương trình</label>
+                  <input
+                    value={promotionForm.name}
+                    onChange={(event) => handlePromotionFormInput('name', event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="Ví dụ: Sale hè 2026"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Phần trăm giảm</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={promotionForm.discountPercent}
+                    onChange={(event) => handlePromotionFormInput('discountPercent', event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Ngày bắt đầu</label>
+                  <input
+                    type="date"
+                    value={promotionForm.startsAt || ''}
+                    onChange={(event) => handlePromotionFormInput('startsAt', event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Ngày kết thúc</label>
+                  <input
+                    type="date"
+                    value={promotionForm.endsAt || ''}
+                    onChange={(event) => handlePromotionFormInput('endsAt', event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Trạng thái</label>
+                  <select
+                    value={promotionForm.status}
+                    onChange={(event) => handlePromotionFormInput('status', event.target.value as AdminPromotionPayload['status'])}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="ACTIVE">Đang áp dụng</option>
+                    <option value="INACTIVE">Tạm tắt</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Số sách đã chọn</label>
+                  <div className="rounded-lg border border-orange-100 bg-orange-50 px-4 py-3 font-semibold text-orange-700">
+                    {promotionForm.bookIds.length} / {promotionBooks.length} sách
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Mô tả</label>
+                <textarea
+                  rows={3}
+                  value={promotionForm.description || ''}
+                  onChange={(event) => handlePromotionFormInput('description', event.target.value)}
+                  className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Ghi chú ngắn về chương trình"
+                />
+              </div>
+
+              <div className="rounded-xl border border-gray-200 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Ảnh banner slider {promotionModalMode === 'create' && <span className="text-red-500">*</span>}
+                  </label>
+                  {(promotionBannerPreview || promotionForm.bannerImageUrl) && (
+                    <button
+                      type="button"
+                      onClick={clearPromotionBanner}
+                      className="text-xs font-medium text-orange-600 hover:text-orange-700"
+                    >
+                      Bỏ chọn ảnh
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={promotionBannerInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => {
+                    const isValid = handlePromotionBannerChange(event.target.files);
+                    if (!isValid) event.currentTarget.value = '';
+                  }}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                <p className="mt-2 text-xs text-gray-500">Hỗ trợ jpg, png, webp. Tối đa 2MB. Ảnh này sẽ hiển thị trên slider trang chủ khi chương trình đang áp dụng.</p>
+                {(promotionBannerPreview || promotionForm.bannerImageUrl) && (
+                  <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
+                    <img
+                      src={promotionBannerPreview || promotionForm.bannerImageUrl || ''}
+                      alt="Ảnh banner khuyến mãi"
+                      className="h-48 w-full object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-gray-200">
+                <div className="border-b border-gray-100 px-4 py-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <h4 className="font-semibold text-gray-900">Sách áp dụng</h4>
+                    <span className="text-sm text-gray-500">
+                      Đang hiện {filteredPromotionModalBooks.length} / {promotionBooks.length} sách
+                    </span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1.3fr_0.9fr_0.9fr_auto]">
+                    <input
+                      value={promotionBookSearch}
+                      onChange={(event) => setPromotionBookSearch(event.target.value)}
+                      placeholder="Tìm theo tên sách, tác giả, ISBN..."
+                      className="rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                    <select
+                      value={promotionCategoryFilter}
+                      onChange={(event) => setPromotionCategoryFilter(event.target.value)}
+                      className="rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    >
+                      <option value="all">Tất cả danh mục</option>
+                      {activeCategories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={promotionStockFilter}
+                      onChange={(event) => setPromotionStockFilter(event.target.value as PromotionBookStockFilter)}
+                      className="rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    >
+                      <option value="all">Tất cả tồn kho</option>
+                      <option value="in_stock">Còn hàng</option>
+                      <option value="low_stock">Sắp hết hàng</option>
+                      <option value="out_of_stock">Hết hàng</option>
+                    </select>
+                    <label className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={showSelectedPromotionBooksOnly}
+                        onChange={(event) => setShowSelectedPromotionBooksOnly(event.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                      />
+                      Đã chọn
+                    </label>
+                  </div>
+                </div>
+                <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto p-4 md:grid-cols-2">
+                  {filteredPromotionModalBooks.map((book) => {
+                    const checked = promotionForm.bookIds.includes(book.id);
+                    return (
+                      <label key={book.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${checked ? 'border-orange-300 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => togglePromotionBook(book.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                        />
+                        <img src={getBookImage(book)} alt={book.title} className="h-14 w-10 rounded object-cover ring-1 ring-gray-200" />
+                        <div className="min-w-0">
+                          <p className="line-clamp-1 text-sm font-semibold text-gray-900">{book.title}</p>
+                          <p className="text-xs text-gray-500">{book.author}</p>
+                          <p className="text-xs text-gray-400">{formatCurrency(book.price)}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                  {filteredPromotionModalBooks.length === 0 && (
+                    <div className="col-span-full rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+                      Không có sách phù hợp với bộ lọc.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
+              <button
+                className="rounded-lg border border-gray-300 px-6 py-3 text-gray-700 transition-colors hover:bg-gray-100"
+                onClick={() => setPromotionModalMode(null)}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSavePromotionProgram}
+                disabled={savingPromotion}
+                className="flex items-center gap-2 rounded-lg bg-orange-500 px-6 py-3 text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+              >
+                <CheckCircle2 className="h-5 w-5" />
+                {savingPromotion ? 'Đang lưu...' : 'Lưu chương trình'}
+              </button>
             </div>
           </div>
         </div>

@@ -114,10 +114,11 @@ export function RegisterPage() {
     }
 
     setLoading(true);
-    try {
-      const verifiedUser = await verifyEmail(form.email.trim(), verificationCode.trim());
-      navigate(verifiedUser.role?.toUpperCase() === 'ADMIN' ? '/admin' : '/');
-    } catch (err: any) {
+      try {
+        const verifiedUser = await verifyEmail(form.email.trim(), verificationCode.trim());
+        const role = verifiedUser.role?.toUpperCase();
+        navigate(role === 'ADMIN' || role === 'STAFF' ? '/admin' : '/');
+      } catch (err: any) {
       setError(getAuthErrorMessage(err, 'Mã xác thực không hợp lệ hoặc đã hết hạn.'));
     } finally {
       setLoading(false);

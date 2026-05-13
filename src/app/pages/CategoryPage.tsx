@@ -696,9 +696,14 @@ export function CategoryPage() {
                       )}
 
                       {book.discount > 0 && (
-                        <div className="absolute top-3 right-3 bg-red-500 text-white w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
-                          -{book.discount}%
-                        </div>
+                        <>
+                          <div className="absolute left-3 top-12 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white shadow-lg">
+                            Đang khuyến mãi
+                          </div>
+                          <div className="absolute top-3 right-3 bg-red-500 text-white w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
+                            -{book.discount}%
+                          </div>
+                        </>
                       )}
                       {book.isOutOfStock && (
                         <div className="absolute bottom-3 left-3 rounded-full bg-gray-900/85 px-3 py-1 text-xs font-bold text-white">
@@ -743,7 +748,12 @@ export function CategoryPage() {
                       <p className="text-sm text-gray-600 mb-3">{book.author}</p>
 
                       <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xl font-bold text-orange-600">
+                        {book.discount > 0 && (
+                          <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
+                            Sale
+                          </span>
+                        )}
+                        <span className={`text-xl font-bold ${book.discount > 0 ? 'text-red-600' : 'text-orange-600'}`}>
                           {formatCurrency(book.price)}
                         </span>
                         {book.originalPrice && (
@@ -788,9 +798,14 @@ export function CategoryPage() {
                         </div>
                       )}
                       {book.discount > 0 && (
-                        <div className="absolute top-2 right-2 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold">
-                          -{book.discount}%
-                        </div>
+                        <>
+                          <div className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-1 text-[11px] font-bold text-white">
+                            Khuyến mãi
+                          </div>
+                          <div className="absolute top-2 right-2 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold">
+                            -{book.discount}%
+                          </div>
+                        </>
                       )}
                       {book.isOutOfStock && (
                         <div className="absolute bottom-2 left-2 rounded-full bg-gray-900/85 px-2 py-1 text-xs font-bold text-white">
@@ -834,7 +849,10 @@ export function CategoryPage() {
                         </div>
 
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-orange-600 mb-1">
+                          {book.discount > 0 && (
+                            <div className="mb-1 text-xs font-semibold text-red-600">Đang khuyến mãi</div>
+                          )}
+                          <div className={`text-2xl font-bold mb-1 ${book.discount > 0 ? 'text-red-600' : 'text-orange-600'}`}>
                             {formatCurrency(book.price)}
                           </div>
                           {book.originalPrice && (

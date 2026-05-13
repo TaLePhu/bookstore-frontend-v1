@@ -117,12 +117,42 @@ export interface AdminCategoryPayload {
   description: string;
 }
 
+export type AdminPromotionStatus = 'ACTIVE' | 'INACTIVE';
+
+export interface AdminPromotionPayload {
+  name: string;
+  description?: string;
+  bannerImageUrl?: string;
+  discountPercent: number | string;
+  startsAt?: string;
+  endsAt?: string;
+  status: AdminPromotionStatus;
+  bookIds: string[];
+  bannerImage?: File | null;
+}
+
+export interface AdminPromotion {
+  id: string;
+  name: string;
+  description?: string | null;
+  bannerImageUrl?: string | null;
+  discountPercent: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  status: AdminPromotionStatus;
+  books: ApiBook[];
+  bookCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AdminBookPayload {
   title: string;
   author: string;
   categoryId: string;
-  price: string;
+  price?: string;
   originalPrice: string;
+  discount?: string;
   stock: string;
   isbn: string;
   description: string;
@@ -214,7 +244,6 @@ const appendBookPayload = (formData: FormData, payload: AdminBookPayload) => {
     'title',
     'author',
     'categoryId',
-    'price',
     'originalPrice',
     'stock',
     'isbn',
@@ -270,6 +299,53 @@ export const restoreAdminBook = async (id: string): Promise<void> => {
 
 export const hardDeleteAdminBook = async (id: string): Promise<void> => {
   await api.delete(`/admin/books/${id}/hard`);
+};
+
+export const getAdminPromotions = async (): Promise<AdminPromotion[]> => {
+  try {
+    const res = await api.get('/admin/promotions');
+    return res.data.data;
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      return [];
+    }
+    throw error;
+  }
+};
+
+const buildPromotionFormData = (payload: AdminPromotionPayload) => {
+  const formData = new FormData();
+  formData.append('name', payload.name);
+  formData.append('description', payload.description || '');
+  if (payload.bannerImageUrl) formData.append('bannerImageUrl', payload.bannerImageUrl);
+  formData.append('discountPercent', String(payload.discountPercent));
+  if (payload.startsAt) formData.append('startsAt', payload.startsAt);
+  if (payload.endsAt) formData.append('endsAt', payload.endsAt);
+  formData.append('status', payload.status);
+  formData.append('bookIds', JSON.stringify(payload.bookIds || []));
+  if (payload.bannerImage) formData.append('bannerImage', payload.bannerImage);
+  return formData;
+};
+
+export const createAdminPromotion = async (
+  payload: AdminPromotionPayload
+): Promise<AdminPromotion> => {
+  const formData = buildPromotionFormData(payload);
+  const res = await api.post('/admin/promotions', formData);
+  return res.data.data;
+};
+
+export const updateAdminPromotion = async (
+  id: string,
+  payload: AdminPromotionPayload
+): Promise<AdminPromotion> => {
+  const formData = buildPromotionFormData(payload);
+  const res = await api.put(`/admin/promotions/${id}`, formData);
+  return res.data.data;
+};
+
+export const deleteAdminPromotion = async (id: string): Promise<void> => {
+  await api.delete(`/admin/promotions/${id}`);
 };
 
 export const getAdminOrders = async (params?: {

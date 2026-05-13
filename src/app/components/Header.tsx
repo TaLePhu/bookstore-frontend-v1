@@ -24,7 +24,8 @@ export function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
+  const role = user?.role?.toUpperCase();
+  const canManage = role === 'ADMIN' || role === 'STAFF';
 
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -139,23 +140,23 @@ export function Header() {
             </div>
           </div>
 
-          <div className={`grid w-auto shrink-0 ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-1 rounded-xl border border-blue-200 p-1.5 sm:gap-2 sm:p-2 lg:flex lg:w-auto lg:flex-nowrap lg:items-center lg:justify-end lg:gap-6 lg:px-4 lg:py-2`}>
-            {isAdmin && (
+          <div className={`grid w-auto shrink-0 ${canManage ? 'grid-cols-4' : 'grid-cols-3'} gap-1 rounded-2xl border border-blue-100 bg-white p-1.5 shadow-sm sm:gap-2 sm:p-2 lg:flex lg:w-auto lg:flex-nowrap lg:items-center lg:justify-end lg:gap-3 lg:px-3 lg:py-2`}>
+            {canManage && (
               <button
                 onClick={() => navigate('/admin')}
-                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14"
+                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-3 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14"
               >
                 <ShieldCheck className="w-5 h-5" />
                 <span className="text-xs">Quản lý</span>
               </button>
             )}
-            <button className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14">
+            <button className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-3 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14">
               <Bell className="w-5 h-5" />
               <span className="text-xs">Thông báo</span>
             </button>
             <button
               onClick={() => navigate('/cart')}
-              className="relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14"
+              className="relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-3 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14"
             >
               <div className="relative">
                 <ShoppingCart className="w-5 h-5" />
@@ -172,7 +173,7 @@ export function Header() {
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex min-h-12 w-full flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14 lg:flex-row lg:justify-start lg:gap-2"
+                  className="flex min-h-12 w-full flex-col items-center justify-center gap-1 rounded-xl px-3 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14 lg:min-w-40 lg:flex-row lg:justify-start lg:gap-3"
                 >
                   {user?.avatar ? (
                     <img src={user.avatar} alt={user?.name} className="w-8 h-8 rounded-full object-cover" />
@@ -182,40 +183,28 @@ export function Header() {
                     </div>
                   )}
                   <div className="hidden flex-col items-start lg:flex">
-                    <span className="text-xs font-medium">{user?.name}</span>
+                    <span className="max-w-24 truncate text-sm font-semibold text-gray-800">{user?.name}</span>
                     <span className="text-xs text-gray-500">Tài khoản</span>
                   </div>
-                  <ChevronDown className="hidden w-4 h-4 lg:block" />
+                  <ChevronDown className={`hidden w-4 h-4 text-gray-400 transition-transform lg:block ${showUserMenu ? 'rotate-180' : ''}`} />
                 </button>
 
                 {showUserMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                    {isAdmin && (
-                      <button
-                        onClick={() => {
-                          navigate('/admin');
-                          setShowUserMenu(false);
-                        }}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-2"
-                      >
-                        <ShieldCheck className="w-4 h-4" />
-                        Trang quản lý
-                      </button>
-                    )}
+                  <div className="absolute right-0 top-full z-50 mt-3 w-56 overflow-hidden rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl">
                     <button
                       onClick={() => {
                         navigate('/account');
                         setShowUserMenu(false);
                       }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-2"
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left font-medium text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-600"
                     >
                       <User className="w-4 h-4" />
                       Quản lý tài khoản
                     </button>
-                    <div className="border-t border-gray-200"></div>
+                    <div className="my-2 border-t border-gray-100"></div>
                     <button
                       onClick={handleLogout}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-2 text-red-600"
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left font-semibold text-red-600 transition-colors hover:bg-red-50"
                     >
                       <LogOut className="w-4 h-4" />
                       Đăng xuất
@@ -226,7 +215,7 @@ export function Header() {
             ) : (
               <button
                 onClick={handleAccountClick}
-                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14"
+                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-3 text-gray-700 transition-colors hover:bg-orange-50 hover:text-orange-500 lg:min-h-14"
               >
                 <User className="w-5 h-5" />
                 <span className="text-xs">Tài khoản</span>

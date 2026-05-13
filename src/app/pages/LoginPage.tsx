@@ -21,7 +21,8 @@ export function LoginPage() {
     setLoading(true);
     try {
       const loggedInUser = await login(email, password);
-      navigate(loggedInUser.role?.toUpperCase() === 'ADMIN' ? '/admin' : '/');
+      const role = loggedInUser.role?.toUpperCase();
+      navigate(role === 'ADMIN' || role === 'STAFF' ? '/admin' : '/');
     } catch (err: any) {
       setError(getAuthErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.'));
     } finally {

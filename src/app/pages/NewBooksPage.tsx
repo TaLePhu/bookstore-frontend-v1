@@ -300,9 +300,14 @@ export function NewBooksPage() {
                         MỚI
                       </div>
                       {book.discount > 0 && (
-                        <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-bold">
-                          -{book.discount}%
-                        </div>
+                        <>
+                          <div className="absolute left-2 top-10 rounded-lg bg-red-600 px-2 py-1 text-[11px] font-bold text-white shadow">
+                            Khuyến mãi
+                          </div>
+                          <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-bold">
+                            -{book.discount}%
+                          </div>
+                        </>
                       )}
                       {book.isOutOfStock && (
                         <div className="absolute bottom-2 left-2 rounded-md bg-gray-900/85 px-2 py-1 text-xs font-bold text-white">
@@ -330,7 +335,12 @@ export function NewBooksPage() {
                         <span>Phát hành: {formatReleaseDate(book.releaseDate)}</span>
                       </div>
                       <div className="flex items-baseline gap-2 mb-3">
-                        <span className="text-xl font-bold text-purple-600">{formatCurrency(book.price)}</span>
+                        {book.discount > 0 && (
+                          <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600">
+                            Sale
+                          </span>
+                        )}
+                        <span className={`text-xl font-bold ${book.discount > 0 ? 'text-red-600' : 'text-purple-600'}`}>{formatCurrency(book.price)}</span>
                         {book.originalPrice && <span className="text-sm text-gray-400 line-through">{formatCurrency(book.originalPrice)}</span>}
                       </div>
                       <div className="flex gap-2">
@@ -368,9 +378,14 @@ export function NewBooksPage() {
                   <img src={book.image} alt={book.title} className="w-32 h-48 object-cover rounded-lg" />
                   <div className="absolute top-2 left-2 bg-purple-600 text-white px-2 py-1 rounded text-xs font-bold">MỚI</div>
                   {book.discount > 0 && (
-                    <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs font-bold">
-                      -{book.discount}%
-                    </div>
+                    <>
+                      <div className="absolute left-2 top-10 rounded bg-red-600 px-2 py-1 text-[11px] font-bold text-white">
+                        Khuyến mãi
+                      </div>
+                      <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs font-bold">
+                        -{book.discount}%
+                      </div>
+                    </>
                   )}
                   {book.isOutOfStock && (
                     <div className="absolute bottom-2 left-2 rounded bg-gray-900/85 px-2 py-1 text-xs font-bold text-white">
@@ -393,7 +408,12 @@ export function NewBooksPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold text-purple-600">{formatCurrency(book.price)}</span>
+                      {book.discount > 0 && (
+                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
+                          Đang khuyến mãi
+                        </span>
+                      )}
+                      <span className={`text-2xl font-bold ${book.discount > 0 ? 'text-red-600' : 'text-purple-600'}`}>{formatCurrency(book.price)}</span>
                       {book.originalPrice && <span className="text-gray-400 line-through">{formatCurrency(book.originalPrice)}</span>}
                     </div>
                     <div className="flex gap-2">

@@ -136,6 +136,11 @@ export function CartPage() {
             >
               <div className="relative aspect-[3/4] overflow-hidden">
                 <img src={book.image} alt={book.title} className="h-full w-full object-cover" />
+                {book.discount > 0 && (
+                  <div className="absolute left-3 top-3 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white shadow">
+                    Khuyến mãi -{book.discount}%
+                  </div>
+                )}
               </div>
               <div className="p-4">
                 <h3 className="mb-1 line-clamp-2 font-bold text-gray-900">{book.title}</h3>
@@ -150,7 +155,10 @@ export function CartPage() {
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="font-bold text-orange-500">{formatCurrency(book.price)}</div>
+                    {book.discount > 0 && (
+                      <div className="mb-1 text-xs font-semibold text-red-600">Đang khuyến mãi</div>
+                    )}
+                    <div className={`font-bold ${book.discount > 0 ? 'text-red-600' : 'text-orange-500'}`}>{formatCurrency(book.price)}</div>
                     {book.originalPrice && (
                       <div className="text-sm text-gray-400 line-through">{formatCurrency(book.originalPrice)}</div>
                     )}

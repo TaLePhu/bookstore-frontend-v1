@@ -358,9 +358,14 @@ export function BestSellersPage() {
                           TOP {index + 1}
                         </div>
                         {book.discount > 0 && (
-                          <div className="absolute top-3 right-3 bg-red-500 text-white w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
-                            -{book.discount}%
-                          </div>
+                          <>
+                            <div className="absolute left-3 top-12 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white shadow-lg">
+                              Đang khuyến mãi
+                            </div>
+                            <div className="absolute top-3 right-3 bg-red-500 text-white w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
+                              -{book.discount}%
+                            </div>
+                          </>
                         )}
                         {book.isOutOfStock && (
                           <div className="absolute bottom-3 left-3 rounded-full bg-gray-900/85 px-3 py-1 text-xs font-bold text-white">
@@ -392,7 +397,12 @@ export function BestSellersPage() {
                         </h3>
                         <p className="text-sm text-gray-600 mb-3">{book.author}</p>
                         <div className="flex items-center gap-2 mb-3">
-                          <span className="text-xl font-bold text-orange-600">{formatCurrency(book.price)}</span>
+                          {book.discount > 0 && (
+                            <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
+                              Giá khuyến mãi
+                            </span>
+                          )}
+                          <span className={`text-xl font-bold ${book.discount > 0 ? 'text-red-600' : 'text-orange-600'}`}>{formatCurrency(book.price)}</span>
                           {book.originalPrice && <span className="text-sm text-gray-400 line-through">{formatCurrency(book.originalPrice)}</span>}
                         </div>
                         <div className="text-xs text-gray-500 mb-3">
@@ -426,9 +436,14 @@ export function BestSellersPage() {
                       <div className="w-32 h-44 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 relative">
                         <img src={book.image} alt={book.title} className="w-full h-full object-cover" />
                         {book.discount > 0 && (
-                          <div className="absolute top-2 right-2 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold">
-                            -{book.discount}%
-                          </div>
+                          <>
+                            <div className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-1 text-[11px] font-bold text-white">
+                              Khuyến mãi
+                            </div>
+                            <div className="absolute top-2 right-2 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold">
+                              -{book.discount}%
+                            </div>
+                          </>
                         )}
                         {book.isOutOfStock && (
                           <div className="absolute bottom-2 left-2 rounded-full bg-gray-900/85 px-2 py-1 text-xs font-bold text-white">
@@ -457,7 +472,10 @@ export function BestSellersPage() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-2xl font-bold text-orange-600 mb-1">{formatCurrency(book.price)}</div>
+                            {book.discount > 0 && (
+                              <div className="mb-1 text-xs font-semibold text-red-600">Đang khuyến mãi</div>
+                            )}
+                            <div className={`text-2xl font-bold mb-1 ${book.discount > 0 ? 'text-red-600' : 'text-orange-600'}`}>{formatCurrency(book.price)}</div>
                             {book.originalPrice && <div className="text-sm text-gray-400 line-through mb-2">{formatCurrency(book.originalPrice)}</div>}
                           </div>
                         </div>
