@@ -10,10 +10,18 @@ type HeroSlide = {
   id: string;
   image: string;
   title: string;
-  description?: string | null;
-  badge?: string;
-  cta: string;
   to: string;
+};
+
+const isPromotionActive = (banner: PromotionBanner) => {
+  const now = Date.now();
+  const startsAt = banner.startsAt ? new Date(banner.startsAt).getTime() : null;
+  const endsAt = banner.endsAt ? new Date(banner.endsAt).getTime() : null;
+
+  if (startsAt && startsAt > now) return false;
+  if (endsAt && endsAt < now) return false;
+
+  return true;
 };
 
 export function HeroCarousel() {
@@ -42,29 +50,23 @@ export function HeroCarousel() {
       id: 'default-banner',
       image: defaultBanner,
       title: 'Nhà sách Nhi',
-      description: 'Khám phá sách mới, sách hay và ưu đãi hấp dẫn mỗi ngày.',
-      badge: 'Bookstore',
-      cta: 'Khám phá ngay',
-      to: '/books',
+      to: '/',
     };
 
     const promotionSlides = promotionBanners
-      .filter((banner) => banner.image)
+      .filter((banner) => banner.image && isPromotionActive(banner))
       .map((banner) => ({
         id: banner.id,
         image: banner.image,
         title: banner.name,
-        description: banner.description,
-        badge: `Giảm ${banner.discountPercent}%`,
-        cta: 'Mua ngay',
-        to: '/promotions',
+        to: `/promotions/books?program=${encodeURIComponent(banner.name)}`,
       }));
 
-    return [defaultSlide, ...promotionSlides];
+    return promotionSlides.length > 0 ? promotionSlides : [defaultSlide];
   }, [promotionBanners]);
 
   const settings = {
-    dots: true,
+    dots: slides.length > 1,
     infinite: slides.length > 1,
     speed: 500,
     slidesToShow: 1,
@@ -95,30 +97,13 @@ export function HeroCarousel() {
               <button
                 type="button"
                 onClick={() => navigate(slide.to)}
-                className="group relative block min-h-[320px] w-full overflow-hidden bg-gray-900 text-left sm:min-h-[420px] lg:min-h-[500px]"
+                className="group relative block aspect-[16/7] w-full overflow-hidden bg-gray-100 text-left"
               >
                 <img
                   src={slide.image}
                   alt={slide.title}
-                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-black/10" />
-                <div className="relative z-10 flex min-h-[320px] max-w-3xl flex-col justify-center px-6 py-12 text-white sm:min-h-[420px] sm:px-12 lg:min-h-[500px]">
-                  {slide.badge && (
-                    <div className="mb-4 inline-flex w-fit rounded-full bg-orange-500 px-4 py-2 text-sm font-bold">
-                      {slide.badge}
-                    </div>
-                  )}
-                  <h2 className="text-4xl font-bold leading-tight sm:text-6xl">{slide.title}</h2>
-                  {slide.description && (
-                    <p className="mt-4 max-w-2xl text-lg leading-7 text-white/90 sm:text-2xl">
-                      {slide.description}
-                    </p>
-                  )}
-                  <span className="mt-8 inline-flex w-fit rounded-full bg-white px-8 py-4 text-lg font-bold text-orange-600 transition-colors group-hover:bg-orange-50">
-                    {slide.cta}
-                  </span>
-                </div>
               </button>
             </div>
           ))}
