@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Get base URL from env if available, else default to localhost:3000
-const API_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api/v1';
+const API_URL = ((import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api/v1').replace(/\/+$/, '');
 const AUTH_ERROR_HANDLED_ENDPOINTS = [
   '/auth/login',
   'auth/login',
