@@ -89,6 +89,7 @@ type ExistingBookImage = { id?: string; url: string; isPrimary?: boolean };
 type PromotionDraft = { price: string; originalPrice: string; discount: string };
 type BookVisibilityFilter = 'active' | 'deleted' | 'all';
 type BookStockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
+type BookCategoryFilter = 'all' | 'uncategorized' | string;
 type PromotionBookStockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
 type CategoryVisibilityFilter = 'active' | 'deleted' | 'all';
 type CategoryBookFilter = 'all' | 'with_books' | 'empty';
@@ -301,6 +302,7 @@ export function AdminPage() {
   const [showCancelRequestsOnly, setShowCancelRequestsOnly] = useState(false);
   const [bookVisibilityFilter, setBookVisibilityFilter] = useState<BookVisibilityFilter>('active');
   const [bookStockFilter, setBookStockFilter] = useState<BookStockFilter>('all');
+  const [bookCategoryFilter, setBookCategoryFilter] = useState<BookCategoryFilter>('all');
   const [categoryVisibilityFilter, setCategoryVisibilityFilter] = useState<CategoryVisibilityFilter>('active');
   const [categoryBookFilter, setCategoryBookFilter] = useState<CategoryBookFilter>('all');
   const [userRoleFilter, setUserRoleFilter] = useState<UserRoleFilter>('CUSTOMER');
@@ -522,11 +524,19 @@ export function AdminPage() {
       });
     }
 
+    if (bookCategoryFilter !== 'all') {
+      result = result.filter((book) => {
+        const categoryId = book.categoryId || book.category?.id || '';
+        if (bookCategoryFilter === 'uncategorized') return !categoryId;
+        return categoryId === bookCategoryFilter;
+      });
+    }
+
     if (currentView !== 'books' || !keyword) return result;
     return result.filter((book) =>
       [book.title, book.author, book.category?.name].filter(Boolean).join(' ').toLowerCase().includes(keyword)
     );
-  }, [books, bookStockFilter, currentView, searchQuery]);
+  }, [books, bookCategoryFilter, bookStockFilter, currentView, searchQuery]);
 
   const filteredPromotionBooks = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -2116,6 +2126,19 @@ export function AdminPage() {
                   <option value="in_stock">Còn hàng</option>
                   <option value="low_stock">Sắp hết hàng</option>
                   <option value="out_of_stock">Hết hàng</option>
+                </select>
+                <select
+                  value={bookCategoryFilter}
+                  onChange={(event) => setBookCategoryFilter(event.target.value)}
+                  className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="all">Tất cả danh mục</option>
+                  {activeCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                  <option value="uncategorized">Chưa phân loại</option>
                 </select>
                 <button
                   onClick={openCreateBook}
