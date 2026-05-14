@@ -80,7 +80,7 @@ const normalizeBook = (book: any): PromotionBook => {
     originalPrice,
     discount,
     image: getBookImage(book),
-    rating: Number(book.rating || 0) || 4.8,
+    rating: Number(book.rating || 0),
     sold: Number(book.soldCount || 0),
     stock: Number(book.stock || 0),
     categoryName: book.category?.name,

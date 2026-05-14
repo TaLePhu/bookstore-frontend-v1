@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import {
   ChevronLeft,
   MapPin,
@@ -25,8 +25,14 @@ import { useAuth } from '../context/AuthContext';
 import authApi from '../utils/api';
 import { getMyAddresses, type AddressItem } from '../services/account.service';
 
+const BUY_NOW_ITEM_KEY = 'tram-sach-buy-now-item';
+
 export function CheckoutPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isBuyNowRoute =
+    (location.state as { mode?: string } | null)?.mode === 'buy-now' ||
+    new URLSearchParams(location.search).get('mode') === 'buy-now';
   const {
     items,
     selectedItems,
@@ -47,6 +53,15 @@ export function CheckoutPage() {
   const [selectedShipping, setSelectedShipping] = useState('standard');
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [buyNowItem, setBuyNowItem] = useState<any | null>(() => {
+    if (!isBuyNowRoute) return null;
+    try {
+      return JSON.parse(sessionStorage.getItem(BUY_NOW_ITEM_KEY) || 'null');
+    } catch {
+      sessionStorage.removeItem(BUY_NOW_ITEM_KEY);
+      return null;
+    }
+  });
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -59,11 +74,16 @@ export function CheckoutPage() {
   });
 
   const shouldShowAddressForm = !isAuthenticated || addresses.length === 0 || selectedAddressId === 'new';
-  const checkoutItems = selectedItems.length > 0 ? selectedItems : items;
-  const checkoutTotalItems = selectedItems.length > 0
+  const isBuyNowMode = Boolean(buyNowItem);
+  const checkoutItems = buyNowItem ? [buyNowItem] : selectedItems.length > 0 ? selectedItems : items;
+  const checkoutTotalItems = buyNowItem
+    ? buyNowItem.quantity
+    : selectedItems.length > 0
     ? selectedTotalItems
     : items.reduce((sum, item) => sum + item.quantity, 0);
-  const checkoutTotalPrice = selectedItems.length > 0
+  const checkoutTotalPrice = buyNowItem
+    ? (Number(buyNowItem.price.replace(/[^\d]/g, '')) || 0) * buyNowItem.quantity
+    : selectedItems.length > 0
     ? selectedTotalPrice
     : items.reduce((sum, item) => sum + (Number(item.price.replace(/[^\d]/g, '')) || 0) * item.quantity, 0);
 
@@ -88,6 +108,17 @@ export function CheckoutPage() {
       navigate('/cart');
     }
   }, [checkoutItems.length, navigate, successOrder]);
+
+  useEffect(() => {
+    if (!isBuyNowRoute) return;
+
+    try {
+      setBuyNowItem(JSON.parse(sessionStorage.getItem(BUY_NOW_ITEM_KEY) || 'null'));
+    } catch {
+      sessionStorage.removeItem(BUY_NOW_ITEM_KEY);
+      setBuyNowItem(null);
+    }
+  }, [isBuyNowRoute]);
 
   useEffect(() => {
     const savedContact = sessionStorage.getItem('tram-sach-checkout-contact');
@@ -197,7 +228,7 @@ export function CheckoutPage() {
         quantity: item.quantity,
       }));
 
-      if (isAuthenticated && cartItemIds.length === 0) {
+      if (isAuthenticated && !isBuyNowMode && cartItemIds.length === 0) {
         toast.error('Giỏ hàng hiện chưa đồng bộ, vui lòng quay lại giỏ hàng và thử lại');
         navigate('/cart');
         return;
@@ -217,14 +248,17 @@ export function CheckoutPage() {
         : { addressId: selectedAddressId };
 
       const res = await authApi.post(isAuthenticated ? '/orders' : '/orders/guest', {
-        ...(isAuthenticated ? { cartItemIds } : { guestItems }),
+        ...(isAuthenticated && !isBuyNowMode ? { cartItemIds } : { guestItems }),
         ...addressPayload,
         note: formData.note,
         shippingFee,
         paymentMethod: mapPaymentMethod(),
       });
 
-      if (isAuthenticated) {
+      if (isBuyNowMode) {
+        sessionStorage.removeItem(BUY_NOW_ITEM_KEY);
+        setBuyNowItem(null);
+      } else if (isAuthenticated) {
         await refreshCart();
       } else if (selectedItems.length > 0) {
         await removeSelectedItems();
@@ -233,7 +267,6 @@ export function CheckoutPage() {
       }
       sessionStorage.removeItem('tram-sach-checkout-contact');
       setSuccessOrder(res.data?.data);
-      toast.success('Đặt hàng thành công');
     } catch (error: any) {
       console.error('Checkout error:', error);
       toast.error(error?.response?.data?.message || 'Không thể tạo đơn hàng');
@@ -405,15 +438,15 @@ export function CheckoutPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Tỉnh/Thành phố</label>
-                  <input name="city" value={formData.city} onChange={handleInputChange} className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors" />
+                  <input name="city" value={formData.city} onChange={handleInputChange} required className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Quận/Huyện</label>
-                  <input name="district" value={formData.district} onChange={handleInputChange} className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors" />
+                  <input name="district" value={formData.district} onChange={handleInputChange} required className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Phường/Xã</label>
-                  <input name="ward" value={formData.ward} onChange={handleInputChange} className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors" />
+                  <input name="ward" value={formData.ward} onChange={handleInputChange} required className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Ghi chú đơn hàng</label>

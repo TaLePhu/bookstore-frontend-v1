@@ -87,7 +87,7 @@ export const toDisplayBook = (book: ApiBook, index: number): DisplayBook => {
     price,
     originalPrice: safeOriginalPrice,
     discount,
-    rating: Number(book.rating) || 4.5,
+    rating: Number(book.rating || 0),
     reviews: Number(book.totalReviews) || 0,
     sold: Number(book.soldCount) || index,
     stock,

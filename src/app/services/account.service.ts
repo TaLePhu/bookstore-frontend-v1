@@ -217,7 +217,21 @@ export const submitOrderReview = async (payload: {
   bookId: string;
   rating: number;
   comment?: string;
-}) => {
+}): Promise<{
+  review: {
+    id: string;
+    userId: string;
+    bookId: string;
+    rating: number;
+    comment?: string | null;
+    createdAt?: string;
+  };
+  bookRating: {
+    bookId: string;
+    rating: number;
+    totalReviews: number;
+  };
+}> => {
   const res = await api.post('/orders/review', payload);
   return res.data.data;
 };

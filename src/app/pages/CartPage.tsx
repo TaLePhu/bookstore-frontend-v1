@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import {
   ShoppingCart,
   Trash2,
@@ -30,8 +30,11 @@ type CartItemView = {
   quantity: number;
 };
 
+const BUY_NOW_ITEM_KEY = 'tram-sach-buy-now-item';
+
 export function CartPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     items,
     removeFromCart,
@@ -54,6 +57,18 @@ export function CartPage() {
   const [itemToRemove, setItemToRemove] = useState<CartItemView | null>(null);
   const [showRemoveSelectedConfirm, setShowRemoveSelectedConfirm] = useState(false);
   const [removedItemTitle, setRemovedItemTitle] = useState('');
+  const [buyNowItem, setBuyNowItem] = useState<CartItemView | null>(null);
+
+  useEffect(() => {
+    if ((location.state as { mode?: string } | null)?.mode !== 'buy-now') return;
+
+    try {
+      setBuyNowItem(JSON.parse(sessionStorage.getItem(BUY_NOW_ITEM_KEY) || 'null'));
+    } catch {
+      sessionStorage.removeItem(BUY_NOW_ITEM_KEY);
+      setBuyNowItem(null);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     const fetchSuggestedBooks = async () => {
@@ -69,14 +84,25 @@ export function CartPage() {
     fetchSuggestedBooks();
   }, []);
 
-  const shippingFee = selectedTotalItems === 0 || selectedTotalPrice >= 200000 ? 0 : 30000;
-  const finalTotal = selectedTotalItems === 0 ? 0 : selectedTotalPrice + shippingFee;
-
   const getItemPrice = (item: CartItemView) => Number(item.price.replace(/[^\d]/g, '')) || 0;
+  const isBuyNowMode = Boolean(buyNowItem);
+  const visibleItems = buyNowItem ? [buyNowItem] : items;
+  const checkoutItemCount = buyNowItem ? buyNowItem.quantity : selectedTotalItems;
+  const checkoutSubtotal = buyNowItem ? getItemPrice(buyNowItem) * buyNowItem.quantity : selectedTotalPrice;
+  const visibleTotalItems = buyNowItem ? buyNowItem.quantity : totalItems;
+  const shippingFee = checkoutItemCount === 0 || checkoutSubtotal >= 200000 ? 0 : 30000;
+  const finalTotal = checkoutItemCount === 0 ? 0 : checkoutSubtotal + shippingFee;
 
   const handleQuantityChange = async (item: CartItemView, quantity: number) => {
     if (quantity <= 0) {
       setItemToRemove(item);
+      return;
+    }
+
+    if (isBuyNowMode) {
+      const nextItem = { ...item, quantity };
+      setBuyNowItem(nextItem);
+      sessionStorage.setItem(BUY_NOW_ITEM_KEY, JSON.stringify(nextItem));
       return;
     }
 
@@ -87,9 +113,15 @@ export function CartPage() {
     if (!itemToRemove) return;
 
     try {
+      if (isBuyNowMode) {
+        sessionStorage.removeItem(BUY_NOW_ITEM_KEY);
+        setBuyNowItem(null);
+        setRemovedItemTitle(itemToRemove.title);
+        return;
+      }
+
       await removeFromCart(itemToRemove.id);
       setRemovedItemTitle(itemToRemove.title);
-      toast.success(`Đã xóa "${itemToRemove.title}" khỏi giỏ hàng`);
     } finally {
       setItemToRemove(null);
     }
@@ -101,19 +133,20 @@ export function CartPage() {
     await removeSelectedItems();
     setShowRemoveSelectedConfirm(false);
     setRemovedItemTitle(`${selectedTotalItems} sản phẩm đã chọn`);
-    toast.success('Đã xóa các sản phẩm đã chọn khỏi giỏ hàng');
   };
 
   const handleCheckout = () => {
-    if (selectedTotalItems === 0) {
+    if (checkoutItemCount === 0) {
       toast.error('Vui lòng chọn ít nhất 1 sản phẩm để thanh toán');
       return;
     }
 
-    navigate('/checkout');
+    navigate(isBuyNowMode ? '/checkout?mode=buy-now' : '/checkout', {
+      state: isBuyNowMode ? { mode: 'buy-now' } : undefined,
+    });
   };
 
-  if (isLoading && items.length === 0) {
+  if (!isBuyNowMode && isLoading && items.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 p-8 text-center text-gray-500">
         Đang tải giỏ hàng...
@@ -267,7 +300,7 @@ export function CartPage() {
     );
   };
 
-  if (items.length === 0) {
+  if (visibleItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="border-b bg-white">
@@ -318,8 +351,10 @@ export function CartPage() {
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-6">
           <h1 className="mb-2 text-3xl font-bold text-gray-900">Giỏ hàng của bạn</h1>
-          <p className="text-gray-600">Bạn có {totalItems} sản phẩm trong giỏ hàng</p>
-          {error && (
+          <p className="text-gray-600">
+            {isBuyNowMode ? 'Sản phẩm mua ngay của bạn' : `Bạn có ${visibleTotalItems} sản phẩm trong giỏ hàng`}
+          </p>
+          {!isBuyNowMode && error && (
             <div className="mt-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
               <span>{error}</span>
               <button
@@ -361,6 +396,7 @@ export function CartPage() {
             <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
               <div className="border-b bg-gray-50 p-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  {!isBuyNowMode && (
                   <label className="flex items-center gap-3 text-sm font-bold text-gray-700">
                     <input
                       type="checkbox"
@@ -370,7 +406,9 @@ export function CartPage() {
                     />
                     Chọn tất cả sản phẩm
                   </label>
-                  <button
+                  )}
+                  {isBuyNowMode && <span className="text-sm font-bold text-orange-700">Luồng mua ngay</span>}
+                  {!isBuyNowMode && <button
                     type="button"
                     onClick={() => setShowRemoveSelectedConfirm(true)}
                     disabled={selectedTotalItems === 0}
@@ -378,15 +416,15 @@ export function CartPage() {
                   >
                     <Trash2 className="h-4 w-4" />
                     Xóa sản phẩm đã chọn
-                  </button>
+                  </button>}
                 </div>
               </div>
 
               <div className="divide-y">
-                {items.map((item) => {
+                {visibleItems.map((item) => {
                   const itemPrice = getItemPrice(item);
                   const itemTotal = itemPrice * item.quantity;
-                  const selected = isItemSelected(item.id);
+                  const selected = isBuyNowMode || isItemSelected(item.id);
 
                   return (
                     <div key={item.id} className={`p-5 transition-colors sm:p-6 ${selected ? 'bg-white' : 'bg-gray-50'}`}>
@@ -396,6 +434,7 @@ export function CartPage() {
                             <input
                               type="checkbox"
                               checked={selected}
+                              disabled={isBuyNowMode}
                               onChange={() => toggleItemSelection(item.id)}
                               className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
                             />
@@ -468,13 +507,13 @@ export function CartPage() {
               <h3 className="mb-6 text-lg font-bold text-gray-900">Thông tin đơn hàng</h3>
               <div className="mb-6 space-y-4">
                 <div className="flex items-center justify-between gap-4 text-gray-600">
-                  <span>Tạm tính ({selectedTotalItems} sản phẩm)</span>
-                  <span className="font-medium">{selectedTotalPrice.toLocaleString('vi-VN')}đ</span>
+                  <span>Tạm tính ({checkoutItemCount} sản phẩm)</span>
+                  <span className="font-medium">{checkoutSubtotal.toLocaleString('vi-VN')}đ</span>
                 </div>
                 <div className="flex items-center justify-between gap-4 text-gray-600">
                   <span>Phí vận chuyển</span>
                   {shippingFee === 0 ? (
-                    <span className="font-medium text-green-600">{selectedTotalItems === 0 ? 'Chưa tính' : 'Miễn phí'}</span>
+                    <span className="font-medium text-green-600">{checkoutItemCount === 0 ? 'Chưa tính' : 'Miễn phí'}</span>
                   ) : (
                     <span className="font-medium">{shippingFee.toLocaleString('vi-VN')}đ</span>
                   )}
@@ -491,14 +530,14 @@ export function CartPage() {
 
               <button
                 onClick={handleCheckout}
-                disabled={selectedTotalItems === 0}
+                disabled={checkoutItemCount === 0}
                 className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 py-4 text-lg font-bold text-white transition-all hover:-translate-y-1 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none"
               >
                 <CreditCard className="h-5 w-5" />
                 Thanh toán ngay
                 <ArrowRight className="h-5 w-5" />
               </button>
-              {selectedTotalItems === 0 && (
+              {checkoutItemCount === 0 && (
                 <p className="mb-3 text-sm text-red-500">Vui lòng chọn ít nhất 1 sản phẩm để thanh toán.</p>
               )}
 

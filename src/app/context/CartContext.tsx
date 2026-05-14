@@ -20,7 +20,11 @@ interface CartContextType {
   selectedItemIds: string[];
   isLoading: boolean;
   error: string;
-  addToCart: (item: Omit<CartItem, 'quantity'>) => Promise<void>;
+  addToCart: (
+    item: Omit<CartItem, 'quantity'>,
+    quantity?: number,
+    options?: { selectOnly?: boolean; silent?: boolean }
+  ) => Promise<void>;
   removeFromCart: (id: string | number) => Promise<void>;
   updateQuantity: (id: string | number, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -173,7 +177,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     syncCart();
   }, [isAuthenticated]);
 
-  const addToCart = async (item: Omit<CartItem, 'quantity'>) => {
+  const addToCart = async (
+    item: Omit<CartItem, 'quantity'>,
+    quantity = 1,
+    options: { selectOnly?: boolean; silent?: boolean } = {}
+  ) => {
+    const safeQuantity = Math.max(1, Math.floor(quantity));
+
     if (isAuthenticated) {
       if (!isValidBookId(item.id)) {
         toast.error('Sản phẩm này chưa sẵn sàng để mua trên hệ thống');
@@ -183,10 +193,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
       try {
         await authApi.post('/cart/add', {
           bookId: item.id,
-          quantity: 1,
+          quantity: safeQuantity,
         });
         await loadServerCart();
-        toast.success(`Đã thêm "${item.title}" vào giỏ hàng`);
+        if (options.selectOnly) {
+          setSelectedItemIds([toItemKey(item.id)]);
+          setHasInitializedSelection(true);
+        }
+        if (!options.silent) {
+          toast.success(`Đã thêm "${item.title}" vào giỏ hàng`);
+        }
       } catch (error: any) {
         console.error('Add to cart error:', error);
         toast.error(error?.response?.data?.message || 'Không thể thêm vào giỏ hàng');
@@ -196,20 +212,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     setItems((prevItems) => {
       const existingItem = prevItems.find((cartItem) => cartItem.id === item.id);
-      const nextQuantity = existingItem ? existingItem.quantity + 1 : 1;
+      const nextQuantity = existingItem ? existingItem.quantity + safeQuantity : safeQuantity;
 
-      toast.success(`Đã thêm "${item.title}" vào giỏ hàng`, {
-        description: `Số lượng hiện tại: ${nextQuantity}`,
-      });
+      if (!options.silent) {
+        toast.success(`Đã thêm "${item.title}" vào giỏ hàng`, {
+          description: `Số lượng hiện tại: ${nextQuantity}`,
+        });
+      }
 
       if (existingItem) {
         return prevItems.map((cartItem) =>
-          cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
+          cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + safeQuantity } : cartItem
         );
       }
 
-      return [...prevItems, { ...item, quantity: 1 }];
+      return [...prevItems, { ...item, quantity: safeQuantity }];
     });
+
+    if (options.selectOnly) {
+      setSelectedItemIds([toItemKey(item.id)]);
+      setHasInitializedSelection(true);
+    }
   };
 
   const removeFromCart = async (id: string | number) => {

@@ -334,7 +334,7 @@ export function BookDetailPage() {
                         author: book.author,
                         price: formatCurrency(displayBook.price),
                         image: displayBook.image,
-                      });
+                      }, quantity);
                     }}
                   >
                     <ShoppingCart className="w-6 h-6" />
@@ -343,8 +343,20 @@ export function BookDetailPage() {
                   <button
                     disabled={isOutOfStock}
                     className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 disabled:hover:translate-y-0 disabled:hover:shadow-none"
-                    onClick={() => {
-                      if (!isOutOfStock) navigate('/checkout');
+                    onClick={async () => {
+                      if (isOutOfStock) return;
+                      sessionStorage.setItem(
+                        'tram-sach-buy-now-item',
+                        JSON.stringify({
+                          id: book.id,
+                          title: book.title,
+                          author: book.author,
+                          price: formatCurrency(displayBook.price),
+                          image: displayBook.image,
+                          quantity,
+                        })
+                      );
+                      navigate('/checkout?mode=buy-now', { state: { mode: 'buy-now' } });
                     }}
                   >
                     Mua ngay
