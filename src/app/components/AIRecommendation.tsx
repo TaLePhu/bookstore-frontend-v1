@@ -11,6 +11,16 @@ interface CategoryItem {
   name: string;
 }
 
+const cleanAiSummary = (answer: string) => {
+  const normalized = answer.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return 'Mình đã chọn vài cuốn phù hợp nhất với nội dung bạn vừa tìm.';
+  }
+
+  const firstSentence = normalized.match(/.+?[.!?](\s|$)/)?.[0]?.trim() || normalized;
+  return firstSentence.length > 180 ? `${firstSentence.slice(0, 177).trim()}...` : firstSentence;
+};
+
 export function AIRecommendation() {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -47,7 +57,7 @@ export function AIRecommendation() {
     setIsLoading(true);
     try {
       const result = await getAIAdvisorRecommendations(keyword, 4);
-      setAiAnswer(result.answer);
+      setAiAnswer(cleanAiSummary(result.answer));
       setBookReasons(Object.fromEntries(result.books.map((book) => [book.id, book.reason])));
       setAiBooks(toVisibleDisplayBooks(result.books));
       setShowResults(true);
@@ -55,12 +65,14 @@ export function AIRecommendation() {
       console.error('Fetch AI recommendation books error:', error);
       try {
         const fallbackBooks = await getBestSellerBooks();
-        setAiAnswer('AI tạm thời chưa phản hồi được, mình hiển thị các sách nổi bật để bạn tham khảo trước.');
+        setAiAnswer('AI tạm thời chưa phản hồi được, mình gợi ý vài cuốn nổi bật để bạn tham khảo trước.');
         setBookReasons({});
         setAiBooks(toVisibleDisplayBooks(fallbackBooks).slice(0, 4));
         setShowResults(true);
       } catch (fallbackError) {
         console.error('Fetch fallback recommendation books error:', fallbackError);
+        setAiAnswer('');
+        setBookReasons({});
         setAiBooks([]);
         setShowResults(true);
       }
@@ -81,7 +93,6 @@ export function AIRecommendation() {
   return (
     <section className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-16">
       <div className="max-w-7xl mx-auto px-4">
-        {/* Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="relative">
@@ -91,15 +102,12 @@ export function AIRecommendation() {
               <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
             </div>
           </div>
-          <h2 className="text-4xl font-bold text-gray-900 mb-3">
-            Trợ lý AI gợi ý sách
-          </h2>
+          <h2 className="text-4xl font-bold text-gray-900 mb-3">Trợ lý AI gợi ý sách</h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Để AI tìm cuốn sách hoàn hảo cho bạn dựa trên sở thích, tâm trạng và mục tiêu đọc
+            Mô tả cuốn sách bạn muốn đọc, AI sẽ chọn những gợi ý dễ hiểu từ kho sách thật của cửa hàng.
           </p>
         </div>
 
-        {/* Search Box */}
         <div className="max-w-4xl mx-auto mb-8">
           <div className="bg-white rounded-2xl shadow-xl p-6">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row">
@@ -110,7 +118,7 @@ export function AIRecommendation() {
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Ví dụ: Tôi muốn đọc sách về khởi nghiệp, dễ hiểu và thực tế..."
                   className="w-full px-6 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 text-base"
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 />
                 <Sparkles className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400" />
               </div>
@@ -133,14 +141,13 @@ export function AIRecommendation() {
               </button>
             </div>
 
-            {/* Quick Prompts */}
             <div className="flex flex-wrap gap-2">
               <span className="text-sm text-gray-600 py-2">Gợi ý nhanh:</span>
-              {quickPrompts.map((item, index) => {
+              {quickPrompts.map((item) => {
                 const Icon = item.icon;
                 return (
                   <button
-                    key={index}
+                    key={item.text}
                     onClick={() => handleQuickPrompt(item.text)}
                     className="px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-indigo-50 hover:to-purple-50 rounded-full text-sm font-medium text-gray-700 hover:text-indigo-700 transition-all border border-gray-200 hover:border-indigo-300 flex items-center gap-2"
                   >
@@ -153,160 +160,119 @@ export function AIRecommendation() {
           </div>
         </div>
 
-        {/* Results */}
         {showResults && (
-          <div className="max-w-6xl mx-auto">
-            <div className="bg-white rounded-2xl shadow-xl p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
+          <div className="mx-auto max-w-6xl">
+            <div className="rounded-2xl bg-white p-6 shadow-xl sm:p-8">
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-500">
+                    <Sparkles className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">Gợi ý phù hợp với tìm kiếm của bạn</h3>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {aiBooks.length > 0
+                        ? `Mình tìm thấy ${aiBooks.length} cuốn trong kho có thể hợp với nhu cầu bạn vừa nhập.`
+                        : 'Mình chưa tìm thấy cuốn nào thật sự phù hợp với nội dung này.'}
+                    </p>
+                  </div>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900">
-                  AI đã tìm thấy {aiBooks.length} cuốn sách phù hợp
-                </h3>
               </div>
+
               {aiAnswer && (
-                <p className="mb-6 rounded-xl bg-indigo-50 px-4 py-3 text-sm leading-6 text-indigo-800">
+                <div className="mb-6 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm leading-6 text-indigo-800">
                   {aiAnswer}
-                </p>
+                </div>
               )}
 
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-                {aiBooks.map((book, index) => (
-                  <div
-                    key={book.id}
-                    className="relative bg-gradient-to-br from-gray-50 to-white rounded-xl overflow-hidden border-2 border-gray-100 hover:border-indigo-300 transition-all hover:shadow-xl group"
-                  >
-                    {/* Image */}
-                    <div className="relative aspect-[3/4] overflow-hidden">
-                      <img
-                        src={book.image}
-                        alt={book.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      {/* Match Score Badge */}
-                      <div className="absolute top-3 left-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" />
-                        {95 - index * 3}% phù hợp
-                      </div>
-                    </div>
-
-                      {book.discount > 0 && (
-                        <div className="absolute right-3 top-3 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white shadow">
-                          Khuyến mãi -{book.discount}%
-                        </div>
-                      )}
-                    {/* Info */}
-                    <div className="p-4">
-                      <div className="text-xs text-indigo-600 font-semibold mb-1">
-                        {getCategoryName(book.categoryId)}
-                      </div>
-                      <h4 className="font-bold text-gray-900 mb-1 line-clamp-1">
-                        {book.title}
-                      </h4>
-                      <p className="text-xs text-gray-600 mb-2">{book.author}</p>
-
-                      {/* AI Reason */}
-                      <div className="bg-indigo-50 rounded-lg p-2 mb-3">
-                        <p className="text-xs text-indigo-700 flex items-start gap-1">
-                          <Bot className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                          <span>{bookReasons[book.id] || 'Dựa trên nội dung bạn vừa tìm và dữ liệu sách thật trong kho'}</span>
-                        </p>
-                      </div>
-
-                      {/* Rating */}
-                      <div className="flex items-center gap-1 mb-3">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-3.5 h-3.5 ${
-                              i < Math.floor(book.rating)
-                                ? 'fill-yellow-400 text-yellow-400'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                        <span className="text-xs text-gray-600 ml-1">
-                          ({book.rating})
-                        </span>
-                      </div>
-
-                      {/* Price & Cart */}
-                      <div className="flex items-center justify-between">
-                        <div>
-                          {book.discount > 0 && (
-                            <div className="mb-1 w-fit rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
-                              Đang khuyến mãi
-                            </div>
-                          )}
-                          <div className="text-red-600 font-bold">
-                            {formatCurrency(book.price)}
-                          </div>
-                          {book.originalPrice && (
-                            <div className="text-gray-400 line-through text-xs">
-                              {formatCurrency(book.originalPrice)}
-                            </div>
-                          )}
-                        </div>
-                        <button 
-                          disabled={book.isOutOfStock}
-                          onClick={() => {
-                            if (book.isOutOfStock) return;
-                            addToCart({
-                              id: book.id,
-                              title: book.title,
-                              author: book.author,
-                              price: formatCurrency(book.price),
-                              image: book.image,
-                            });
-                          }}
-                          className="w-9 h-9 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white hover:shadow-lg transition-all hover:scale-110 disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 disabled:hover:scale-100 disabled:hover:shadow-none"
-                        >
-                          <ShoppingCart className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* AI Stats */}
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
-                      <Bot className="w-6 h-6 text-indigo-600" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-gray-900">500K+</div>
-                      <div className="text-sm text-gray-600">Lượt gợi ý</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                      <Heart className="w-6 h-6 text-purple-600" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-gray-900">98%</div>
-                      <div className="text-sm text-gray-600">Độ hài lòng</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-pink-100 rounded-xl flex items-center justify-center">
-                      <Sparkles className="w-6 h-6 text-pink-600" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-gray-900">10K+</div>
-                      <div className="text-sm text-gray-600">Sách trong kho</div>
-                    </div>
-                  </div>
+              {aiBooks.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-gray-500">
+                  Bạn thử mô tả rõ hơn một chút, ví dụ thể loại, chủ đề, tác giả yêu thích hoặc mục tiêu đọc nhé.
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+                  {aiBooks.map((book) => (
+                    <div
+                      key={book.id}
+                      className="group overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg"
+                    >
+                      <div className="relative aspect-[3/4] overflow-hidden bg-gray-100">
+                        <img
+                          src={book.image}
+                          alt={book.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute left-3 top-3 rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white shadow">
+                          {getCategoryName(book.categoryId)}
+                        </div>
+                        {book.discount > 0 && (
+                          <div className="absolute right-3 top-3 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white shadow">
+                            -{book.discount}%
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-4">
+                        <h4 className="mb-1 line-clamp-2 font-bold text-gray-900">{book.title}</h4>
+                        <p className="mb-3 text-sm text-gray-600">{book.author}</p>
+
+                        <div className="mb-3 rounded-lg bg-indigo-50 p-3 text-xs leading-5 text-indigo-700">
+                          <span className="font-semibold">Vì sao gợi ý: </span>
+                          {bookReasons[book.id] || 'Phù hợp với nội dung bạn vừa tìm và đang có trong kho.'}
+                        </div>
+
+                        <div className="mb-3 flex items-center gap-1">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-3.5 w-3.5 ${
+                                i < Math.floor(book.rating)
+                                  ? 'fill-yellow-400 text-yellow-400'
+                                  : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                          <span className="ml-1 text-xs text-gray-600">{book.rating.toFixed(1)}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className={`font-bold ${book.discount > 0 ? 'text-red-600' : 'text-orange-500'}`}>
+                              {formatCurrency(book.price)}
+                            </div>
+                            {book.originalPrice && (
+                              <div className="text-xs text-gray-400 line-through">
+                                {formatCurrency(book.originalPrice)}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            disabled={book.isOutOfStock}
+                            onClick={() => {
+                              if (book.isOutOfStock) return;
+                              addToCart({
+                                id: book.id,
+                                title: book.title,
+                                author: book.author,
+                                price: formatCurrency(book.price),
+                                image: book.image,
+                              });
+                            }}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white transition-all hover:scale-110 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:hover:scale-100"
+                            aria-label={`Thêm ${book.title} vào giỏ hàng`}
+                          >
+                            <ShoppingCart className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Feature Cards */}
         {!showResults && (
           <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
@@ -314,27 +280,21 @@ export function AIRecommendation() {
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <h3 className="font-bold text-gray-900 mb-2">Gợi ý thông minh</h3>
-              <p className="text-sm text-gray-600">
-                AI phân tích sở thích và tìm sách phù hợp nhất với bạn
-              </p>
+              <p className="text-sm text-gray-600">AI phân tích nhu cầu và tìm sách phù hợp nhất với bạn.</p>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4">
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-2">Cá nhân hóa</h3>
-              <p className="text-sm text-gray-600">
-                Học từ lịch sử đọc để đưa ra gợi ý ngày càng chính xác
-              </p>
+              <h3 className="font-bold text-gray-900 mb-2">Dễ hiểu</h3>
+              <p className="text-sm text-gray-600">Mỗi kết quả có lý do ngắn gọn để bạn biết vì sao cuốn đó phù hợp.</p>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
               <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center mb-4">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-2">Xu hướng mới</h3>
-              <p className="text-sm text-gray-600">
-                Cập nhật liên tục các đầu sách thịnh hành và được yêu thích
-              </p>
+              <h3 className="font-bold text-gray-900 mb-2">Kho sách thật</h3>
+              <p className="text-sm text-gray-600">Kết quả lấy trực tiếp từ dữ liệu sách đang có trong hệ thống.</p>
             </div>
           </div>
         )}

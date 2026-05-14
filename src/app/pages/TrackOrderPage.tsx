@@ -101,7 +101,7 @@ export function TrackOrderPage() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
-  const [reviewedBookIds, setReviewedBookIds] = useState<string[]>([]);
+  const [viewingReviewBookId, setViewingReviewBookId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<'cancel' | 'review' | null>(initialState?.action || null);
 
   const address = selectedOrder?.address;
@@ -191,6 +191,7 @@ export function TrackOrderPage() {
   const currentStepIndex = trackingSteps.reduce((latestIndex, step, index) => (step.id <= currentStatus ? index : latestIndex), 0);
   const canRequestCancel = selectedOrder ? ['PENDING', 'PROCESSING'].includes(selectedOrder.status) && !hasCancelRequest : false;
   const canReviewOrder = selectedOrder?.status === 'COMPLETED';
+  const viewingReviewItem = selectedOrder?.items.find((item) => item.bookId === viewingReviewBookId);
   const shippingAddress = address
     ? [address.addressLine, address.wardName, address.districtName, address.provinceName, address.country]
         .filter(Boolean)
@@ -217,8 +218,11 @@ export function TrackOrderPage() {
     }
 
     if (pendingAction === 'review') {
-      if (canReviewOrder && selectedOrder.items[0]?.bookId) {
-        openReviewModal(selectedOrder.items[0].bookId);
+      const nextReviewItem = selectedOrder.items.find((item) => !item.review);
+      if (canReviewOrder && nextReviewItem?.bookId) {
+        openReviewModal(nextReviewItem.bookId);
+      } else if (canReviewOrder) {
+        toast.info('Tất cả sản phẩm trong đơn hàng này đã được đánh giá.');
       } else {
         toast.error('Chỉ có thể đánh giá sau khi đơn hàng hoàn thành.');
       }
@@ -289,6 +293,12 @@ export function TrackOrderPage() {
   };
 
   const openReviewModal = (bookId: string) => {
+    const item = selectedOrder?.items.find((orderItem) => orderItem.bookId === bookId);
+    if (item?.review) {
+      setViewingReviewBookId(bookId);
+      return;
+    }
+
     setReviewingBookId(bookId);
     setReviewRating(5);
     setReviewComment('');
@@ -305,13 +315,31 @@ export function TrackOrderPage() {
 
     try {
       setIsSubmittingReview(true);
-      await submitOrderReview({
+      const result = await submitOrderReview({
         orderCode: code,
         bookId: reviewingBookId,
         rating: reviewRating,
         comment: reviewComment.trim() || undefined,
       });
-      setReviewedBookIds((prev) => Array.from(new Set([...prev, reviewingBookId])));
+      const reviewUpdate = {
+        bookId: reviewingBookId,
+        rating: result.bookRating.rating,
+        totalReviews: result.bookRating.totalReviews,
+        review: result.review,
+        updatedAt: Date.now(),
+      };
+      sessionStorage.setItem(`tram-sach-review-updated-${reviewingBookId}`, JSON.stringify(reviewUpdate));
+      window.dispatchEvent(new CustomEvent('tram-sach-review-updated', { detail: reviewUpdate }));
+      setSelectedOrder((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((item) =>
+                item.bookId === reviewingBookId ? { ...item, review: result.review } : item
+              ),
+            }
+          : current
+      );
       setReviewingBookId(null);
       setReviewComment('');
       toast.success('Cảm ơn bạn đã đánh giá sản phẩm.');
@@ -513,7 +541,10 @@ export function TrackOrderPage() {
               <div className="rounded-2xl bg-white p-6 shadow-lg">
                 <h2 className="mb-6 text-2xl font-bold text-gray-900">Sản phẩm ({selectedOrder.items.length})</h2>
                 <div className="space-y-4">
-                  {selectedOrder.items.map((item) => (
+                  {selectedOrder.items.map((item) => {
+                    const hasReview = Boolean(item.review);
+
+                    return (
                     <div key={item.id} className="flex gap-4 rounded-xl bg-gray-50 p-4">
                       <div className="h-28 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
                         {item.book ? (
@@ -530,21 +561,34 @@ export function TrackOrderPage() {
                             <div className="text-xs text-gray-500">Đơn giá: {formatCurrency(Number(item.price || 0))}</div>
                           </div>
                         </div>
-                        {canReviewOrder && (
-                          <div className="mt-4 flex justify-end">
+                        {(canReviewOrder || hasReview) && (
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                            {hasReview ? (
+                              <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1 text-sm font-semibold text-green-700 ring-1 ring-green-100">
+                                <CheckCircle2 className="h-4 w-4" />
+                                Đã đánh giá
+                              </span>
+                            ) : (
+                              <span />
+                            )}
                             <button
                               type="button"
                               onClick={() => openReviewModal(item.bookId)}
-                              className="inline-flex items-center gap-2 rounded-lg border border-yellow-300 bg-white px-3 py-2 text-sm font-semibold text-yellow-700 transition-colors hover:bg-yellow-50"
+                              className={`inline-flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm font-semibold transition-colors ${
+                                hasReview
+                                  ? 'border-green-300 text-green-700 hover:bg-green-50'
+                                  : 'border-yellow-300 text-yellow-700 hover:bg-yellow-50'
+                              }`}
                             >
                               <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                              {reviewedBookIds.includes(item.bookId) ? 'Cập nhật đánh giá' : 'Đánh giá sách'}
+                              {hasReview ? 'Xem đánh giá' : 'Đánh giá sách'}
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="mt-6 space-y-3 border-t pt-6">
@@ -723,6 +767,68 @@ export function TrackOrderPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {viewingReviewItem?.review && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Đánh giá đã gửi</h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  {viewingReviewItem.book?.title || 'Sách đã mua'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingReviewBookId(null)}
+                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 px-6 py-5">
+              <div>
+                <div className="mb-2 text-sm font-semibold text-gray-700">Số sao</div>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <Star
+                      key={rating}
+                      className={`h-8 w-8 ${
+                        rating <= Number(viewingReviewItem.review?.rating || 0)
+                          ? 'fill-yellow-400 text-yellow-400'
+                          : 'text-gray-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-sm font-semibold text-gray-700">Nhận xét</div>
+                <div className="min-h-28 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700">
+                  {viewingReviewItem.review.comment?.trim() || 'Bạn đã đánh giá sao cho sản phẩm này.'}
+                </div>
+                {viewingReviewItem.review.createdAt && (
+                  <div className="mt-2 text-right text-xs text-gray-500">
+                    Đã gửi: {formatDateTime(viewingReviewItem.review.createdAt)}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-gray-100 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setViewingReviewBookId(null)}
+                className="rounded-lg bg-orange-500 px-5 py-2.5 font-semibold text-white hover:bg-orange-600"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

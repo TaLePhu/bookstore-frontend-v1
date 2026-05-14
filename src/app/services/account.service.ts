@@ -50,6 +50,20 @@ export interface OrderItemDto {
   price: number | string;
   subTotal: number | string;
   bookId: string;
+  review?: {
+    id: string;
+    userId: string;
+    bookId: string;
+    orderId?: string | null;
+    rating: number;
+    comment?: string | null;
+    createdAt?: string | null;
+    user?: {
+      userName?: string | null;
+      fullName?: string | null;
+      email?: string | null;
+    } | null;
+  } | null;
   book?: {
     id: string;
     title: string;
@@ -225,6 +239,11 @@ export const submitOrderReview = async (payload: {
     rating: number;
     comment?: string | null;
     createdAt?: string;
+    user?: {
+      userName?: string | null;
+      fullName?: string | null;
+      email?: string | null;
+    } | null;
   };
   bookRating: {
     bookId: string;

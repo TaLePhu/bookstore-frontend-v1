@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
   Star,
@@ -30,6 +30,16 @@ interface ReviewCard {
   comment: string;
 }
 
+interface ReviewUpdatePayload {
+  bookId?: string;
+  rating?: number;
+  totalReviews?: number;
+  updatedAt?: number;
+  review?: NonNullable<ApiBook['reviews']>[number];
+}
+
+const clampRating = (rating: number) => Math.min(5, Math.max(0, rating));
+
 const getBookGalleryImages = (book: ApiBook) => {
   const images = book.images?.map((item) =>
     typeof item === 'string' ? item : item.imageUrl || item.url || ''
@@ -39,14 +49,19 @@ const getBookGalleryImages = (book: ApiBook) => {
 
 const buildReviews = (book: ApiBook): ReviewCard[] =>
   (book.reviews || [])
-    .filter((review) => review.comment)
+    .slice()
+    .sort((first, second) => {
+      const firstTime = first.createdAt ? new Date(first.createdAt).getTime() : 0;
+      const secondTime = second.createdAt ? new Date(second.createdAt).getTime() : 0;
+      return secondTime - firstTime;
+    })
     .map((review) => ({
       id: review.id,
       user: review.user?.fullName || review.user?.userName || review.user?.email || 'Độc giả',
-      rating: Number(review.rating) || 0,
+      rating: clampRating(Number(review.rating) || 0),
       date: review.createdAt ? new Date(review.createdAt).toLocaleDateString('vi-VN') : 'Đang cập nhật',
       verified: true,
-      comment: review.comment || '',
+      comment: review.comment?.trim() || 'Người mua đã đánh giá sao cho sản phẩm này.',
     }));
 
 export function BookDetailPage() {
@@ -63,33 +78,110 @@ export function BookDetailPage() {
   const [mainImage, setMainImage] = useState('');
   const [galleryStartIndex, setGalleryStartIndex] = useState(0);
 
-  useEffect(() => {
-    const fetchBook = async () => {
-      if (!id) return;
+  const fetchBookDetail = useCallback(async (options: { resetView?: boolean; silent?: boolean } = {}) => {
+    if (!id) return;
 
-      try {
+    try {
+      if (!options.silent) {
         setLoading(true);
-        setError('');
+      }
+      setError('');
+      if (options.resetView) {
         setQuantity(1);
         setSelectedTab('description');
         setGalleryStartIndex(0);
+      }
 
-        const data = await getBookById(id);
-        setBook(data);
-        setMainImage(getBookImage(data));
+      const data = await getBookById(id);
+      setBook(data);
+      setMainImage((current) => (options.resetView || !current ? getBookImage(data) : current));
 
+      if (options.resetView) {
         const related = await getRelatedBooks(data.id, 5);
         setRelatedBooks(related.filter((item) => !isBookDeleted(item)));
-      } catch (fetchError) {
-        console.error('Fetch book detail error:', fetchError);
-        setError('Không tải được thông tin sách.');
-      } finally {
+      }
+    } catch (fetchError) {
+      console.error('Fetch book detail error:', fetchError);
+      setError('Không tải được thông tin sách.');
+    } finally {
+      if (!options.silent) {
         setLoading(false);
+      }
+    }
+  }, [id]);
+
+  const applyReviewUpdate = useCallback((update?: ReviewUpdatePayload | null) => {
+    if (!update?.bookId || update.bookId !== id) {
+      return;
+    }
+
+    setBook((current) => {
+      if (!current || current.id !== update.bookId) {
+        return current;
+      }
+
+      const currentReviews = current.reviews || [];
+      const hasIncomingReview = Boolean(update.review?.id);
+      const hasReviewAlready = hasIncomingReview
+        ? currentReviews.some((review) => review.id === update.review?.id)
+        : false;
+      const nextReviews = hasIncomingReview && !hasReviewAlready
+        ? [update.review!, ...currentReviews]
+        : currentReviews;
+
+      return {
+        ...current,
+        rating: update.rating ?? current.rating,
+        totalReviews: update.totalReviews ?? Math.max(Number(current.totalReviews) || 0, nextReviews.length),
+        reviews: nextReviews,
+      };
+    });
+  }, [id]);
+
+  useEffect(() => {
+    fetchBookDetail({ resetView: true });
+  }, [fetchBookDetail]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const refreshIfCurrentBook = async (event?: Event) => {
+      const update = (event as CustomEvent<ReviewUpdatePayload> | undefined)?.detail;
+      const updatedBookId = update?.bookId;
+      if (!updatedBookId || updatedBookId === id) {
+        if (update) {
+          applyReviewUpdate(update);
+        }
+        try {
+          await fetchBookDetail({ silent: true });
+        } finally {
+          if (update) {
+            applyReviewUpdate(update);
+          }
+        }
       }
     };
 
-    fetchBook();
-  }, [id]);
+    const marker = sessionStorage.getItem(`tram-sach-review-updated-${id}`);
+    if (marker) {
+      sessionStorage.removeItem(`tram-sach-review-updated-${id}`);
+      try {
+        const update = JSON.parse(marker) as ReviewUpdatePayload;
+        applyReviewUpdate(update);
+        fetchBookDetail({ silent: true }).finally(() => applyReviewUpdate(update));
+      } catch {
+        // Ignore stale markers from older app versions.
+      }
+    }
+
+    window.addEventListener('tram-sach-review-updated', refreshIfCurrentBook);
+    window.addEventListener('focus', refreshIfCurrentBook);
+
+    return () => {
+      window.removeEventListener('tram-sach-review-updated', refreshIfCurrentBook);
+      window.removeEventListener('focus', refreshIfCurrentBook);
+    };
+  }, [applyReviewUpdate, fetchBookDetail, id]);
 
   const displayBook = useMemo(() => (book ? toDisplayBook(book, 0) : null), [book]);
   const galleryImages = useMemo(() => (book ? getBookGalleryImages(book) : []), [book]);
@@ -98,6 +190,34 @@ export function BookDetailPage() {
     [galleryImages, galleryStartIndex]
   );
   const reviews = useMemo(() => (book ? buildReviews(book) : []), [book]);
+  const reviewCount = useMemo(
+    () => Math.max(Number(book?.totalReviews) || 0, reviews.length),
+    [book?.totalReviews, reviews.length]
+  );
+  const averageRating = useMemo(() => {
+    const apiRating = clampRating(Number(book?.rating) || 0);
+    if (apiRating > 0 || reviews.length === 0) {
+      return apiRating;
+    }
+
+    const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+    return clampRating(totalRating / reviews.length);
+  }, [book?.rating, reviews]);
+  const ratingBreakdown = useMemo(() => {
+    const countedReviews = reviews.length;
+
+    return [5, 4, 3, 2, 1].map((stars) => {
+      const count = reviews.filter((review) => Math.round(review.rating) === stars).length;
+
+      return {
+        stars,
+        count,
+        percent: countedReviews > 0 ? Math.round((count / countedReviews) * 100) : 0,
+      };
+    });
+  }, [reviews]);
+  const hasReviewSummary = reviewCount > 0 || averageRating > 0;
+  const hasDetailedReviews = reviews.length > 0;
   const maxQuantity = Math.max(1, Number(book?.stock) || 1);
 
   if (loading) {
@@ -258,14 +378,14 @@ export function BookDetailPage() {
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1">
                     {[...Array(5)].map((_, i) => (
-                      <Star key={i} className={`w-5 h-5 ${i < Math.floor(displayBook.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
+                      <Star key={i} className={`w-5 h-5 ${i < Math.floor(averageRating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
                     ))}
                   </div>
-                  <span className="text-xl font-bold text-gray-900">{displayBook.rating.toFixed(1)}</span>
+                  <span className="text-xl font-bold text-gray-900">{averageRating.toFixed(1)}</span>
                 </div>
                 <div className="flex items-center gap-1 text-gray-600">
                   <MessageCircle className="w-5 h-5" />
-                  <span>{displayBook.reviews.toLocaleString()} đánh giá</span>
+                  <span>{reviewCount.toLocaleString('vi-VN')} đánh giá</span>
                 </div>
                 <div className="flex items-center gap-1 text-gray-600">
                   <TrendingUp className="w-5 h-5" />
@@ -393,7 +513,7 @@ export function BookDetailPage() {
                 {[
                   { id: 'description', label: 'Mô tả sản phẩm' },
                   { id: 'specifications', label: 'Thông tin chi tiết' },
-                  { id: 'reviews', label: `Đánh giá (${displayBook.reviews})` },
+                  { id: 'reviews', label: `Đánh giá (${reviewCount.toLocaleString('vi-VN')})` },
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -458,42 +578,127 @@ export function BookDetailPage() {
 
                 {selectedTab === 'reviews' && (
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-6">Đánh giá từ khách hàng</h3>
-                    {reviews.length === 0 ? (
-                      <div className="rounded-xl bg-gray-50 p-6 text-center text-gray-500">
-                        Chưa có đánh giá cho cuốn sách này.
+                    <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900">Đánh giá từ khách hàng</h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Tổng hợp cảm nhận của khách đã mua sách tại Trạm Sách.
+                        </p>
+                      </div>
+                      <div className="text-sm text-gray-500">{reviewCount.toLocaleString('vi-VN')} lượt đánh giá</div>
+                    </div>
+                    {!hasReviewSummary ? (
+                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+                        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white text-orange-500 shadow-sm">
+                          <MessageCircle className="h-7 w-7" />
+                        </div>
+                        <h4 className="font-semibold text-gray-900">Chưa có đánh giá</h4>
+                        <p className="mt-2 text-sm text-gray-500">
+                          Khi khách hàng hoàn tất đơn và gửi đánh giá, nội dung sẽ hiển thị tại đây.
+                        </p>
                       </div>
                     ) : (
-                      <div className="space-y-6">
-                        {reviews.map((review) => (
-                          <div key={review.id} className="border-b pb-6 last:border-b-0">
-                            <div className="flex items-start gap-4">
-                              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-600">
-                                {review.user.charAt(0)}
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="font-medium text-gray-900">{review.user}</span>
-                                  {review.verified && (
-                                    <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
-                                      <Shield className="w-3 h-3" />
-                                      Đã mua hàng
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="flex items-center gap-1">
-                                    {[...Array(5)].map((_, i) => (
-                                      <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
-                                    ))}
-                                  </div>
-                                  <span className="text-sm text-gray-500">{review.date}</span>
-                                </div>
-                                <p className="text-gray-700">{review.comment}</p>
-                              </div>
+                      <div className="space-y-8">
+                        <div className="grid gap-6 rounded-xl border border-orange-100 bg-orange-50/60 p-5 md:grid-cols-[220px_1fr]">
+                          <div className="flex flex-col items-center justify-center rounded-xl bg-white p-5 text-center shadow-sm">
+                            <div className="text-5xl font-bold text-gray-900">{averageRating.toFixed(1)}</div>
+                            <div className="mt-2 flex items-center gap-1">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`h-5 w-5 ${
+                                    i < Math.floor(averageRating)
+                                      ? 'fill-yellow-400 text-yellow-400'
+                                      : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <div className="mt-2 text-sm text-gray-500">
+                              {reviewCount.toLocaleString('vi-VN')} lượt đánh giá
                             </div>
                           </div>
-                        ))}
+
+                          <div className="space-y-3">
+                            {hasDetailedReviews ? (
+                              <>
+                                {ratingBreakdown.map((item) => (
+                                  <div key={item.stars} className="grid grid-cols-[64px_1fr_48px] items-center gap-3 text-sm">
+                                    <div className="flex items-center gap-1 font-medium text-gray-700">
+                                      {item.stars}
+                                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                    </div>
+                                    <div className="h-2 overflow-hidden rounded-full bg-white">
+                                      <div
+                                        className="h-full rounded-full bg-yellow-400"
+                                        style={{ width: `${item.percent}%` }}
+                                      />
+                                    </div>
+                                    <div className="text-right text-gray-500">{item.count}</div>
+                                  </div>
+                                ))}
+                                {reviewCount > reviews.length && (
+                                  <p className="text-xs text-gray-500">
+                                    Biểu đồ đang dựa trên {reviews.length.toLocaleString('vi-VN')} nhận xét hiển thị gần nhất.
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <div className="flex h-full min-h-36 items-center rounded-xl bg-white p-5 text-sm text-gray-500">
+                                Sách đã có điểm đánh giá tổng hợp, nhưng chưa có nhận xét chi tiết để thống kê theo từng mức sao.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {hasDetailedReviews ? (
+                          <div className="space-y-5">
+                            {reviews.map((review) => (
+                              <div key={review.id} className="rounded-xl border border-gray-100 p-5">
+                                <div className="flex items-start gap-4">
+                                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-100 font-bold text-orange-600">
+                                    {review.user.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                                      <span className="font-medium text-gray-900">{review.user}</span>
+                                      {review.verified && (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
+                                          <Shield className="h-3 w-3" />
+                                          Đã mua hàng
+                                        </span>
+                                      )}
+                                      <span className="text-sm text-gray-400">{review.date}</span>
+                                    </div>
+                                    <div className="mb-3 flex items-center gap-2">
+                                      <div className="flex items-center gap-1">
+                                        {[...Array(5)].map((_, i) => (
+                                          <Star
+                                            key={i}
+                                            className={`h-4 w-4 ${
+                                              i < Math.round(review.rating)
+                                                ? 'fill-yellow-400 text-yellow-400'
+                                                : 'text-gray-300'
+                                            }`}
+                                          />
+                                        ))}
+                                      </div>
+                                      <span className="text-sm font-medium text-gray-700">{review.rating.toFixed(1)}</span>
+                                    </div>
+                                    <p className="text-gray-700">{review.comment}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
+                            <h4 className="font-semibold text-gray-900">Chưa có nhận xét chi tiết</h4>
+                            <p className="mt-2 text-sm text-gray-500">
+                              Điểm đánh giá đã được ghi nhận. Nhận xét bằng chữ sẽ xuất hiện sau khi khách hàng gửi thêm nội dung.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
