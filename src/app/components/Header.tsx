@@ -4,7 +4,7 @@ import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { LoginModal } from './LoginModal';
-import { searchBooks } from '../services/book.service';
+import { smartSearchBooks } from '../services/book.service';
 import { getBookImage } from '../utils/book-display';
 import logoUrl from '../../assets/logo.png';
 
@@ -23,6 +23,7 @@ export function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchMessage, setSearchMessage] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const role = user?.role?.toUpperCase();
   const canManage = role === 'ADMIN' || role === 'STAFF';
@@ -31,11 +32,13 @@ export function Header() {
     const timer = setTimeout(async () => {
       if (!searchQuery.trim()) {
         setSearchResults([]);
+        setSearchMessage('');
         return;
       }
 
       try {
-        const result = await searchBooks(searchQuery, 1, 5);
+        const result = await smartSearchBooks(searchQuery, 1, 5);
+        setSearchMessage(result.message);
         setSearchResults(
           result.data.map((book) => ({
             id: book.id,
@@ -47,6 +50,7 @@ export function Header() {
       } catch (error) {
         console.error('Header search error:', error);
         setSearchResults([]);
+        setSearchMessage('He thong dang gap truc trac nho, ban thu lai sau it phut nhe.');
       }
     }, 300);
 
@@ -112,6 +116,9 @@ export function Header() {
 
               {showSearchResults && searchQuery.trim() && (
                 <div className="absolute z-50 mt-2 w-full rounded-xl border bg-white shadow-lg">
+                  {searchMessage && (
+                    <div className="border-b border-gray-100 px-4 py-3 text-sm text-blue-700">{searchMessage}</div>
+                  )}
                   {searchResults.length > 0 ? (
                     <div className="max-h-80 overflow-y-auto p-2">
                       {searchResults.map((result) => (

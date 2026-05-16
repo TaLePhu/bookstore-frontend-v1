@@ -64,6 +64,11 @@ interface BooksListResponse {
   };
 }
 
+export interface SmartSearchBooksResponse extends SearchBooksResponse {
+  message: string;
+  isFallback: boolean;
+}
+
 export const getAllBooks = async (page = 1, limit = 10): Promise<BooksListResponse> => {
   const res = await api.get('/books', {
     params: { page, limit },
@@ -137,5 +142,59 @@ export const semanticSearchBooks = async (
   return {
     data: res.data.data,
     pagination: res.data.pagination,
+  };
+};
+
+export const smartSearchBooks = async (
+  q: string,
+  page = 1,
+  limit = 8
+): Promise<SmartSearchBooksResponse> => {
+  const trimmedQuery = q.trim();
+  if (!trimmedQuery) {
+    return {
+      data: [],
+      pagination: { total: 0, page, limit },
+      message: '',
+      isFallback: false,
+    };
+  }
+
+  try {
+    const semantic = await semanticSearchBooks(trimmedQuery, page, limit);
+    if (semantic.data.length > 0) {
+      return {
+        ...semantic,
+        message: `Mình tìm thấy một số sách hợp với "${trimmedQuery}".`,
+        isFallback: false,
+      };
+    }
+  } catch (error) {
+    console.warn('Semantic search failed on client, trying fallback search:', error);
+  }
+
+  try {
+    const keyword = await searchBooks(trimmedQuery, page, limit);
+    if (keyword.data.length > 0) {
+      return {
+        ...keyword,
+        message: `Chưa thấy kết quả ngữ nghĩa rõ ràng, đây là các sách gần với "${trimmedQuery}".`,
+        isFallback: false,
+      };
+    }
+  } catch (error) {
+    console.warn('Keyword fallback search failed on client, trying latest books:', error);
+  }
+
+  const fallback = await getAllBooks(1, limit);
+  return {
+    data: fallback.data,
+    pagination: {
+      total: fallback.pagination.total,
+      page: 1,
+      limit,
+    },
+    message: `Chưa có kết quả khớp chính xác cho "${trimmedQuery}", mình gợi ý vài đầu sách nổi bật để bạn tham khảo nhé.`,
+    isFallback: true,
   };
 };
