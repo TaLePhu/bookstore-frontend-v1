@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   AlertCircle,
@@ -2115,7 +2115,7 @@ export function AdminPage() {
                 <select
                   value={bookVisibilityFilter}
                   onChange={(event) => setBookVisibilityFilter(event.target.value as BookVisibilityFilter)}
-                  className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   <option value="active">Sách đang bán</option>
                   <option value="deleted">Sách đã xóa mềm</option>
@@ -2124,7 +2124,7 @@ export function AdminPage() {
                 <select
                   value={bookStockFilter}
                   onChange={(event) => setBookStockFilter(event.target.value as BookStockFilter)}
-                  className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   <option value="all">Tất cả tồn kho</option>
                   <option value="in_stock">Còn hàng</option>
@@ -2134,7 +2134,7 @@ export function AdminPage() {
                 <select
                   value={bookCategoryFilter}
                   onChange={(event) => setBookCategoryFilter(event.target.value)}
-                  className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   <option value="all">Tất cả danh mục</option>
                   {activeCategories.map((category) => (
@@ -2146,7 +2146,7 @@ export function AdminPage() {
                 </select>
                 <button
                   onClick={openCreateBook}
-                  className="px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 md:w-auto"
                 >
                   <Plus className="w-5 h-5" />
                   Thêm sách mới
@@ -2174,7 +2174,7 @@ export function AdminPage() {
                   </div>
                 </div>
                 <div className="overflow-x-auto">
-                <table className="w-full min-w-[1100px]">
+                <table className="w-full min-w-[920px]">
                   <thead className="bg-slate-50/80">
                     <tr>
                       <TableHead>Sách</TableHead>
@@ -2266,7 +2266,7 @@ export function AdminPage() {
                           )}
                         </TableCell>
                         <TableCell align="right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex flex-wrap justify-end gap-2">
                             <button
                               onClick={() => openBookDetail(book, 'detail')}
                               className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-100 transition-colors hover:bg-blue-100"
@@ -2463,7 +2463,7 @@ export function AdminPage() {
                             <TableCell><input type="number" min="0" value={draft.originalPrice} onChange={(event) => handlePromotionDraftChange(book.id, 'originalPrice', event.target.value)} className="w-32 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500" /></TableCell>
                             <TableCell><input type="number" min="0" max="100" value={draft.discount} onChange={(event) => handlePromotionDraftChange(book.id, 'discount', event.target.value)} className="w-24 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500" /></TableCell>
                             <TableCell>{isActivePromotion ? (<span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">Đang giảm {Number(book.discount || 0)}%</span>) : (<span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">Chưa áp dụng</span>)}</TableCell>
-                            <TableCell align="right"><div className="flex justify-end gap-2"><button onClick={() => handleSavePromotion(book)} disabled={isUpdating} className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50">{isUpdating ? 'Đang lưu...' : 'Lưu'}</button><button onClick={() => handleClearPromotion(book)} disabled={isUpdating || !isActivePromotion} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50">Tắt sale</button></div></TableCell>
+                            <TableCell align="right"><div className="flex flex-wrap justify-end gap-2"><button onClick={() => handleSavePromotion(book)} disabled={isUpdating} className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50">{isUpdating ? 'Đang lưu...' : 'Lưu'}</button><button onClick={() => handleClearPromotion(book)} disabled={isUpdating || !isActivePromotion} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50">Tắt sale</button></div></TableCell>
                           </tr>
                         );
                       })}
@@ -2583,7 +2583,7 @@ export function AdminPage() {
                             </TableCell>
                             <TableCell>{formatDate(category.createdAt)}</TableCell>
                             <TableCell align="right">
-                              <div className="flex justify-end gap-2">
+                              <div className="flex flex-wrap justify-end gap-2">
                                 <button
                                   onClick={() => openEditCategory(category)}
                                   disabled={deleted}
@@ -2700,7 +2700,7 @@ export function AdminPage() {
                 <select
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value as 'all' | AdminOrderStatus)}
-                  className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   <option value="all">Tất cả trạng thái</option>
                   <option value="PENDING">Chờ xử lý</option>
@@ -2748,7 +2748,7 @@ export function AdminPage() {
                           )}
                         </TableCell>
                         <TableCell align="right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex flex-wrap justify-end gap-2">
                             {hasPendingCustomerCancelRequest(order) && (
                               <button
                                 onClick={() => openOrderDetail(order)}
@@ -2918,7 +2918,7 @@ export function AdminPage() {
                           </span>
                         </TableCell>
                         <TableCell align="right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex flex-wrap justify-end gap-2">
                             <button
                               type="button"
                               disabled={updatingUserId === customer.id || customer.id === user?.id}
@@ -4022,3 +4022,5 @@ function InfoBlock({ title, rows }: { title: string; rows: Array<[string, string
     </div>
   );
 }
+
+
