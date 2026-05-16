@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { BookOpen, Mail, Lock, AlertCircle } from 'lucide-react';
 import { getAuthErrorMessage } from '../utils/auth-error';
+import { toast } from 'sonner';
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -22,6 +23,7 @@ export function LoginPage() {
     try {
       const loggedInUser = await login(email, password);
       const role = loggedInUser.role?.toUpperCase();
+      toast.success('Đăng nhập thành công!');
       navigate(role === 'ADMIN' || role === 'STAFF' ? '/admin' : '/');
     } catch (err: any) {
       setError(getAuthErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.'));

@@ -23,7 +23,7 @@ function AdminRoute() {
   const role = user?.role?.toUpperCase();
 
   if (!isAuthenticated) {
-    return createElement(Navigate, { to: '/login', replace: true });
+    return createElement(Navigate, { to: '/', replace: true });
   }
 
   if (role !== 'ADMIN' && role !== 'STAFF') {

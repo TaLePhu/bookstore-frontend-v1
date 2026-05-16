@@ -19,6 +19,8 @@ const AUTH_ERROR_HANDLED_ENDPOINTS = [
   'auth/verify-reset-code',
   '/auth/reset-password',
   'auth/reset-password',
+  '/auth/logout',
+  'auth/logout',
 ];
 
 const api = axios.create({
@@ -48,12 +50,14 @@ api.interceptors.response.use(
       requestUrl.endsWith(endpoint)
     );
 
-    if (error.response?.status === 401 && !shouldLetFormHandleError) {
-      // Clear local storage and redirect to login
+    const hasToken = Boolean(localStorage.getItem('accessToken'));
+
+    if (error.response?.status === 401 && !shouldLetFormHandleError && hasToken) {
+      // Clear local storage and redirect to storefront home
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      window.location.href = '/';
     }
     return Promise.reject(error);
   }

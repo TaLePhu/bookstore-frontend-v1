@@ -39,6 +39,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import {
   createAdminBook,
@@ -1714,9 +1715,10 @@ export function AdminPage() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
+  const handleLogout = async () => {
+    await logout();
+    toast.success('Đăng xuất thành công. Quay lại trang chủ bán hàng.');
+    navigate('/', { replace: true });
   };
 
   const handleAdminLogoClick = () => {

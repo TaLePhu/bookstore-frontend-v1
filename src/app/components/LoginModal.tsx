@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getAuthErrorMessage } from '../utils/auth-error';
+import { toast } from 'sonner';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -151,6 +152,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         }
 
         const loggedInUser = await login(form.email.trim(), form.password);
+        toast.success('Đăng nhập thành công!');
         closeModal();
         const role = loggedInUser.role?.toUpperCase();
         if (role === 'ADMIN' || role === 'STAFF') {
@@ -190,6 +192,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       updateField('confirmPassword', '');
       setMode('verify');
       setSuccessMessage(message);
+      toast.success('Đăng ký thành công. Vui lòng kiểm tra email để xác thực.');
     } catch (err: any) {
       setError(getAuthErrorMessage(err, 'Đã có lỗi xảy ra. Vui lòng thử lại.'));
     } finally {
@@ -209,6 +212,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setIsLoading(true);
     try {
       const verifiedUser = await verifyEmail(form.email.trim(), verificationCode.trim());
+      toast.success('Xác thực email thành công. Chào mừng bạn!');
       closeModal();
       const role = verifiedUser.role?.toUpperCase();
       if (role === 'ADMIN' || role === 'STAFF') {
@@ -298,6 +302,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       const message = await resetPassword(form.email.trim(), verificationCode.trim(), form.password);
       setMode('login');
       setSuccessMessage(message);
+      toast.success('Đặt lại mật khẩu thành công. Bạn có thể đăng nhập ngay.');
       updateField('password', '');
       updateField('confirmPassword', '');
       setVerificationCode('');

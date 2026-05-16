@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { LoginModal } from './LoginModal';
 import { smartSearchBooks } from '../services/book.service';
 import { getBookImage } from '../utils/book-display';
+import { toast } from 'sonner';
 import logoUrl from '../../assets/logo.png';
 
 interface SearchResult {
@@ -68,7 +69,8 @@ export function Header() {
   const handleLogout = async () => {
     await logout();
     setShowUserMenu(false);
-    navigate('/');
+    toast.success('Đăng xuất thành công. Hẹn gặp lại bạn!');
+    navigate('/', { replace: true });
   };
 
   return (

@@ -203,7 +203,7 @@ export function AccountPage() {
 
   useEffect(() => {
     if (!user) {
-      navigate('/login');
+      navigate('/', { replace: true });
       return;
     }
 
@@ -524,7 +524,8 @@ export function AccountPage() {
             <button
               onClick={async () => {
                 await logout();
-                navigate('/');
+                toast.success('Đăng xuất thành công. Hẹn gặp lại bạn!');
+                navigate('/', { replace: true });
               }}
               className="w-full bg-white rounded-2xl shadow-lg p-4 flex items-center gap-3 text-red-600 hover:bg-red-50 transition-colors"
             >

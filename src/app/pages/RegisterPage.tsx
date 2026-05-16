@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router';
 import { AlertCircle, BookOpen, Lock, Mail, Phone, RefreshCw, ShieldCheck, User, type LucideIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getAuthErrorMessage } from '../utils/auth-error';
+import { toast } from 'sonner';
 
 const isStrongPassword = (value: string) =>
   value.length >= 8 && /[a-z]/.test(value) && /[A-Z]/.test(value) && /[0-9]/.test(value);
@@ -95,6 +96,7 @@ export function RegisterPage() {
         password: form.password,
       });
       setSuccess(message);
+      toast.success('Đăng ký thành công. Vui lòng kiểm tra email để xác thực.');
       setStep('verify');
     } catch (err: any) {
       setError(getAuthErrorMessage(err, 'Đăng ký thất bại. Bạn vui lòng thử lại.'));
@@ -117,6 +119,7 @@ export function RegisterPage() {
       try {
         const verifiedUser = await verifyEmail(form.email.trim(), verificationCode.trim());
         const role = verifiedUser.role?.toUpperCase();
+        toast.success('Xác thực email thành công. Chào mừng bạn!');
         navigate(role === 'ADMIN' || role === 'STAFF' ? '/admin' : '/');
       } catch (err: any) {
       setError(getAuthErrorMessage(err, 'Mã xác thực không hợp lệ hoặc đã hết hạn.'));
