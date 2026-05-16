@@ -186,7 +186,7 @@ export function AIRecommendation() {
               )}
 
               {aiBooks.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-gray-500">
+                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-center sm:p-8 text-gray-500">
                   Bạn thử mô tả rõ hơn một chút, ví dụ thể loại, chủ đề, tác giả yêu thích hoặc mục tiêu đọc nhé.
                 </div>
               ) : (
@@ -302,3 +302,4 @@ export function AIRecommendation() {
     </section>
   );
 }
+

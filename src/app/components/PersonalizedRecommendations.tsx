@@ -203,11 +203,11 @@ export function PersonalizedRecommendations() {
       </div>
 
       {loading ? (
-        <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
+        <div className="rounded-xl border bg-white p-4 text-center sm:p-8 text-gray-500">
           Đang chuẩn bị gợi ý sách cho bạn...
         </div>
       ) : books.length === 0 ? (
-        <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
+        <div className="rounded-xl border bg-white p-4 text-center sm:p-8 text-gray-500">
           Chưa có sách phù hợp để gợi ý.
         </div>
       ) : (
@@ -296,3 +296,4 @@ export function PersonalizedRecommendations() {
     </section>
   );
 }
+

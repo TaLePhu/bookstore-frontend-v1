@@ -148,7 +148,7 @@ export function CartPage() {
 
   if (!isBuyNowMode && isLoading && items.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8 text-center text-gray-500">
+      <div className="min-h-screen bg-gray-50 p-4 text-center text-gray-500 sm:p-8">
         Đang tải giỏ hàng...
       </div>
     );

@@ -127,7 +127,7 @@ export function PromotionBooksPage() {
                 Lọc sách theo tên chương trình, phần trăm giảm và khoảng giá bán đang áp dụng.
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[460px]">
+            <div className="grid gap-3 sm:grid-cols-3 lg:min-w-0">
               <Stat label="Sách khuyến mãi" value={allPromotionBooks.length.toLocaleString('vi-VN')} />
               <Stat label="Đang hiển thị" value={filteredBooks.length.toLocaleString('vi-VN')} />
               <Stat label="Giảm cao nhất" value={`${maxDiscount}%`} />

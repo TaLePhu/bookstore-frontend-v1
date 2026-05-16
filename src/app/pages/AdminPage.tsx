@@ -1725,8 +1725,8 @@ export function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+    <div className="min-h-screen bg-gray-100 flex flex-col lg:flex-row">
+      <aside className="w-full border-b border-gray-200 bg-white lg:min-h-screen lg:w-64 lg:border-b-0 lg:border-r lg:flex-shrink-0 flex flex-col">
         <div className="border-b border-gray-200 p-5">
           <button
             onClick={handleAdminLogoClick}
@@ -1739,7 +1739,8 @@ export function AdminPage() {
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 overflow-x-auto p-3 lg:p-4">
+          <div className="flex gap-2 lg:block lg:space-y-1">
           {visibleMenuItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
@@ -1750,7 +1751,7 @@ export function AdminPage() {
                   setCurrentView(item.id);
                   setSearchQuery('');
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`flex shrink-0 items-center gap-3 rounded-lg px-4 py-3 transition-colors lg:w-full ${
                   isActive ? 'bg-orange-50 text-orange-600 font-medium' : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
@@ -1759,6 +1760,7 @@ export function AdminPage() {
               </button>
             );
           })}
+          </div>
         </nav>
 
         <div className="p-4 border-t border-gray-200">
@@ -1791,8 +1793,8 @@ export function AdminPage() {
       </aside>
 
       <main className="flex-1 overflow-auto">
-        <header className="bg-white border-b border-gray-200 px-8 py-4">
-          <div className="flex items-center justify-between gap-4">
+        <header className="border-b border-gray-200 bg-white px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-800">
                 {visibleMenuItems.find((item) => item.id === currentView)?.label}
@@ -1810,9 +1812,9 @@ export function AdminPage() {
           </div>
         </header>
 
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
           {popupMessage && (
-            <div className="fixed right-6 top-6 z-[60] max-w-sm rounded-xl border border-gray-200 bg-white p-4 shadow-2xl">
+            <div className="fixed left-2 right-2 top-3 z-[60] rounded-xl border border-gray-200 bg-white p-4 shadow-2xl sm:left-auto sm:right-6 sm:top-6 sm:max-w-sm">
               <div className="flex items-start gap-3">
                 {popupMessage.type === 'success' ? (
                   <CheckCircle2 className="mt-0.5 h-5 w-5 text-green-600" />
@@ -2707,8 +2709,8 @@ export function AdminPage() {
                 </select>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <table className="w-full">
+              <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
+                <table className="w-full min-w-[860px]">
                   <thead className="bg-gray-50">
                     <tr>
                       <TableHead>Mã đơn</TableHead>
@@ -3740,8 +3742,8 @@ export function AdminPage() {
 
               <div>
                 <h4 className="text-sm font-medium text-gray-500 mb-3">Sản phẩm</h4>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full">
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full min-w-[640px]">
                     <thead className="bg-gray-50">
                       <tr>
                         <TableHead>Tên sách</TableHead>

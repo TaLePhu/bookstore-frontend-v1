@@ -102,11 +102,11 @@ export function BookFinder() {
         )}
 
         {loadingBooks ? (
-          <div className="rounded-2xl border bg-white p-8 text-center text-gray-500">
+          <div className="rounded-2xl border bg-white p-4 text-center sm:p-8 text-gray-500">
             Đang tải sách theo danh mục...
           </div>
         ) : books.length === 0 ? (
-          <div className="rounded-2xl border bg-white p-8 text-center text-gray-500">
+          <div className="rounded-2xl border bg-white p-4 text-center sm:p-8 text-gray-500">
             Chưa có sách phù hợp trong danh mục này.
           </div>
         ) : (
@@ -225,3 +225,4 @@ export function BookFinder() {
     </section>
   );
 }
+

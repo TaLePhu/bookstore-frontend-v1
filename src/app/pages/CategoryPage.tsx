@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -134,7 +134,7 @@ const getCategoryMeta = (name: string) => {
   );
 };
 
-const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')}đ`;
+const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')}Ä‘`;
 
 const getFallbackBookImage = (bookId: string) => {
   const hash = bookId.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
@@ -213,7 +213,7 @@ export function CategoryPage() {
         setCategories(data);
       } catch (fetchError) {
         console.error('Fetch categories error:', fetchError);
-        setError('Không tải được danh mục từ hệ thống.');
+        setError('KhÃ´ng táº£i Ä‘Æ°á»£c danh má»¥c tá»« há»‡ thá»‘ng.');
       } finally {
         setLoadingCategories(false);
       }
@@ -238,7 +238,7 @@ export function CategoryPage() {
       } catch (fetchError) {
         console.error('Fetch books error:', fetchError);
         setBooks([]);
-        setError('Không tải được sách của danh mục này.');
+        setError('KhÃ´ng táº£i Ä‘Æ°á»£c sÃ¡ch cá»§a danh má»¥c nÃ y.');
       } finally {
         setLoadingBooks(false);
       }
@@ -273,34 +273,34 @@ export function CategoryPage() {
 
     return {
       id: categoryId || 'unknown',
-      name: 'Danh mục sách',
-      description: 'Khám phá các đầu sách nổi bật trong danh mục này.',
+      name: 'Danh má»¥c sÃ¡ch',
+      description: 'KhÃ¡m phÃ¡ cÃ¡c Ä‘áº§u sÃ¡ch ná»•i báº­t trong danh má»¥c nÃ y.',
       createdAt: '',
       ...getCategoryMeta(''),
     };
   }, [categoryId, displayCategories]);
 
   const currentSubCategories = useMemo(
-    () => [{ id: 'all', name: 'Tất cả', count: books.length }],
+    () => [{ id: 'all', name: 'Táº¥t cáº£', count: books.length }],
     [books.length]
   );
 
   const priceRanges = [
-    { id: 'all', name: 'Tất cả mức giá' },
-    { id: '0-50', name: 'Dưới 50.000đ' },
-    { id: '50-100', name: '50.000đ - 100.000đ' },
-    { id: '100-150', name: '100.000đ - 150.000đ' },
-    { id: '150-200', name: '150.000đ - 200.000đ' },
-    { id: '200+', name: 'Trên 200.000đ' },
+    { id: 'all', name: 'Táº¥t cáº£ má»©c giÃ¡' },
+    { id: '0-50', name: 'DÆ°á»›i 50.000Ä‘' },
+    { id: '50-100', name: '50.000Ä‘ - 100.000Ä‘' },
+    { id: '100-150', name: '100.000Ä‘ - 150.000Ä‘' },
+    { id: '150-200', name: '150.000Ä‘ - 200.000Ä‘' },
+    { id: '200+', name: 'TrÃªn 200.000Ä‘' },
   ];
 
   const sortOptions = [
-    { id: 'popular', name: 'Phổ biến nhất' },
-    { id: 'bestseller', name: 'Bán chạy' },
-    { id: 'rating', name: 'Đánh giá cao' },
-    { id: 'price-low', name: 'Giá thấp đến cao' },
-    { id: 'price-high', name: 'Giá cao đến thấp' },
-    { id: 'newest', name: 'Mới nhất' },
+    { id: 'popular', name: 'Phá»• biáº¿n nháº¥t' },
+    { id: 'bestseller', name: 'BÃ¡n cháº¡y' },
+    { id: 'rating', name: 'ÄÃ¡nh giÃ¡ cao' },
+    { id: 'price-low', name: 'GiÃ¡ tháº¥p Ä‘áº¿n cao' },
+    { id: 'price-high', name: 'GiÃ¡ cao Ä‘áº¿n tháº¥p' },
+    { id: 'newest', name: 'Má»›i nháº¥t' },
   ];
 
   const filteredBooks = useMemo(() => {
@@ -361,7 +361,7 @@ export function CategoryPage() {
               onClick={() => navigate('/')}
               className="text-gray-600 hover:text-orange-600 transition-colors"
             >
-              Danh mục
+              Danh má»¥c
             </button>
             <ChevronRight className="w-4 h-4 text-gray-400" />
             <span className="text-orange-600 font-medium">{currentCategory.name}</span>
@@ -385,15 +385,15 @@ export function CategoryPage() {
               <div className="mt-6 flex flex-wrap items-center gap-4 sm:gap-6">
                 <div className="flex items-center gap-2">
                   <BookOpen className="w-5 h-5" />
-                  <span>{loadingBooks ? 'Đang tải...' : `${books.length} sách`}</span>
+                  <span>{loadingBooks ? 'Äang táº£i...' : `${books.length} sÃ¡ch`}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Tag className="w-5 h-5" />
-                  <span>Giảm đến 35%</span>
+                  <span>Giáº£m Ä‘áº¿n 35%</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Star className="w-5 h-5 fill-yellow-300 text-yellow-300" />
-                  <span>Đánh giá cao</span>
+                  <span>ÄÃ¡nh giÃ¡ cao</span>
                 </div>
               </div>
             </div>
@@ -415,7 +415,7 @@ export function CategoryPage() {
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center gap-4 overflow-x-auto">
             {loadingCategories ? (
-              <div className="text-sm text-gray-500">Đang tải danh mục...</div>
+              <div className="text-sm text-gray-500">Äang táº£i danh má»¥c...</div>
             ) : (
               displayCategories.map((cat) => {
                 const Icon = cat.icon;
@@ -448,7 +448,7 @@ export function CategoryPage() {
                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors lg:hidden"
               >
                 <Filter className="w-5 h-5" />
-                <span className="font-medium">Bộ lọc</span>
+                <span className="font-medium">Bá»™ lá»c</span>
               </button>
 
               <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg">
@@ -469,7 +469,7 @@ export function CategoryPage() {
 
             <div className="flex items-center justify-between gap-4">
               <div className="text-sm text-gray-600">
-                <span className="font-bold text-gray-900">{filteredBooks.length}</span> sản phẩm
+                <span className="font-bold text-gray-900">{filteredBooks.length}</span> sáº£n pháº©m
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -500,7 +500,7 @@ export function CategoryPage() {
             selectedPriceRange !== 'all' ||
             selectedRating !== 'all') && (
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
-              <span className="text-sm text-gray-600">Đang lọc:</span>
+              <span className="text-sm text-gray-600">Äang lá»c:</span>
               {selectedSubCategory !== 'all' && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm">
                   <span>
@@ -521,7 +521,7 @@ export function CategoryPage() {
               )}
               {selectedRating !== 'all' && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm">
-                  <span>{selectedRating === '4+' ? '4 sao trở lên' : '4.5 sao trở lên'}</span>
+                  <span>{selectedRating === '4+' ? '4 sao trá»Ÿ lÃªn' : '4.5 sao trá»Ÿ lÃªn'}</span>
                   <button onClick={() => setSelectedRating('all')}>
                     <X className="w-4 h-4" />
                   </button>
@@ -535,7 +535,7 @@ export function CategoryPage() {
                 }}
                 className="text-sm text-orange-600 hover:text-orange-700 font-medium ml-2"
               >
-                Xóa tất cả
+                XÃ³a táº¥t cáº£
               </button>
             </div>
           )}
@@ -552,7 +552,7 @@ export function CategoryPage() {
             {/* <div className="bg-white rounded-xl shadow-sm border p-6">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-orange-600" />
-                Danh mục con
+                Danh má»¥c con
               </h3>
               <div className="space-y-2">
                 {currentSubCategories.map((subCat) => (
@@ -580,7 +580,7 @@ export function CategoryPage() {
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Tag className="w-5 h-5 text-orange-600" />
-                Khoảng giá
+                Khoáº£ng giÃ¡
               </h3>
               <div className="space-y-2">
                 {priceRanges.map((range) => (
@@ -605,13 +605,13 @@ export function CategoryPage() {
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Star className="w-5 h-5 text-orange-600 fill-orange-600" />
-                Đánh giá
+                ÄÃ¡nh giÃ¡
               </h3>
               <div className="space-y-2">
                 {[
-                  { id: 'all', stars: 0, label: 'Tất cả' },
-                  { id: '4+', stars: 4, label: '4 sao trở lên' },
-                  { id: '4.5+', stars: 4.5, label: '4.5 sao trở lên' },
+                  { id: 'all', stars: 0, label: 'Táº¥t cáº£' },
+                  { id: '4+', stars: 4, label: '4 sao trá»Ÿ lÃªn' },
+                  { id: '4.5+', stars: 4.5, label: '4.5 sao trá»Ÿ lÃªn' },
                 ].map((rating) => (
                   <label
                     key={rating.id}
@@ -649,25 +649,25 @@ export function CategoryPage() {
 
             <div className={`bg-gradient-to-br ${currentCategory.color} rounded-xl p-6 text-white`}>
               <CategoryIcon className="w-12 h-12 mb-4 opacity-80" />
-              <h3 className="font-bold text-lg mb-2">Khuyến mãi đặc biệt!</h3>
+              <h3 className="font-bold text-lg mb-2">Khuyáº¿n mÃ£i Ä‘áº·c biá»‡t!</h3>
               <p className="text-sm opacity-90 mb-4">
-                Giảm giá đến 35% cho tất cả sách trong danh mục {currentCategory.name}
+                Giáº£m giÃ¡ Ä‘áº¿n 35% cho táº¥t cáº£ sÃ¡ch trong danh má»¥c {currentCategory.name}
               </p>
               <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg text-sm">
                 <Tag className="w-4 h-4" />
-                <span>Áp dụng đến 31/03/2026</span>
+                <span>Ãp dá»¥ng Ä‘áº¿n 31/03/2026</span>
               </div>
             </div>
           </div>
 
           <div className="lg:col-span-9">
             {loadingBooks ? (
-              <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
-                Đang tải sách theo danh mục...
+              <div className="rounded-xl border bg-white p-4 text-center sm:p-8 text-gray-500">
+                Äang táº£i sÃ¡ch theo danh má»¥c...
               </div>
             ) : filteredBooks.length === 0 ? (
-              <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
-                Chưa có sách nào trong danh mục này.
+              <div className="rounded-xl border bg-white p-4 text-center sm:p-8 text-gray-500">
+                ChÆ°a cÃ³ sÃ¡ch nÃ o trong danh má»¥c nÃ y.
               </div>
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
@@ -691,14 +691,14 @@ export function CategoryPage() {
 
                       {book.isNew && !book.badge && (
                         <div className="absolute top-3 left-3 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                          MỚI
+                          Má»šI
                         </div>
                       )}
 
                       {book.discount > 0 && (
                         <>
                           <div className="absolute left-3 top-12 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white shadow-lg">
-                            Đang khuyến mãi
+                            Äang khuyáº¿n mÃ£i
                           </div>
                           <div className="absolute top-3 right-3 bg-red-500 text-white w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
                             -{book.discount}%
@@ -707,7 +707,7 @@ export function CategoryPage() {
                       )}
                       {book.isOutOfStock && (
                         <div className="absolute bottom-3 left-3 rounded-full bg-gray-900/85 px-3 py-1 text-xs font-bold text-white">
-                          Hết hàng
+                          Háº¿t hÃ ng
                         </div>
                       )}
 
@@ -777,7 +777,7 @@ export function CategoryPage() {
                         className="w-full bg-orange-500 text-white py-2.5 rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:hover:bg-gray-300"
                       >
                         <ShoppingCart className="w-4 h-4" />
-                        {book.isOutOfStock ? 'Hết hàng' : 'Thêm vào giỏ'}
+                        {book.isOutOfStock ? 'Háº¿t hÃ ng' : 'ThÃªm vÃ o giá»'}
                       </button>
                     </div>
                   </div>
@@ -800,7 +800,7 @@ export function CategoryPage() {
                       {book.discount > 0 && (
                         <>
                           <div className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-1 text-[11px] font-bold text-white">
-                            Khuyến mãi
+                            Khuyáº¿n mÃ£i
                           </div>
                           <div className="absolute top-2 right-2 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold">
                             -{book.discount}%
@@ -809,7 +809,7 @@ export function CategoryPage() {
                       )}
                       {book.isOutOfStock && (
                         <div className="absolute bottom-2 left-2 rounded-full bg-gray-900/85 px-2 py-1 text-xs font-bold text-white">
-                          Hết hàng
+                          Háº¿t hÃ ng
                         </div>
                       )}
                     </div>
@@ -839,18 +839,18 @@ export function CategoryPage() {
                               ))}
                             </div>
                             <span className="text-sm text-gray-600">
-                              {book.rating.toFixed(1)} ({book.reviews} đánh giá)
+                              {book.rating.toFixed(1)} ({book.reviews} Ä‘Ã¡nh giÃ¡)
                             </span>
                           </div>
 
                           <div className="text-sm text-gray-500">
-                            Đã bán {book.sold.toLocaleString()} sản phẩm
+                            ÄÃ£ bÃ¡n {book.sold.toLocaleString()} sáº£n pháº©m
                           </div>
                         </div>
 
                         <div className="text-right">
                           {book.discount > 0 && (
-                            <div className="mb-1 text-xs font-semibold text-red-600">Đang khuyến mãi</div>
+                            <div className="mb-1 text-xs font-semibold text-red-600">Äang khuyáº¿n mÃ£i</div>
                           )}
                           <div className={`text-2xl font-bold mb-1 ${book.discount > 0 ? 'text-red-600' : 'text-orange-600'}`}>
                             {formatCurrency(book.price)}
@@ -878,13 +878,13 @@ export function CategoryPage() {
                           className="flex-1 bg-orange-500 text-white py-2.5 rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:hover:bg-gray-300"
                         >
                           <ShoppingCart className="w-4 h-4" />
-                          {book.isOutOfStock ? 'Hết hàng' : 'Thêm vào giỏ'}
+                          {book.isOutOfStock ? 'Háº¿t hÃ ng' : 'ThÃªm vÃ o giá»'}
                         </button>
                         <button
                           onClick={() => navigate(`/book/${book.id}`)}
-                          className="px-6 py-2.5 border-2 border-orange-500 text-orange-600 rounded-lg font-medium hover:bg-orange-50 transition-colors"
+                          className="w-full px-6 py-2.5 border-2 border-orange-500 text-orange-600 rounded-lg font-medium hover:bg-orange-50 transition-colors sm:w-auto"
                         >
-                          Xem chi tiết
+                          Xem chi tiáº¿t
                         </button>
                         <button className="w-10 h-10 border-2 border-gray-200 rounded-lg flex items-center justify-center hover:border-red-500 hover:text-red-500 transition-colors">
                           <Heart className="w-5 h-5" />
@@ -898,7 +898,7 @@ export function CategoryPage() {
 
             {/* <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
               <button className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium">
-                Trước
+                TrÆ°á»›c
               </button>
               {[1, 2, 3, 4, 5].map((page) => (
                 <button
@@ -924,7 +924,7 @@ export function CategoryPage() {
       onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
       className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium"
     >
-      Trước
+      TrÆ°á»›c
     </button>
 
     {[...Array(totalPages)].map((_, index) => {
@@ -962,3 +962,6 @@ export function CategoryPage() {
     </div>
   );
 }
+
+
+

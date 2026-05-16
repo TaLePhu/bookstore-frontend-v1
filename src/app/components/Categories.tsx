@@ -30,11 +30,11 @@ export function Categories() {
       <h2 className="text-3xl font-bold text-gray-900 mb-8">Danh mục nổi bật</h2>
 
       {loading ? (
-        <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
+        <div className="rounded-xl border bg-white p-4 text-center sm:p-8 text-gray-500">
           Đang tải danh mục...
         </div>
       ) : categories.length === 0 ? (
-        <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
+        <div className="rounded-xl border bg-white p-4 text-center sm:p-8 text-gray-500">
           Chưa có dữ liệu danh mục.
         </div>
       ) : (
@@ -58,3 +58,4 @@ export function Categories() {
     </section>
   );
 }
+

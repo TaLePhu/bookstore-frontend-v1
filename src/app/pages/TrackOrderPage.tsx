@@ -433,7 +433,7 @@ export function TrackOrderPage() {
             ].map((item) => {
               const Icon = item.icon;
               return (
-                <div key={item.title} className="rounded-2xl bg-white p-6 text-center shadow-lg">
+                <div key={item.title} className="rounded-2xl bg-white p-4 text-center shadow-lg sm:p-6">
                   <div className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full ${item.color}`}>
                     <Icon className="h-7 w-7" />
                   </div>
@@ -446,7 +446,7 @@ export function TrackOrderPage() {
         ) : (
           <div className="grid gap-8 xl:grid-cols-12">
             <div className="space-y-8 xl:col-span-8">
-              <div className="rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 p-6 text-white shadow-lg">
+              <div className="rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 p-4 text-white shadow-lg sm:p-6">
                 <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="text-sm opacity-90">Mã đơn hàng</div>
@@ -495,7 +495,7 @@ export function TrackOrderPage() {
                 </div>
               )}
 
-              <div className="rounded-2xl bg-white p-6 shadow-lg">
+              <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-6">
                 <h2 className="mb-6 text-2xl font-bold text-gray-900">Lộ trình đơn hàng</h2>
                 <div className="relative">
                   <div className="absolute bottom-0 left-6 top-0 w-1 bg-gray-200" />
@@ -538,7 +538,7 @@ export function TrackOrderPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white p-6 shadow-lg">
+              <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-6">
                 <h2 className="mb-6 text-2xl font-bold text-gray-900">Sản phẩm ({selectedOrder.items.length})</h2>
                 <div className="space-y-4">
                   {selectedOrder.items.map((item) => {
@@ -609,7 +609,7 @@ export function TrackOrderPage() {
             </div>
 
             <div className="space-y-6 xl:col-span-4">
-              <div className="rounded-2xl bg-white p-6 shadow-lg">
+              <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-6">
                 <div className="mb-5 flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
                     <Home className="h-5 w-5 text-green-600" />
@@ -631,7 +631,7 @@ export function TrackOrderPage() {
                 )}
               </div>
 
-              <div className="rounded-2xl bg-white p-6 shadow-lg">
+              <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-6">
                 <div className="mb-5 flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100">
                     <CreditCard className="h-5 w-5 text-orange-600" />
@@ -650,7 +650,7 @@ export function TrackOrderPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white p-6 shadow-lg">
+              <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-6">
                 <div className="mb-5 flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
                     <XCircle className="h-5 w-5 text-red-600" />
@@ -716,7 +716,7 @@ export function TrackOrderPage() {
       {showCancelModal && selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <form onSubmit={handleCancelOrder} className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-4 py-4 sm:px-6 sm:py-5">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Yêu cầu hủy đơn hàng</h3>
                 <p className="mt-1 text-sm text-gray-600">Đơn hàng {displayOrderCode}</p>
@@ -731,7 +731,7 @@ export function TrackOrderPage() {
               </button>
             </div>
 
-            <div className="space-y-4 px-6 py-5">
+            <div className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
               <div className="rounded-xl bg-red-50 p-4 text-sm leading-6 text-red-700">
                 Sau khi gửi yêu cầu, đơn hàng sẽ chuyển sang trạng thái đã hủy nếu còn đủ điều kiện hủy.
               </div>
@@ -773,7 +773,7 @@ export function TrackOrderPage() {
       {viewingReviewItem?.review && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-4 py-4 sm:px-6 sm:py-5">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Đánh giá đã gửi</h3>
                 <p className="mt-1 text-sm text-gray-600">
@@ -789,7 +789,7 @@ export function TrackOrderPage() {
               </button>
             </div>
 
-            <div className="space-y-5 px-6 py-5">
+            <div className="space-y-5 px-4 py-4 sm:px-6 sm:py-5">
               <div>
                 <div className="mb-2 text-sm font-semibold text-gray-700">Số sao</div>
                 <div className="flex gap-2">
@@ -835,7 +835,7 @@ export function TrackOrderPage() {
       {reviewingBookId && selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <form onSubmit={handleSubmitReview} className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-4 py-4 sm:px-6 sm:py-5">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Đánh giá sản phẩm</h3>
                 <p className="mt-1 text-sm text-gray-600">
@@ -852,7 +852,7 @@ export function TrackOrderPage() {
               </button>
             </div>
 
-            <div className="space-y-5 px-6 py-5">
+            <div className="space-y-5 px-4 py-4 sm:px-6 sm:py-5">
               <div>
                 <label className="mb-2 block text-sm font-semibold text-gray-700">Số sao</label>
                 <div className="flex gap-2">

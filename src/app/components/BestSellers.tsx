@@ -41,11 +41,11 @@ export function BestSellers() {
       </div>
 
       {loading ? (
-        <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
+        <div className="rounded-xl border bg-white p-4 text-center sm:p-8 text-gray-500">
           Đang tải sách bán chạy...
         </div>
       ) : books.length === 0 ? (
-        <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
+        <div className="rounded-xl border bg-white p-4 text-center sm:p-8 text-gray-500">
           Chưa có dữ liệu sách bán chạy.
         </div>
       ) : (
@@ -143,3 +143,4 @@ export function BestSellers() {
     </section>
   );
 }
+

@@ -408,12 +408,12 @@ export function AccountPage() {
   };
 
   if (!user || loading) {
-    return <div className="min-h-screen bg-gray-50 p-8 text-center text-gray-500">Đang tải tài khoản...</div>;
+    return <div className="min-h-screen bg-gray-50 p-4 text-center text-gray-500 sm:p-8">Đang tải tài khoản...</div>;
   }
 
   if (loadError) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8 text-center">
+      <div className="min-h-screen bg-gray-50 p-4 text-center sm:p-8">
         <div className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-lg">
           <p className="mb-4 text-gray-700">{loadError}</p>
           <button
@@ -431,8 +431,8 @@ export function AccountPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-12 gap-8">
-          <div className="col-span-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
+          <div className="lg:col-span-4 xl:col-span-3">
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
               <div className="h-24 bg-gradient-to-r from-orange-500 to-orange-600"></div>
               <div className="px-6 pb-6">
@@ -533,7 +533,7 @@ export function AccountPage() {
             </button>
           </div>
 
-          <div className="col-span-9">
+          <div className="lg:col-span-8 xl:col-span-9">
             {(actionError || actionSuccess) && (
               <div
                 className={`mb-6 rounded-xl border p-4 text-sm ${
@@ -546,7 +546,7 @@ export function AccountPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-4 gap-6 mb-8">
+            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:gap-6 xl:grid-cols-4">
               {stats.map((stat) => {
                 const Icon = stat.icon;
                 return (
@@ -564,8 +564,8 @@ export function AccountPage() {
             </div>
 
             {activeTab === 'profile' && profile && (
-              <div className="bg-white rounded-2xl shadow-lg p-8">
-                <div className="flex items-center justify-between mb-6">
+              <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-6 lg:p-8">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h2 className="text-2xl font-bold text-gray-900">Thông tin cá nhân</h2>
                   {!isEditing ? (
                     <button
@@ -620,7 +620,7 @@ export function AccountPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div>
                     <label className="text-sm text-gray-600 mb-2 block">Họ và tên</label>
                     <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
@@ -747,7 +747,7 @@ export function AccountPage() {
             )}
 
             {activeTab === 'orders' && (
-              <div className="bg-white rounded-2xl shadow-lg p-8">
+              <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-6 lg:p-8">
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900">Đơn hàng của tôi</h2>
@@ -849,7 +849,7 @@ export function AccountPage() {
             )}
 
             {activeTab === 'addresses' && (
-              <div className="bg-white rounded-2xl shadow-lg p-8">
+              <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-6 lg:p-8">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold text-gray-900">Địa chỉ nhận hàng</h2>
                   <button
@@ -971,7 +971,7 @@ export function AccountPage() {
 
             {activeTab === 'settings' && (
               <div className="space-y-6">
-                <div className="bg-white rounded-2xl shadow-lg p-8">
+                <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-6 lg:p-8">
                   <h2 className="text-2xl font-bold text-gray-900 mb-6">Cài đặt tài khoản</h2>
                   <div className="space-y-4">
                     {[
@@ -1060,7 +1060,7 @@ export function AccountPage() {
             onSubmit={handleChangePassword}
             className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
           >
-            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-4 py-4 sm:px-6 sm:py-5">
               <div className="flex items-start gap-4">
                 <div className="rounded-xl bg-orange-100 p-3 text-orange-600">
                   <KeyRound className="h-6 w-6" />
@@ -1080,7 +1080,7 @@ export function AccountPage() {
               </button>
             </div>
 
-            <div className="space-y-4 px-6 py-5">
+            <div className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Mật khẩu hiện tại</label>
                 <input

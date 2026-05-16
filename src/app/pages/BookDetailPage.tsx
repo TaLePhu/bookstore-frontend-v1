@@ -221,11 +221,11 @@ export function BookDetailPage() {
   const maxQuantity = Math.max(1, Number(book?.stock) || 1);
 
   if (loading) {
-    return <div className="min-h-screen bg-gray-50 p-8 text-center text-gray-500">Đang tải chi tiết sách...</div>;
+    return <div className="min-h-screen bg-gray-50 p-4 text-center text-gray-500 sm:p-8">Đang tải chi tiết sách...</div>;
   }
 
   if (!book || !displayBook) {
-    return <div className="min-h-screen bg-gray-50 p-8 text-center text-red-600">{error || 'Không tìm thấy sách.'}</div>;
+    return <div className="min-h-screen bg-gray-50 p-4 text-center text-red-600 sm:p-8">{error || 'Không tìm thấy sách.'}</div>;
   }
 
   const isOutOfStock = displayBook.isOutOfStock;
@@ -307,7 +307,7 @@ export function BookDetailPage() {
                     <ChevronLeft className="h-5 w-5" />
                   </button>
                 )}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {visibleGalleryImages.map((image, index) => {
                     const imageIndex = galleryStartIndex + index;
 
@@ -588,7 +588,7 @@ export function BookDetailPage() {
                       <div className="text-sm text-gray-500">{reviewCount.toLocaleString('vi-VN')} lượt đánh giá</div>
                     </div>
                     {!hasReviewSummary ? (
-                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-center sm:p-8">
                         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white text-orange-500 shadow-sm">
                           <MessageCircle className="h-7 w-7" />
                         </div>
@@ -751,3 +751,4 @@ export function BookDetailPage() {
     </div>
   );
 }
+
