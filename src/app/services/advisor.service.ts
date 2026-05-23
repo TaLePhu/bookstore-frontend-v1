@@ -18,12 +18,14 @@ export interface AdvisorHistoryMessage {
 export const getAIAdvisorRecommendations = async (
   question: string,
   limit = 4,
-  history: AdvisorHistoryMessage[] = []
+  history: AdvisorHistoryMessage[] = [],
+  excludeBookIds: string[] = []
 ): Promise<AdvisorResponse> => {
   const res = await api.post('/ai-advisor/recommendations', {
     question,
     limit,
     history,
+    excludeBookIds,
   });
 
   return res.data.data;

@@ -71,13 +71,21 @@ export function AIAdvisorPage() {
         role: message.type === 'user' ? 'user' : 'assistant',
         content: message.text,
       }));
+    const excludeBookIds = Array.from(
+      new Set(
+        messages
+          .flatMap((message) => message.books || [])
+          .map((book) => book.id)
+          .filter(Boolean)
+      )
+    ).slice(-30);
 
     setMessages(nextMessages);
     setInputValue('');
     setIsTyping(true);
 
     try {
-      const result = await getAIAdvisorRecommendations(messageText, 5, history);
+      const result = await getAIAdvisorRecommendations(messageText, 5, history, excludeBookIds);
       setMessages((prev) => [
         ...prev,
         {
