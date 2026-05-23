@@ -118,6 +118,7 @@ const MAX_BOOK_IMAGES = 5;
 const MAX_BOOK_IMAGE_SIZE = 2 * 1024 * 1024;
 const ACCEPTED_BOOK_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ORDER_STATUS_OPTIONS: AdminOrderStatus[] = ['PENDING', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
+const ADMIN_BOOKS_PAGE_SIZE = 10;
 const EMPTY_ORDER_STATUS_TOTALS: Record<AdminOrderStatus, number> = {
   PENDING: 0,
   PROCESSING: 0,
@@ -304,6 +305,7 @@ export function AdminPage() {
   const [bookVisibilityFilter, setBookVisibilityFilter] = useState<BookVisibilityFilter>('active');
   const [bookStockFilter, setBookStockFilter] = useState<BookStockFilter>('all');
   const [bookCategoryFilter, setBookCategoryFilter] = useState<BookCategoryFilter>('all');
+  const [bookCurrentPage, setBookCurrentPage] = useState(1);
   const [categoryVisibilityFilter, setCategoryVisibilityFilter] = useState<CategoryVisibilityFilter>('active');
   const [categoryBookFilter, setCategoryBookFilter] = useState<CategoryBookFilter>('all');
   const [userRoleFilter, setUserRoleFilter] = useState<UserRoleFilter>('CUSTOMER');
@@ -538,6 +540,27 @@ export function AdminPage() {
       [book.title, book.author, book.category?.name].filter(Boolean).join(' ').toLowerCase().includes(keyword)
     );
   }, [books, bookCategoryFilter, bookStockFilter, currentView, searchQuery]);
+
+  const totalBookPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredBooks.length / ADMIN_BOOKS_PAGE_SIZE)),
+    [filteredBooks.length]
+  );
+
+  const paginatedBooks = useMemo(() => {
+    const safePage = Math.min(bookCurrentPage, totalBookPages);
+    const start = (safePage - 1) * ADMIN_BOOKS_PAGE_SIZE;
+    return filteredBooks.slice(start, start + ADMIN_BOOKS_PAGE_SIZE);
+  }, [bookCurrentPage, filteredBooks, totalBookPages]);
+
+  useEffect(() => {
+    if (bookCurrentPage > totalBookPages) {
+      setBookCurrentPage(totalBookPages);
+    }
+  }, [bookCurrentPage, totalBookPages]);
+
+  useEffect(() => {
+    setBookCurrentPage(1);
+  }, [searchQuery, bookVisibilityFilter, bookStockFilter, bookCategoryFilter, currentView]);
 
   const filteredPromotionBooks = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -2187,7 +2210,7 @@ export function AdminPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredBooks.map((book) => {
+                    {paginatedBooks.map((book) => {
                       const statusMeta = getBookStatusMeta(book);
                       const stock = Number(book.stock || 0);
                       const bookPromotion = getPromotionForBook(book.id);
@@ -2317,6 +2340,47 @@ export function AdminPage() {
                 </table>
                 </div>
                 {filteredBooks.length === 0 && <EmptyState text="Không có sách phù hợp." />}
+                {filteredBooks.length > 0 && (
+                  <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
+                    <p className="text-sm text-gray-500">
+                      Trang {bookCurrentPage}/{totalBookPages} • Hiển thị {paginatedBooks.length} / {filteredBooks.length} sách
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setBookCurrentPage((prev) => Math.max(1, prev - 1))}
+                        disabled={bookCurrentPage === 1}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Trước
+                      </button>
+                      {Array.from({ length: totalBookPages }, (_, index) => index + 1)
+                        .slice(Math.max(0, bookCurrentPage - 3), Math.max(5, Math.min(totalBookPages, bookCurrentPage + 2)))
+                        .map((page) => (
+                          <button
+                            key={page}
+                            type="button"
+                            onClick={() => setBookCurrentPage(page)}
+                            className={`h-9 min-w-9 rounded-lg px-3 text-sm font-medium transition-colors ${
+                              page === bookCurrentPage
+                                ? 'bg-orange-500 text-white'
+                                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      <button
+                        type="button"
+                        onClick={() => setBookCurrentPage((prev) => Math.min(totalBookPages, prev + 1))}
+                        disabled={bookCurrentPage === totalBookPages}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Sau
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
