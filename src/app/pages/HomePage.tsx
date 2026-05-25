@@ -12,10 +12,10 @@ export function HomePage() {
     <>
       <HeroCarousel />
       <Features />
-      <PersonalizedRecommendations />
       <BestSellers />
       <BookFinder />
       <NewBooks />
+      <PersonalizedRecommendations />
       {/* <AIRecommendation /> */}
       {/* <Categories /> */}
     </>

@@ -125,6 +125,7 @@ export function PersonalizedRecommendations() {
 
   useEffect(() => {
     let active = true;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const fetchRecommendations = async () => {
       try {
@@ -158,10 +159,13 @@ export function PersonalizedRecommendations() {
       }
     };
 
-    fetchRecommendations();
+    timeoutId = setTimeout(fetchRecommendations, 500);
 
     return () => {
       active = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, [isAuthenticated, user?.id]);
 

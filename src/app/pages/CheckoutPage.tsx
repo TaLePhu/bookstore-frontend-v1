@@ -40,7 +40,7 @@ export function CheckoutPage() {
     selectedTotalPrice,
     clearCart,
     removeSelectedItems,
-    refreshCart,
+    removeItemsLocally,
   } = useCart();
   const { isAuthenticated, user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -259,7 +259,7 @@ export function CheckoutPage() {
         sessionStorage.removeItem(BUY_NOW_ITEM_KEY);
         setBuyNowItem(null);
       } else if (isAuthenticated) {
-        await refreshCart();
+        removeItemsLocally(checkoutItems.map((item) => item.id));
       } else if (selectedItems.length > 0) {
         await removeSelectedItems();
       } else {

@@ -29,6 +29,7 @@ interface CartContextType {
   updateQuantity: (id: string | number, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
   removeSelectedItems: () => Promise<void>;
+  removeItemsLocally: (ids: Array<string | number>) => void;
   refreshCart: () => Promise<void>;
   toggleItemSelection: (id: string | number) => void;
   toggleAllSelection: () => void;
@@ -320,6 +321,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prevItems) => prevItems.filter((item) => !selectedSet.has(toItemKey(item.id))));
   };
 
+  const removeItemsLocally = (ids: Array<string | number>) => {
+    const itemKeys = new Set(ids.map(toItemKey));
+    setItems((prevItems) => prevItems.filter((item) => !itemKeys.has(toItemKey(item.id))));
+    setSelectedItemIds((prev) => prev.filter((id) => !itemKeys.has(id)));
+  };
+
   const refreshCart = async () => {
     if (isAuthenticated) {
       await loadServerCart();
@@ -365,6 +372,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         updateQuantity,
         clearCart,
         removeSelectedItems,
+        removeItemsLocally,
         refreshCart,
         toggleItemSelection,
         toggleAllSelection,
