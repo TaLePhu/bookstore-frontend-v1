@@ -44,6 +44,14 @@ export interface ApiBook {
       email?: string | null;
     } | null;
   }>;
+  reason?: string;
+}
+
+export interface HomeRecommendationsResponse {
+  source: 'personalized' | 'popular';
+  title: string;
+  subtitle: string;
+  books: ApiBook[];
 }
 
 interface SearchBooksResponse {
@@ -113,6 +121,14 @@ export const getBestSellerBooks = async (): Promise<ApiBook[]> => {
     params: { limit: 12 },
   });
   return fallbackRes.data.data;
+};
+
+export const getHomeRecommendations = async (limit = 4): Promise<HomeRecommendationsResponse> => {
+  const res = await api.get('/books/recommendations/home', {
+    params: { limit },
+  });
+
+  return res.data.data;
 };
 
 export const searchBooks = async (
