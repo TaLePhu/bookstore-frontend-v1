@@ -187,7 +187,7 @@ const buildAdvisorHistoryContent = (message: Message) => {
   return [message.text, `Các sách đã gợi ý trong lượt này:\n${suggestedBooks}`].join('\n\n');
 };
 
-const renderFormattedMessage = (text: string) => {
+const renderFormattedMessage = (text: string, hasBookCards = false) => {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
   if (lines.length === 0) return null;
 
@@ -195,6 +195,7 @@ const renderFormattedMessage = (text: string) => {
   const bullets = lines
     .filter((line) => line.startsWith('-'))
     .map((line) => line.replace(/^-\s*/, ''));
+  const visibleBullets = hasBookCards ? [] : bullets;
 
   return (
     <div className="space-y-3">
@@ -203,9 +204,9 @@ const renderFormattedMessage = (text: string) => {
           {line}
         </p>
       ))}
-      {bullets.length > 0 && (
+      {visibleBullets.length > 0 && (
         <ul className="space-y-2">
-          {bullets.map((line, index) => {
+          {visibleBullets.map((line, index) => {
             const [title, ...rest] = line.split(':');
             const description = rest.join(':').trim();
 
@@ -597,7 +598,9 @@ export function AIAdvisorPage() {
                           : 'border border-gray-200 bg-white text-gray-800'
                       }`}
                     >
-                      {message.type === 'ai' ? renderFormattedMessage(message.text) : <p className="whitespace-pre-line">{message.text}</p>}
+                      {message.type === 'ai'
+                        ? renderFormattedMessage(message.text, Boolean(message.books?.length))
+                        : <p className="whitespace-pre-line">{message.text}</p>}
                     </div>
 
                     {message.books && message.books.length > 0 && (
