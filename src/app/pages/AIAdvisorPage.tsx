@@ -170,6 +170,23 @@ const toClientConversation = (conversation: AdvisorConversation): Conversation =
   };
 };
 
+const buildAdvisorHistoryContent = (message: Message) => {
+  if (message.type === 'user' || !message.books || message.books.length === 0) {
+    return message.text;
+  }
+
+  const suggestedBooks = message.books
+    .map((book, index) => {
+      const title = book.title || `Sách ${index + 1}`;
+      const author = book.author ? ` - ${book.author}` : '';
+      const reason = book.reason ? `: ${book.reason}` : '';
+      return `${index + 1}. ${title}${author}${reason}`;
+    })
+    .join('\n');
+
+  return [message.text, `Các sách đã gợi ý trong lượt này:\n${suggestedBooks}`].join('\n\n');
+};
+
 const renderFormattedMessage = (text: string) => {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
   if (lines.length === 0) return null;
@@ -392,10 +409,10 @@ export function AIAdvisorPage() {
     const nextMessages = [...currentMessages, userMessage];
     const history: AdvisorHistoryMessage[] = currentMessages
       .filter((message) => message.id !== 1)
-      .slice(-8)
+      .slice(-10)
       .map((message) => ({
         role: message.type === 'user' ? 'user' : 'assistant',
-        content: message.text,
+        content: buildAdvisorHistoryContent(message),
       }));
     const excludeBookIds = Array.from(
       new Set(
