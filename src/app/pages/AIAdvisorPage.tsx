@@ -563,14 +563,6 @@ export function AIAdvisorPage() {
                   <p className="text-sm opacity-90">{activeConversation?.title || 'Cuộc trò chuyện mới'}</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleNewConversation}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/30 px-4 py-2 text-sm font-medium transition-colors hover:bg-white/10"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Cuộc trò chuyện mới</span>
-              </button>
             </div>
           </div>
 
