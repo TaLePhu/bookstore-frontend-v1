@@ -13,8 +13,10 @@ import {
   Lightbulb,
   User,
   ShoppingCart,
+  RotateCcw,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import {
   getAIAdvisorRecommendations,
   type AdvisorBook,
@@ -28,6 +30,50 @@ interface Message {
   text: string;
   books?: AdvisorBook[];
 }
+
+const INITIAL_AI_MESSAGE: Message = {
+  id: 1,
+  type: 'ai',
+  text: 'Xin chÃ o! TÃ´i lÃ  AI Assistant cá»§a Tráº¡m SÃ¡ch. HÃ£y cho tÃ´i biáº¿t báº¡n muá»‘n Ä‘á»c thá»ƒ loáº¡i gÃ¬, má»¥c tiÃªu Ä‘á»c ra sao hoáº·c má»™t cuá»‘n sÃ¡ch báº¡n tá»«ng thÃ­ch.',
+};
+const MAX_STORED_MESSAGES = 40;
+
+const getStorageKey = (userId?: string) => `bookstore:ai-advisor:messages:${userId || 'guest'}`;
+
+const isValidStoredMessage = (message: unknown): message is Message => {
+  if (!message || typeof message !== 'object') return false;
+  const item = message as Partial<Message>;
+  return (
+    typeof item.id === 'number' &&
+    (item.type === 'user' || item.type === 'ai') &&
+    typeof item.text === 'string' &&
+    (!item.books || Array.isArray(item.books))
+  );
+};
+
+const loadStoredMessages = (storageKey: string): Message[] => {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return [INITIAL_AI_MESSAGE];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [INITIAL_AI_MESSAGE];
+
+    const storedMessages = parsed.filter(isValidStoredMessage).slice(-MAX_STORED_MESSAGES);
+    return storedMessages.length > 0 ? storedMessages : [INITIAL_AI_MESSAGE];
+  } catch (error) {
+    console.warn('Failed to load AI advisor messages:', error);
+    return [INITIAL_AI_MESSAGE];
+  }
+};
+
+const saveStoredMessages = (storageKey: string, messages: Message[]) => {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)));
+  } catch (error) {
+    console.warn('Failed to save AI advisor messages:', error);
+  }
+};
 
 const renderFormattedMessage = (text: string) => {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
@@ -73,7 +119,9 @@ const renderFormattedMessage = (text: string) => {
 export function AIAdvisorPage() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const storageKey = getStorageKey(user?.id);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -83,6 +131,10 @@ export function AIAdvisorPage() {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    setMessages(loadStoredMessages(storageKey));
+  }, [storageKey]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -122,12 +174,14 @@ export function AIAdvisorPage() {
     ).slice(-30);
 
     setMessages(nextMessages);
+    saveStoredMessages(storageKey, nextMessages);
     setInputValue('');
     setIsTyping(true);
 
     try {
       const result = await getAIAdvisorRecommendations(messageText, 5, history, excludeBookIds);
-      setMessages((prev) => [
+      setMessages((prev) => {
+        const updatedMessages: Message[] = [
         ...prev,
         {
           id: Date.now() + 1,
@@ -135,17 +189,24 @@ export function AIAdvisorPage() {
           text: result.answer,
           books: result.books.filter((book) => !isBookDeleted(book)),
         },
-      ]);
+        ];
+        saveStoredMessages(storageKey, updatedMessages);
+        return updatedMessages;
+      });
     } catch (error) {
       console.error('AI advisor error:', error);
-      setMessages((prev) => [
+      setMessages((prev) => {
+        const updatedMessages: Message[] = [
         ...prev,
         {
           id: Date.now() + 1,
           type: 'ai',
           text: 'Xin lỗi, AI tư vấn đang tạm thời bận. Bạn thử lại sau ít phút hoặc nhập một nhu cầu cụ thể hơn nhé.',
         },
-      ]);
+        ];
+        saveStoredMessages(storageKey, updatedMessages);
+        return updatedMessages;
+      });
     } finally {
       setIsTyping(false);
     }
@@ -156,6 +217,12 @@ export function AIAdvisorPage() {
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const handleResetConversation = () => {
+    localStorage.removeItem(storageKey);
+    setMessages([INITIAL_AI_MESSAGE]);
+    setInputValue('');
   };
 
   return (
@@ -187,6 +254,16 @@ export function AIAdvisorPage() {
                   <span>Tư vấn miễn phí</span>
                 </div>
               </div>
+              {messages.length > 1 && (
+                <button
+                  type="button"
+                  onClick={handleResetConversation}
+                  className="ml-auto inline-flex items-center gap-2 rounded-lg border border-white/30 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Làm mới</span>
+                </button>
+              )}
             </div>
             <div className="hidden lg:block">
               <img

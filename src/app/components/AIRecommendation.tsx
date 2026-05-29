@@ -12,12 +12,50 @@ interface CategoryItem {
 }
 
 const cleanAiSummary = (answer: string) => {
-  const normalized = answer.replace(/\s+/g, ' ').trim();
+  const normalized = answer.trim();
   if (!normalized) {
     return 'Mình đã chọn vài cuốn phù hợp nhất với nội dung bạn vừa tìm.';
   }
 
   return normalized.length > 360 ? `${normalized.slice(0, 357).trim()}...` : normalized;
+};
+
+const renderFormattedSummary = (text: string) => {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+
+  const intro = lines.filter((line) => !line.startsWith('-'));
+  const bullets = lines
+    .filter((line) => line.startsWith('-'))
+    .map((line) => line.replace(/^-\s*/, ''));
+
+  return (
+    <div className="space-y-2">
+      {intro.map((line, index) => (
+        <p key={`summary-p-${index}`}>{line}</p>
+      ))}
+      {bullets.length > 0 && (
+        <ul className="space-y-2">
+          {bullets.map((line, index) => {
+            const [title, ...rest] = line.split(':');
+            const description = rest.join(':').trim();
+
+            return (
+              <li key={`summary-b-${index}`} className="rounded-lg bg-white/70 px-3 py-2">
+                {description ? (
+                  <>
+                    <span className="font-semibold">{title.trim()}:</span> {description}
+                  </>
+                ) : (
+                  line
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
 };
 
 export function AIRecommendation() {
@@ -180,7 +218,7 @@ export function AIRecommendation() {
 
               {aiAnswer && (
                 <div className="mb-6 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm leading-6 text-indigo-800">
-                  {aiAnswer}
+                  {renderFormattedSummary(aiAnswer)}
                 </div>
               )}
 
