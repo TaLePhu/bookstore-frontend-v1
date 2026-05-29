@@ -519,6 +519,10 @@ export function AIAdvisorPage() {
             </button>
           </div>
 
+          <div className="border-b border-blue-100 bg-blue-50/70 px-4 py-3 text-xs leading-5 text-blue-900">
+            Nếu muốn tìm chủ đề sách hoàn toàn khác, hãy bấm nút <span className="font-semibold">+</span> để tạo cuộc trò chuyện mới. Cuộc trò chuyện hiện tại sẽ tiếp tục ghi nhớ các yêu cầu trước đó.
+          </div>
+
           <div className="max-h-[620px] space-y-2 overflow-y-auto p-3">
             {conversations.map((conversation) => {
               const isActive = conversation.id === activeConversation?.id;
