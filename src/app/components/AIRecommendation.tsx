@@ -17,8 +17,7 @@ const cleanAiSummary = (answer: string) => {
     return 'Mình đã chọn vài cuốn phù hợp nhất với nội dung bạn vừa tìm.';
   }
 
-  const firstSentence = normalized.match(/.+?[.!?](\s|$)/)?.[0]?.trim() || normalized;
-  return firstSentence.length > 180 ? `${firstSentence.slice(0, 177).trim()}...` : firstSentence;
+  return normalized.length > 360 ? `${normalized.slice(0, 357).trim()}...` : normalized;
 };
 
 export function AIRecommendation() {
