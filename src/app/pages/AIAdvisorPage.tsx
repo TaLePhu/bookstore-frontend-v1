@@ -29,6 +29,47 @@ interface Message {
   books?: AdvisorBook[];
 }
 
+const renderFormattedMessage = (text: string) => {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+
+  const intro = lines.filter((line) => !line.startsWith('-'));
+  const bullets = lines
+    .filter((line) => line.startsWith('-'))
+    .map((line) => line.replace(/^-\s*/, ''));
+
+  return (
+    <div className="space-y-3">
+      {intro.map((line, index) => (
+        <p key={`p-${index}`} className="leading-7">
+          {line}
+        </p>
+      ))}
+      {bullets.length > 0 && (
+        <ul className="space-y-2">
+          {bullets.map((line, index) => {
+            const [title, ...rest] = line.split(':');
+            const description = rest.join(':').trim();
+
+            return (
+              <li key={`b-${index}`} className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2 leading-6">
+                {description ? (
+                  <>
+                    <span className="font-semibold text-blue-900">{title.trim()}:</span>{' '}
+                    <span>{description}</span>
+                  </>
+                ) : (
+                  <span>{line}</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+};
+
 export function AIAdvisorPage() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
@@ -196,7 +237,7 @@ export function AIAdvisorPage() {
                           : 'bg-white border border-gray-200 text-gray-800'
                       }`}
                     >
-                      <p className="whitespace-pre-line">{message.text}</p>
+                      {message.type === 'ai' ? renderFormattedMessage(message.text) : <p className="whitespace-pre-line">{message.text}</p>}
                     </div>
 
                     {message.books && message.books.length > 0 && (
