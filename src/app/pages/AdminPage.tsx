@@ -124,6 +124,7 @@ const MAX_BOOK_IMAGE_SIZE = 2 * 1024 * 1024;
 const ACCEPTED_BOOK_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ORDER_STATUS_OPTIONS: AdminOrderStatus[] = ['PENDING', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
 const ADMIN_BOOKS_PAGE_SIZE = 10;
+const ADMIN_ORDERS_PAGE_SIZE = 10;
 const EMPTY_ORDER_STATUS_TOTALS: Record<AdminOrderStatus, number> = {
   PENDING: 0,
   PROCESSING: 0,
@@ -437,6 +438,8 @@ export function AdminPage() {
   const [promotions, setPromotions] = useState<AdminPromotion[]>([]);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [orderCurrentPage, setOrderCurrentPage] = useState(1);
+  const [orderTotal, setOrderTotal] = useState(0);
   const [orderStatusTotals, setOrderStatusTotals] = useState<Record<AdminOrderStatus, number>>(EMPTY_ORDER_STATUS_TOTALS);
   const [customers, setCustomers] = useState<AdminUser[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -528,7 +531,8 @@ export function AdminPage() {
       if (!isAdmin) {
         const [ordersData, booksData, promotionsData, orderStatusResults] = await Promise.all([
           getAdminOrders({
-            limit: 50,
+            page: orderCurrentPage,
+            limit: ADMIN_ORDERS_PAGE_SIZE,
             status: statusFilter === 'all' ? undefined : statusFilter,
           }),
           getManagementBooks({ limit: 50 }),
@@ -549,6 +553,7 @@ export function AdminPage() {
         setCategories([]);
         setCustomers([]);
         setOrders(ordersData.data);
+        setOrderTotal(ordersData.total);
         setOrderStatusTotals(
           ORDER_STATUS_OPTIONS.reduce(
             (acc, status, index) => ({
@@ -571,7 +576,8 @@ export function AdminPage() {
         getAdminPromotions(),
         getAdminCategories({ includeDeleted: true }),
         getAdminOrders({
-          limit: 50,
+          page: orderCurrentPage,
+          limit: ADMIN_ORDERS_PAGE_SIZE,
           status: statusFilter === 'all' ? undefined : statusFilter,
         }),
         getAdminCustomers({
@@ -590,6 +596,7 @@ export function AdminPage() {
       setPromotions(promotionsData);
       setCategories(categoriesData);
       setOrders(ordersData.data);
+      setOrderTotal(ordersData.total);
       setOrderStatusTotals(
         ORDER_STATUS_OPTIONS.reduce(
           (acc, status, index) => ({
@@ -610,7 +617,7 @@ export function AdminPage() {
 
   useEffect(() => {
     loadData();
-  }, [isAdmin, statusFilter, bookVisibilityFilter, userRoleFilter, userLockFilter, userVerifiedFilter]);
+  }, [isAdmin, statusFilter, orderCurrentPage, bookVisibilityFilter, userRoleFilter, userLockFilter, userVerifiedFilter]);
 
   useEffect(() => {
     setPromotionDrafts((prev) => {
@@ -731,6 +738,27 @@ export function AdminPage() {
     );
   }, [orders, currentView, searchQuery, showCancelRequestsOnly]);
 
+  const totalOrderPages = useMemo(
+    () => Math.max(1, Math.ceil(orderTotal / ADMIN_ORDERS_PAGE_SIZE)),
+    [orderTotal]
+  );
+
+  useEffect(() => {
+    if (orderCurrentPage > totalOrderPages) {
+      setOrderCurrentPage(totalOrderPages);
+    }
+  }, [orderCurrentPage, totalOrderPages]);
+
+  useEffect(() => {
+    setOrderCurrentPage(1);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (currentView === 'orders') {
+      setOrderCurrentPage(1);
+    }
+  }, [currentView, searchQuery, showCancelRequestsOnly]);
+
   const filteredCustomers = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
     let result = [...customers];
@@ -813,6 +841,7 @@ export function AdminPage() {
 
   const goToOrders = (status?: AdminOrderStatus) => {
     setStatusFilter(status || 'all');
+    setOrderCurrentPage(1);
     setShowCancelRequestsOnly(false);
     setSearchQuery('');
     setCurrentView('orders');
@@ -820,6 +849,7 @@ export function AdminPage() {
 
   const goToCancelRequests = () => {
     setStatusFilter('all');
+    setOrderCurrentPage(1);
     setShowCancelRequestsOnly(true);
     setSearchQuery('');
     setCurrentView('orders');
@@ -3301,6 +3331,50 @@ export function AdminPage() {
                   </tbody>
                 </table>
                 {filteredOrders.length === 0 && <EmptyState text="Không có đơn hàng phù hợp." />}
+                {orderTotal > 0 && (
+                  <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
+                    <p className="text-sm text-gray-500">
+                      {searchQuery.trim() || showCancelRequestsOnly
+                        ? `Trang ${orderCurrentPage}/${totalOrderPages} • Hiển thị ${filteredOrders.length} đơn phù hợp trong trang hiện tại`
+                        : `Trang ${orderCurrentPage}/${totalOrderPages} • Hiển thị ${orders.length} / ${orderTotal} đơn`}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setOrderCurrentPage((prev) => Math.max(1, prev - 1))}
+                        disabled={orderCurrentPage === 1 || isLoading}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Trước
+                      </button>
+                      {Array.from({ length: totalOrderPages }, (_, index) => index + 1)
+                        .slice(Math.max(0, orderCurrentPage - 3), Math.max(5, Math.min(totalOrderPages, orderCurrentPage + 2)))
+                        .map((page) => (
+                          <button
+                            key={page}
+                            type="button"
+                            onClick={() => setOrderCurrentPage(page)}
+                            disabled={isLoading}
+                            className={`h-9 min-w-9 rounded-lg px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                              page === orderCurrentPage
+                                ? 'bg-orange-500 text-white'
+                                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      <button
+                        type="button"
+                        onClick={() => setOrderCurrentPage((prev) => Math.min(totalOrderPages, prev + 1))}
+                        disabled={orderCurrentPage === totalOrderPages || isLoading}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Sau
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
