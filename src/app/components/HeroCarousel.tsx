@@ -76,11 +76,15 @@ export function HeroCarousel() {
   const settings = {
     dots: slides.length > 1,
     infinite: slides.length > 1,
-    speed: 500,
+    speed: 650,
     slidesToShow: 1,
     slidesToScroll: 1,
     autoplay: slides.length > 1,
-    autoplaySpeed: 5000,
+    autoplaySpeed: 3500,
+    arrows: false,
+    pauseOnHover: false,
+    pauseOnFocus: false,
+    cssEase: 'ease-in-out',
     beforeChange: (_current: number, next: number) => setCurrentSlide(next),
     customPaging: (i: number) => (
       <div
@@ -99,7 +103,7 @@ export function HeroCarousel() {
   return (
     <section className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
       <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
-        <Slider {...settings}>
+        <Slider key={slides.map((slide) => slide.id).join('-')} {...settings}>
           {slides.map((slide) => (
             <div key={slide.id} className="outline-none">
               <button
