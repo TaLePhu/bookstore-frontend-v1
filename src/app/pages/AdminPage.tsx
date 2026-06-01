@@ -1,12 +1,10 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   AlertCircle,
   ArchiveX,
   BookOpen,
   CheckCircle2,
-  ClipboardCheck,
-  Copy,
   DollarSign,
   Edit,
   Eye,
@@ -16,7 +14,6 @@ import {
   Package,
   Percent,
   Plus,
-  Printer,
   RefreshCcw,
   Settings,
   ShoppingCart,
@@ -25,21 +22,6 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { getPromotions } from '../services/promotion.service';
@@ -94,42 +76,39 @@ import {
   ADMIN_BOOKS_PAGE_SIZE,
   ADMIN_ORDERS_PAGE_SIZE,
   ACCEPTED_BOOK_IMAGE_TYPES,
-  COLORS,
   EMPTY_ORDER_STATUS_TOTALS,
   LOW_STOCK_THRESHOLD,
   MAX_BOOK_IMAGES,
   MAX_BOOK_IMAGE_SIZE,
-  ORDER_PAYMENT_METHOD_OPTIONS,
-  ORDER_PAYMENT_STATUS_OPTIONS,
   ORDER_STATUS_OPTIONS,
   emptyUserForm,
 } from './admin/constants';
 import {
-  BookImageGallery,
-  BookInput,
   EmptyState,
   InfoBlock,
   SearchBox,
   TableCell,
   TableHead,
-  UserInput,
 } from './admin/components';
+import { OrdersView } from './admin/OrdersView';
+import { OrderDetailModal } from './admin/OrderDetailModal';
+import { BooksView } from './admin/BooksView';
+import { BookModal } from './admin/BookModal';
+import { PromotionsView } from './admin/PromotionsView';
+import { PromotionModal } from './admin/PromotionModal';
+import { CategoriesView } from './admin/CategoriesView';
+import { CustomersView } from './admin/CustomersView';
+import { UserCreateModal } from './admin/UserCreateModal';
+import { CategoryModal } from './admin/CategoryModal';
+import { CancelDecisionModal, ConfirmDialogModal } from './admin/AdminDialogs';
+import { DashboardView } from './admin/DashboardView';
 import {
   buildOrderPrintHtml,
   formatCurrency,
   formatDate,
-  getBookStatusMeta,
-  getLatestCancelNote,
-  getNextStatuses,
   getOrderOperationNote,
-  getOrderShippingAddress,
-  getOrderStatusPillClass,
   getOrderStatusText,
-  getOrderTaskPillClass,
-  getOrderTaskText,
   getPaymentMethodText,
-  getPaymentStatusPillClass,
-  getPaymentStatusText,
   hasCustomerCancelRequest,
   hasPendingCustomerCancelRequest,
 } from './admin/utils';
@@ -868,7 +847,7 @@ export function AdminPage() {
       id: 'pending-orders',
       label: `${(orderStatusTotals.PENDING || 0).toLocaleString('vi-VN')} đơn chờ xác nhận`,
       helper: 'Kiểm tra thông tin khách và chuyển sang đóng gói.',
-      actionLabel: 'Xem đơn',
+      actionLabel: 'Xem don',
       hidden: (orderStatusTotals.PENDING || 0) === 0,
       onClick: () => goToOrders('PENDING'),
     },
@@ -1255,7 +1234,7 @@ export function AdminPage() {
       publisher: '',
       publishYear: '',
       pages: '',
-      language: 'Tiếng Việt',
+    language: 'Tiếng Việt',
       releaseDate: '',
     });
     setSelectedBook(null);
@@ -2232,128 +2211,23 @@ export function AdminPage() {
           )}
 
           {confirmDialog && (
-            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-                <div className="flex items-start gap-4">
-                  <div className={`rounded-full p-3 ${confirmDialog.variant === 'danger' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
-                    <AlertCircle className="h-6 w-6" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-900">{confirmDialog.title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-gray-600">{confirmDialog.message}</p>
-                  </div>
-                </div>
-                <div className="mt-6 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    disabled={isConfirmingDialog}
-                    onClick={() => setConfirmDialog(null)}
-                    className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isConfirmingDialog}
-                    onClick={handleConfirmDialog}
-                    className={`rounded-lg px-4 py-2 font-semibold text-white disabled:opacity-50 ${
-                      confirmDialog.variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600'
-                    }`}
-                  >
-                    {isConfirmingDialog ? 'Đang xử lý...' : confirmDialog.confirmLabel}
-                  </button>
-                </div>
-              </div>
-            </div>
+            <ConfirmDialogModal
+              confirmDialog={confirmDialog}
+              isConfirmingDialog={isConfirmingDialog}
+              closeConfirmDialog={() => setConfirmDialog(null)}
+              handleConfirmDialog={handleConfirmDialog}
+            />
           )}
 
           {cancelDecisionDialog && (
-            <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/50 p-4">
-              <form
-                onSubmit={handleCancelDecisionSubmit}
-                className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
-              >
-                <div
-                  className={`px-6 py-5 text-white ${
-                    cancelDecisionDialog.action === 'approve' ? 'bg-red-600' : 'bg-orange-500'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="text-xl font-bold">
-                        {cancelDecisionDialog.action === 'approve'
-                          ? hasPendingCustomerCancelRequest(cancelDecisionDialog.order)
-                            ? 'Duyệt hủy đơn hàng'
-                            : 'Hủy đơn thủ công'
-                          : 'Từ chối yêu cầu hủy'}
-                      </h3>
-                      <p className="mt-1 text-sm text-white/90">
-                        Đơn {cancelDecisionDialog.order.orderCode || cancelDecisionDialog.order.id.slice(0, 8)}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={closeCancelDecisionDialog}
-                      disabled={updatingStatus}
-                      className="rounded-lg p-1.5 text-white/80 hover:bg-white/15 hover:text-white disabled:opacity-50"
-                      title="Đóng"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-4 p-6">
-                  <label className="block">
-                    <span className="text-sm font-semibold text-gray-800">
-                      {cancelDecisionDialog.action === 'approve'
-                        ? 'Lý do hủy đơn'
-                        : 'Lý do từ chối yêu cầu hủy'}
-                    </span>
-                    <textarea
-                      value={cancelDecisionNote}
-                      onChange={(event) => setCancelDecisionNote(event.target.value.slice(0, 500))}
-                      rows={4}
-                      className="mt-2 w-full resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-                      placeholder={
-                        cancelDecisionDialog.action === 'approve'
-                          ? 'Nhập lý do hủy đơn hàng...'
-                          : 'Nhập lý do từ chối yêu cầu hủy...'
-                      }
-                    />
-                  </label>
-                  <div className="text-right text-xs text-gray-500">{cancelDecisionNote.length}/500</div>
-
-                  <div className="flex justify-end gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={closeCancelDecisionDialog}
-                      disabled={updatingStatus}
-                      className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Đóng
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={updatingStatus || cancelDecisionNote.trim().length === 0}
-                      className={`rounded-lg px-4 py-2 font-semibold text-white disabled:opacity-50 ${
-                        cancelDecisionDialog.action === 'approve'
-                          ? 'bg-red-600 hover:bg-red-700'
-                          : 'bg-orange-500 hover:bg-orange-600'
-                      }`}
-                    >
-                      {updatingStatus
-                        ? 'Đang xử lý...'
-                        : cancelDecisionDialog.action === 'approve'
-                          ? hasPendingCustomerCancelRequest(cancelDecisionDialog.order)
-                            ? 'Duyệt hủy'
-                            : 'Hủy đơn'
-                          : 'Từ chối yêu cầu'}
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
+            <CancelDecisionModal
+              cancelDecisionDialog={cancelDecisionDialog}
+              cancelDecisionNote={cancelDecisionNote}
+              updatingStatus={updatingStatus}
+              closeCancelDecisionDialog={closeCancelDecisionDialog}
+              setCancelDecisionNote={setCancelDecisionNote}
+              handleCancelDecisionSubmit={handleCancelDecisionSubmit}
+            />
           )}
 
           {error && (
@@ -2371,808 +2245,77 @@ export function AdminPage() {
           )}
 
           {currentView === 'dashboard' && (
-            <div className="space-y-6">
-              {!isAdmin && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                      <div>
-                        <h2 className="text-2xl font-bold text-gray-950">Bảng làm việc hôm nay</h2>
-                        <p className="mt-1 text-sm text-gray-500">Tập trung vào đơn cần xử lý, tồn kho và khuyến mãi đang chạy.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => goToOrders()}
-                        className="w-fit rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
-                      >
-                        Mở đơn hàng
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    {staffWorkCards.map((card) => {
-                      const Icon = card.icon;
-                      return (
-                        <button
-                          key={card.id}
-                          type="button"
-                          onClick={card.onClick}
-                          className={`rounded-2xl border p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${card.className}`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold">{card.title}</p>
-                              <p className="mt-2 text-3xl font-bold">{card.value.toLocaleString('vi-VN')}</p>
-                            </div>
-                            <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${card.iconClassName}`}>
-                              <Icon className="h-5 w-5" />
-                            </span>
-                          </div>
-                          <p className="mt-3 text-sm opacity-80">{card.helper}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.35fr_0.9fr]">
-                    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-900">Hàng đợi xử lý đơn</h3>
-                          <p className="text-sm text-gray-500">Ưu tiên yêu cầu hủy, đơn mới, đóng gói và đang giao lâu nhất.</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => goToOrders()}
-                          className="text-sm font-semibold text-orange-600 hover:text-orange-700"
-                        >
-                          Xem tất cả
-                        </button>
-                      </div>
-                      <div className="divide-y divide-gray-100">
-                        {staffPriorityOrders.slice(0, 8).map((order) => {
-                          const actions = getOrderActions(order, 'table').filter((action) => action.key !== 'view').slice(0, 2);
-                          return (
-                            <div key={order.id} className="grid gap-4 px-6 py-4 lg:grid-cols-[1fr_auto] lg:items-center">
-                              <button type="button" onClick={() => openOrderDetail(order)} className="min-w-0 text-left">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="font-semibold text-gray-950">{order.orderCode || order.id.slice(0, 8)}</span>
-                                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getOrderTaskPillClass(order)}`}>
-                                    {getOrderTaskText(order)}
-                                  </span>
-                                </div>
-                                <p className="mt-1 text-sm text-gray-600">
-                                  {order.customerName || 'Khách hàng'}{order.customerPhone ? ` - ${order.customerPhone}` : ''}
-                                </p>
-                                <p className="mt-1 text-sm text-gray-500">{formatDate(order.createdAt)} · {formatCurrency(order.totalAmount)}</p>
-                              </button>
-                              <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
-                                {actions.map((action) => renderOrderActionButton(order, action))}
-                                {renderOrderActionButton(order, { key: 'view', label: 'Xem chi tiết', group: 'view', variant: 'icon' })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                        {staffPriorityOrders.length === 0 && <EmptyState text="Không có đơn ưu tiên cần xử lý." />}
-                      </div>
-                    </div>
-
-                    <div className="space-y-6">
-                      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900">Cảnh báo tồn kho</h3>
-                            <p className="text-sm text-gray-500">Sách hết hàng và sắp hết để staff theo dõi và báo quản lý.</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => goToStockAlerts('all')}
-                            className="text-sm font-semibold text-orange-600 hover:text-orange-700"
-                          >
-                            Tất cả sách
-                          </button>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                          {stockAlertBooks.slice(0, 5).map((book) => {
-                            const stock = Number(book.stock || 0);
-                            return (
-                              <div key={book.id} className="flex items-center justify-between gap-4 px-6 py-4">
-                                <div className="min-w-0">
-                                  <p className="line-clamp-1 font-semibold text-gray-950">{book.title}</p>
-                                  <p className="mt-1 text-sm text-gray-500">{book.category?.name || 'Chưa phân loại'}</p>
-                                  <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${stock <= 0 ? 'bg-rose-50 text-rose-700 ring-rose-100' : 'bg-amber-50 text-amber-700 ring-amber-100'}`}>
-                                    Tồn {stock.toLocaleString('vi-VN')}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => openBookDetail(book, 'detail')}
-                                  className="shrink-0 rounded-lg bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-100 transition-colors hover:bg-orange-100"
-                                >
-                                  Xem chi tiết
-                                </button>
-                              </div>
-                            );
-                          })}
-                          {stockAlertBooks.length === 0 && <EmptyState text="Không có cảnh báo tồn kho." />}
-                        </div>
-                      </div>
-
-                      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900">Khuyến mãi đang chạy</h3>
-                            <p className="text-sm text-gray-500">Thông tin nhanh để tư vấn khách.</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setCurrentView('promotions')}
-                            className="text-sm font-semibold text-orange-600 hover:text-orange-700"
-                          >
-                            Xem thêm
-                          </button>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                          {staffActivePromotions.slice(0, 4).map((promotion) => (
-                            <div key={promotion.id} className="px-6 py-4">
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="min-w-0">
-                                  <p className="line-clamp-1 font-semibold text-gray-950">{promotion.name}</p>
-                                  <p className="mt-1 text-sm text-gray-500">{promotion.bookCount || promotion.books?.length || 0} sách áp dụng</p>
-                                </div>
-                                <span className="shrink-0 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 ring-1 ring-orange-100">
-                                  -{promotion.discountPercent}%
-                                </span>
-                              </div>
-                              <p className="mt-2 text-sm font-medium text-gray-700">{getPromotionRemainingText(promotion)}</p>
-                            </div>
-                          ))}
-                          {staffActivePromotions.length === 0 && <EmptyState text="Không có chương trình đang chạy." />}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isAdmin && (
-              <>
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-950">Tổng quan điều hành</h2>
-                    <p className="mt-1 text-sm text-gray-500">Theo dõi doanh thu, tồn kho, đơn hàng và các việc cần xử lý trong ngày.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => goToOrders()}
-                    className="w-fit rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
-                  >
-                    Mở quản lý đơn
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-                {adminKpiCards.map((card) => {
-                  const Icon = card.icon;
-                  const content = (
-                    <>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold">{card.title}</p>
-                          <p className="mt-2 text-2xl font-bold">{card.value}</p>
-                        </div>
-                        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.iconClassName}`}>
-                          <Icon className="h-5 w-5" />
-                        </span>
-                      </div>
-                      <p className="mt-3 text-xs font-medium opacity-80">{card.helper}</p>
-                    </>
-                  );
-
-                  return card.onClick ? (
-                    <button
-                      key={card.id}
-                      type="button"
-                      onClick={card.onClick}
-                      className={`rounded-2xl border p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${card.className}`}
-                    >
-                      {content}
-                    </button>
-                  ) : (
-                    <div key={card.id} className={`rounded-2xl border p-5 shadow-sm ${card.className}`}>
-                      {content}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.95fr_1.4fr]">
-                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                  <div className="border-b border-gray-100 px-6 py-4">
-                    <h3 className="text-lg font-bold text-gray-900">Việc cần xử lý</h3>
-                    <p className="text-sm text-gray-500">Các việc ảnh hưởng trực tiếp đến vận hành cửa hàng.</p>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {adminActionItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between gap-4 px-6 py-4">
-                        <div>
-                          <p className="font-semibold text-gray-950">{item.label}</p>
-                          <p className="mt-1 text-sm text-gray-500">{item.helper}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={item.onClick}
-                          className="shrink-0 rounded-lg bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-100 transition-colors hover:bg-orange-100"
-                        >
-                          {item.actionLabel}
-                        </button>
-                      </div>
-                    ))}
-                    {adminActionItems.length === 0 && <EmptyState text="Không có việc cần xử lý ngay." />}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[1fr_0.55fr]">
-                  <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900">Doanh thu theo tháng</h3>
-                    <p className="mt-1 text-sm text-gray-500">Đơn vị: triệu đồng, chỉ tính đơn hoàn thành.</p>
-                    <div className="mt-6">
-                      <ResponsiveContainer width="100%" height={290}>
-                        <LineChart data={dashboard?.revenueData || []}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="month" stroke="#9CA3AF" />
-                          <YAxis stroke="#9CA3AF" />
-                          <Tooltip formatter={(value) => [`${value} triệu đồng`, 'Doanh thu']} />
-                          <Legend />
-                          <Line type="monotone" dataKey="revenue" stroke="#F97316" strokeWidth={3} name="Doanh thu" />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900">Chỉ số vận hành</h3>
-                    <div className="mt-5 space-y-3">
-                      {adminHealthMetrics.map((metric) => (
-                        <div key={metric.label} className="rounded-xl bg-gray-50 px-4 py-3">
-                          <p className="text-xs font-medium text-gray-500">{metric.label}</p>
-                          <p className="mt-1 text-xl font-bold text-gray-950">{metric.value}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_0.8fr]">
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-900">Đơn theo trạng thái</h3>
-                  <p className="mt-1 text-sm text-gray-500">Backlog vận hành theo từng bước xử lý.</p>
-                  <div className="mt-6">
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={adminOrderStatusChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="label" stroke="#9CA3AF" />
-                        <YAxis allowDecimals={false} stroke="#9CA3AF" />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#F97316" name="Số đơn" radius={[8, 8, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-900">Phân bổ danh mục</h3>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie
-                        data={dashboard?.categoryData || []}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={85}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {(dashboard?.categoryData || []).map((entry, index) => (
-                          <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="mt-4 space-y-2">
-                    {(dashboard?.categoryData || []).slice(0, 5).map((item, index) => (
-                      <div key={item.name} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                          <span className="text-sm text-gray-600">{item.name}</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-800">{item.value}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                  <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-                    <h3 className="text-lg font-bold text-gray-900">Đơn gần đây</h3>
-                    <button type="button" onClick={() => goToOrders()} className="text-sm font-semibold text-orange-600 hover:text-orange-700">
-                      Xem tất cả
-                    </button>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {(dashboard?.recentOrders || []).map((order) => (
-                      <button
-                        key={order.id}
-                        onClick={() => openOrderDetail(order)}
-                        className="w-full px-6 py-4 text-left transition-colors hover:bg-orange-50/60"
-                      >
-                        <div className="flex items-center justify-between gap-4">
-                          <div>
-                            <p className="font-semibold text-gray-950">{order.orderCode || order.id.slice(0, 8)}</p>
-                            <p className="mt-1 text-sm text-gray-500">{order.customerName}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-gray-900">{formatCurrency(order.totalAmount)}</p>
-                            <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getOrderStatusPillClass(order.status)}`}>
-                              {getOrderStatusText(order.status)}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                    {(dashboard?.recentOrders || []).length === 0 && <EmptyState text="Chưa có đơn gần đây." />}
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                  <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-                    <h3 className="text-lg font-bold text-gray-900">Sách tồn thấp</h3>
-                    <button type="button" onClick={() => goToStockAlerts('low_stock')} className="text-sm font-semibold text-orange-600 hover:text-orange-700">
-                      Xem sách
-                    </button>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {stockAlertBooks.slice(0, 5).map((book) => {
-                      const stock = Number(book.stock || 0);
-                      return (
-                        <button
-                          key={book.id}
-                          type="button"
-                          onClick={() => openBookDetail(book, 'detail')}
-                          className="w-full px-6 py-4 text-left transition-colors hover:bg-orange-50/60"
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="min-w-0">
-                              <p className="line-clamp-1 font-semibold text-gray-950">{book.title}</p>
-                              <p className="mt-1 text-sm text-gray-500">Đã bán {Number(book.soldCount || 0).toLocaleString('vi-VN')}</p>
-                            </div>
-                            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${stock <= 0 ? 'bg-rose-50 text-rose-700 ring-rose-100' : 'bg-amber-50 text-amber-700 ring-amber-100'}`}>
-                              Tồn {stock.toLocaleString('vi-VN')}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {stockAlertBooks.length === 0 && <EmptyState text="Không có sách tồn thấp." />}
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                  <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-                    <h3 className="text-lg font-bold text-gray-900">Khuyến mãi đang chạy</h3>
-                    <button type="button" onClick={() => setCurrentView('promotions')} className="text-sm font-semibold text-orange-600 hover:text-orange-700">
-                      Xem KM
-                    </button>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {staffActivePromotions.slice(0, 5).map((promotion) => (
-                      <button
-                        key={promotion.id}
-                        type="button"
-                        onClick={() => setCurrentView('promotions')}
-                        className="w-full px-6 py-4 text-left transition-colors hover:bg-orange-50/60"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <p className="line-clamp-1 font-semibold text-gray-950">{promotion.name}</p>
-                            <p className="mt-1 text-sm text-gray-500">{promotion.bookCount || promotion.books?.length || 0} sách · {getPromotionRemainingText(promotion)}</p>
-                          </div>
-                          <span className="shrink-0 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 ring-1 ring-orange-100">
-                            -{promotion.discountPercent}%
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                    {staffActivePromotions.length === 0 && <EmptyState text="Không có khuyến mãi đang chạy." />}
-                  </div>
-                </div>
-              </div>
-              </>
-              )}
-            </div>
+            <DashboardView
+              isAdmin={isAdmin}
+              dashboard={dashboard}
+              staffWorkCards={staffWorkCards}
+              staffPriorityOrders={staffPriorityOrders}
+              stockAlertBooks={stockAlertBooks}
+              staffActivePromotions={staffActivePromotions}
+              adminKpiCards={adminKpiCards}
+              adminActionItems={adminActionItems}
+              adminOrderStatusChartData={adminOrderStatusChartData}
+              adminHealthMetrics={adminHealthMetrics}
+              goToOrders={() => goToOrders()}
+              goToStockAlerts={goToStockAlerts}
+              openOrderDetail={openOrderDetail}
+              openBookDetail={(book) => openBookDetail(book, 'detail')}
+              openPromotionsView={() => setCurrentView('promotions')}
+              getOrderActions={(order, placement) => getOrderActions(order, placement)}
+              renderOrderActionButton={renderOrderActionButton}
+              getPromotionRemainingText={getPromotionRemainingText}
+            />
           )}
 
+
           {currentView === 'books' && (
-            <div className="space-y-6">
-              {outOfStockBooks.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium text-red-800">Có {outOfStockBooks.length} sách hết hàng</h4>
-                    <p className="text-sm text-red-700">{outOfStockBooks.map((book) => book.title).join(', ')}</p>
-                  </div>
-                </div>
-              )}
-
-              {lowStockBooks.length > 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium text-yellow-800">
-                      Có {lowStockBooks.length} sách sắp hết hàng
-                    </h4>
-                    <p className="text-sm text-yellow-700">
-                      {lowStockBooks.map((book) => `${book.title} (${Number(book.stock || 0)} cuốn)`).join(', ')}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm sách theo tên, tác giả, danh mục..." />
-                {isAdmin && (
-                  <select
-                    value={bookVisibilityFilter}
-                    onChange={(event) => setBookVisibilityFilter(event.target.value as BookVisibilityFilter)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  >
-                    <option value="active">Sách đang bán</option>
-                    <option value="deleted">Sách đã xóa mềm</option>
-                    <option value="all">Tất cả sách</option>
-                  </select>
-                )}
-                <select
-                  value={bookStockFilter}
-                  onChange={(event) => setBookStockFilter(event.target.value as BookStockFilter)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="all">Tất cả tồn kho</option>
-                  <option value="in_stock">Còn hàng</option>
-                  <option value="low_stock">Sắp hết hàng</option>
-                  <option value="out_of_stock">Hết hàng</option>
-                </select>
-                <select
-                  value={bookCategoryFilter}
-                  onChange={(event) => setBookCategoryFilter(event.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="all">Tất cả danh mục</option>
-                  {activeCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                  <option value="uncategorized">Chưa phân loại</option>
-                </select>
-                {isAdmin && (
-                  <button
-                    onClick={openCreateBook}
-                    className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 md:w-auto"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Thêm sách mới
-                  </button>
-                )}
-              </div>
-
-              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                <div className="flex flex-col gap-3 border-b border-gray-100 bg-white px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Danh sách sách</h3>
-                    <p className="text-sm text-gray-500">
-                      {filteredBooks.length.toLocaleString('vi-VN')} mục phù hợp với bộ lọc hiện tại
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2 text-xs font-medium">
-                    <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">
-                      Còn hàng: {books.filter((book) => !isBookDeleted(book) && Number(book.stock || 0) > LOW_STOCK_THRESHOLD).length}
-                    </span>
-                    <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700">
-                      Sắp hết: {lowStockBooks.length}
-                    </span>
-                    <span className="rounded-full bg-red-50 px-3 py-1.5 text-red-700">
-                      Hết hàng: {outOfStockBooks.length}
-                    </span>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                <table className="w-full min-w-[920px]">
-                  <thead className="bg-slate-50/80">
-                    <tr>
-                      <TableHead>Sách</TableHead>
-                      <TableHead>Danh mục</TableHead>
-                      <TableHead>Giá</TableHead>
-                      <TableHead>Tồn kho</TableHead>
-                      <TableHead>Đã bán</TableHead>
-                      <TableHead>Trạng thái</TableHead>
-                      <TableHead align="right">Thao tác</TableHead>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {paginatedBooks.map((book) => {
-                      const statusMeta = getBookStatusMeta(book);
-                      const stock = Number(book.stock || 0);
-                      const bookPromotion = getPromotionForBook(book.id);
-                      const promotionActive = isPromotionCurrentlyActive(bookPromotion);
-                      const hasDiscount = Number(book.discount || 0) > 0;
-
-                      return (
-                      <tr key={book.id} title={statusMeta.label} className={`transition-colors hover:bg-orange-50/30 ${isBookDeleted(book) ? 'bg-gray-50/80' : 'bg-white'}`}>
-                        <TableCell>
-                          <div className="flex min-w-0 items-center gap-4">
-                            <div className="h-20 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100 shadow-sm ring-1 ring-gray-200">
-                              <img
-                                src={getBookImage(book)}
-                                alt={book.title}
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="line-clamp-2 text-sm font-semibold leading-6 text-gray-950">{book.title}</p>
-                              <p className="mt-1 text-sm text-gray-500">{book.author}</p>
-                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
-                                {book.isbn && (
-                                  <span className="rounded-full bg-gray-100 px-2 py-1">ISBN {book.isbn}</span>
-                                )}
-                                {book.publisher && (
-                                  <span className="rounded-full bg-gray-100 px-2 py-1">{book.publisher}</span>
-                                )}
-                                {bookPromotion && (
-                                  <span
-                                    className={`rounded-full px-2 py-1 font-semibold ${
-                                      promotionActive
-                                        ? 'bg-orange-100 text-orange-700'
-                                        : 'bg-gray-100 text-gray-600'
-                                    }`}
-                                  >
-                                    KM {bookPromotion.discountPercent}% - {getPromotionStatusLabel(bookPromotion)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{book.category?.name || 'Chưa phân loại'}</TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <span className={`font-semibold ${hasDiscount ? 'text-red-600' : 'text-gray-900'}`}>
-                              {formatCurrency(book.price)}
-                            </span>
-                            {hasDiscount && (
-                              <div className="flex flex-col gap-1">
-                                <span className="text-xs text-gray-400 line-through">
-                                  {formatCurrency(book.originalPrice)}
-                                </span>
-                                <span className="w-fit rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
-                                  -{Number(book.discount || 0)}%
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className={`font-semibold ${stock <= 0 ? 'text-red-600' : stock <= LOW_STOCK_THRESHOLD ? 'text-amber-600' : 'text-gray-900'}`}>
-                            {stock.toLocaleString('vi-VN')}
-                          </span>
-                        </TableCell>
-                        <TableCell>{Number(book.soldCount || 0).toLocaleString('vi-VN')}</TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {isBookDeleted(book) ? (
-                            <span className="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700">Đã xóa mềm</span>
-                          ) : Number(book.stock || 0) > 0 && Number(book.stock || 0) <= LOW_STOCK_THRESHOLD ? (
-                            <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">Sắp hết hàng</span>
-                          ) : (
-                          <span className={`text-xs px-2 py-1 rounded-full ${Number(book.stock || 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                            {Number(book.stock || 0) > 0 ? 'Còn hàng' : 'Hết hàng'}
-                          </span>
-                          )}
-                        </TableCell>
-                        <TableCell align="right">
-                          <div className="flex flex-wrap justify-end gap-2">
-                            <button
-                              onClick={() => openBookDetail(book, 'detail')}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-100 transition-colors hover:bg-blue-100"
-                              title="Xem chi tiết"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            {isAdmin && (
-                              <button
-                                onClick={() => openBookDetail(book, 'edit')}
-                                disabled={isBookDeleted(book)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-orange-600 ring-1 ring-orange-100 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                title="Chỉnh sửa"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                            )}
-                            {isAdmin && (
-                              <button
-                                onClick={() => handleSoftDeleteBook(book)}
-                                disabled={deletingBookId === book.id || isBookDeleted(book)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600 ring-1 ring-red-100 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                title="Xóa mềm: ẩn sách khỏi trang bán hàng"
-                              >
-                                <ArchiveX className="w-4 h-4" />
-                              </button>
-                            )}
-                            {isAdmin && isBookDeleted(book) && (
-                              <button
-                                onClick={() => handleRestoreDeletedBook(book)}
-                                disabled={deletingBookId === book.id}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600 ring-1 ring-green-100 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                title="Khôi phục sách đã xóa mềm"
-                              >
-                                <RefreshCcw className="w-4 h-4" />
-                              </button>
-                            )}
-                            {isAdmin && (
-                              <button
-                                onClick={() => handlePermanentDeleteBook(book)}
-                                disabled={deletingBookId === book.id}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-700 ring-1 ring-rose-100 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                title="Xóa cứng vĩnh viễn"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </tr>
-                    );
-                    })}
-                  </tbody>
-                </table>
-                </div>
-                {filteredBooks.length === 0 && <EmptyState text="Không có sách phù hợp." />}
-                {filteredBooks.length > 0 && (
-                  <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
-                    <p className="text-sm text-gray-500">
-                      Trang {bookCurrentPage}/{totalBookPages} • Hiển thị {paginatedBooks.length} / {filteredBooks.length} sách
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setBookCurrentPage((prev) => Math.max(1, prev - 1))}
-                        disabled={bookCurrentPage === 1}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Trước
-                      </button>
-                      {Array.from({ length: totalBookPages }, (_, index) => index + 1)
-                        .slice(Math.max(0, bookCurrentPage - 3), Math.max(5, Math.min(totalBookPages, bookCurrentPage + 2)))
-                        .map((page) => (
-                          <button
-                            key={page}
-                            type="button"
-                            onClick={() => setBookCurrentPage(page)}
-                            className={`h-9 min-w-9 rounded-lg px-3 text-sm font-medium transition-colors ${
-                              page === bookCurrentPage
-                                ? 'bg-orange-500 text-white'
-                                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        ))}
-                      <button
-                        type="button"
-                        onClick={() => setBookCurrentPage((prev) => Math.min(totalBookPages, prev + 1))}
-                        disabled={bookCurrentPage === totalBookPages}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Sau
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <BooksView
+              isAdmin={isAdmin}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              books={books}
+              filteredBooks={filteredBooks}
+              paginatedBooks={paginatedBooks}
+              outOfStockBooks={outOfStockBooks}
+              lowStockBooks={lowStockBooks}
+              activeCategories={activeCategories}
+              bookVisibilityFilter={bookVisibilityFilter}
+              setBookVisibilityFilter={setBookVisibilityFilter}
+              bookStockFilter={bookStockFilter}
+              setBookStockFilter={setBookStockFilter}
+              bookCategoryFilter={bookCategoryFilter}
+              setBookCategoryFilter={setBookCategoryFilter}
+              openCreateBook={openCreateBook}
+              openBookDetail={openBookDetail}
+              handleSoftDeleteBook={handleSoftDeleteBook}
+              handleRestoreDeletedBook={handleRestoreDeletedBook}
+              handlePermanentDeleteBook={handlePermanentDeleteBook}
+              deletingBookId={deletingBookId}
+              isBookDeleted={isBookDeleted}
+              getPromotionForBook={getPromotionForBook}
+              isPromotionCurrentlyActive={isPromotionCurrentlyActive}
+              getPromotionStatusLabel={getPromotionStatusLabel}
+              bookCurrentPage={bookCurrentPage}
+              totalBookPages={totalBookPages}
+              setBookCurrentPage={setBookCurrentPage}
+            />
           )}
 
           {currentView === 'promotions' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
-                  <p className="text-sm text-gray-500">Chương trình</p>
-                  <p className="mt-2 text-3xl font-bold text-gray-900">{promotions.length}</p>
-                </div>
-                <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
-                  <p className="text-sm text-gray-500">Đang áp dụng</p>
-                  <p className="mt-2 text-3xl font-bold text-orange-600">{activePromotions.length}</p>
-                </div>
-                <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
-                  <p className="text-sm text-gray-500">Sách trong chương trình</p>
-                  <p className="mt-2 text-3xl font-bold text-gray-900">{promotionBookTotal}</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm chương trình hoặc sách..." />
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={() => navigate('/promotions')} className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 font-semibold text-orange-700 transition-colors hover:bg-orange-100">
-                    Xem trang khuyến mãi
-                  </button>
-                  {isAdmin && (
-                    <button onClick={openCreatePromotion} className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-3 font-semibold text-white transition-colors hover:bg-orange-600">
-                      <Plus className="h-5 w-5" />
-                      Tạo chương trình
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid gap-4">
-                {filteredPromotions.map((promotion) => (
-                  <div key={promotion.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-lg font-bold text-gray-900">{promotion.name}</h3>
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${promotion.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                            {promotion.status === 'ACTIVE' ? 'Đang áp dụng' : 'Tạm tắt'}
-                          </span>
-                          <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
-                            Giảm {promotion.discountPercent}%
-                          </span>
-                        </div>
-                        {promotion.description && <p className="mt-2 text-sm text-gray-600">{promotion.description}</p>}
-                        <div className="mt-3 flex flex-wrap gap-3 text-sm text-gray-500">
-                          <span>Bắt đầu: {formatDate(promotion.startsAt)}</span>
-                          <span>Kết thúc: {formatDate(promotion.endsAt)}</span>
-                          <span>{promotion.bookCount || promotion.books?.length || 0} sách</span>
-                        </div>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {(promotion.books || []).slice(0, 5).map((book) => (
-                            <div key={book.id} className="flex max-w-[220px] items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-2 py-2">
-                              <img src={getBookImage(book)} alt={book.title} className="h-10 w-8 rounded object-cover ring-1 ring-gray-200" />
-                              <span className="line-clamp-2 text-xs font-medium text-gray-700">{book.title}</span>
-                            </div>
-                          ))}
-                          {(promotion.books?.length || 0) > 5 && (
-                            <span className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-600">
-                              +{(promotion.books?.length || 0) - 5} sách
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {isAdmin ? (
-                        <div className="flex shrink-0 gap-2">
-                          <button onClick={() => openEditPromotion(promotion)} className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100 transition-colors hover:bg-blue-100" title="Sửa chương trình">
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button onClick={() => handleDeletePromotionProgram(promotion)} disabled={deletingPromotionId === promotion.id} className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 text-red-700 ring-1 ring-red-100 transition-colors hover:bg-red-100 disabled:opacity-50" title="Xóa chương trình">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="rounded-lg bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600 ring-1 ring-gray-100">
-                          Chỉ xem
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {filteredPromotions.length === 0 && <EmptyState text="Chưa có chương trình khuyến mãi phù hợp." />}
-              </div>
-            </div>
+            <PromotionsView
+              isAdmin={isAdmin}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              promotions={promotions}
+              activePromotions={activePromotions}
+              promotionBookTotal={promotionBookTotal}
+              filteredPromotions={filteredPromotions}
+              openCreatePromotion={openCreatePromotion}
+              openEditPromotion={openEditPromotion}
+              handleDeletePromotionProgram={handleDeletePromotionProgram}
+              deletingPromotionId={deletingPromotionId}
+              onViewPromotionsPage={() => navigate('/promotions')}
+            />
           )}
 
           {false && currentView === 'promotions' && (
@@ -3195,7 +2338,7 @@ export function AdminPage() {
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm sách để cấu hình khuyến mãi..." />
                 <button onClick={() => navigate('/promotions')} className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 font-semibold text-orange-700 transition-colors hover:bg-orange-100">
-                  Xem trang khuyến mãi
+                    Xem trang khuyến mãi
                 </button>
               </div>
 
@@ -3208,12 +2351,12 @@ export function AdminPage() {
                   <table className="w-full min-w-[1000px]">
                     <thead className="bg-slate-50/80">
                       <tr>
-                        <TableHead>Sách</TableHead>
+                      <TableHead>Sách</TableHead>
                         <TableHead>Giá bán</TableHead>
                         <TableHead>Giá gốc</TableHead>
                         <TableHead>% giảm</TableHead>
                         <TableHead>Hiện trạng</TableHead>
-                        <TableHead align="right">Thao tác</TableHead>
+                      <TableHead align="right">Thao tác</TableHead>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -3250,521 +2393,77 @@ export function AdminPage() {
           )}
 
           {currentView === 'categories' && (
-            <div className="space-y-6">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm danh mục theo tên hoặc mô tả..." />
-                <select
-                  value={categoryVisibilityFilter}
-                  onChange={(event) => setCategoryVisibilityFilter(event.target.value as CategoryVisibilityFilter)}
-                  className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="active">Danh mục đang dùng</option>
-                  <option value="deleted">Danh mục đã xóa mềm</option>
-                  <option value="all">Tất cả danh mục</option>
-                </select>
-                <select
-                  value={categoryBookFilter}
-                  onChange={(event) => setCategoryBookFilter(event.target.value as CategoryBookFilter)}
-                  className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="all">Tất cả số sách</option>
-                  <option value="with_books">Có sách</option>
-                  <option value="empty">Không có sách</option>
-                </select>
-                <button
-                  onClick={openCreateCategory}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-3 font-medium text-white transition-colors hover:bg-orange-600"
-                >
-                  <Plus className="h-5 w-5" />
-                  Thêm danh mục
-                </button>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <p className="text-sm text-gray-500">Tổng danh mục</p>
-                  <p className="mt-2 text-3xl font-bold text-gray-900">{activeCategories.length}</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <p className="text-sm text-gray-500">Đang có sách</p>
-                  <p className="mt-2 text-3xl font-bold text-emerald-600">
-                    {activeCategories.filter((category) => getCategoryBookCount(category.id) > 0).length}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <p className="text-sm text-gray-500">Chưa có sách</p>
-                  <p className="mt-2 text-3xl font-bold text-amber-600">
-                    {activeCategories.filter((category) => getCategoryBookCount(category.id) === 0).length}
-                  </p>
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                <div className="border-b border-gray-100 px-5 py-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Danh sách danh mục</h3>
-                  <p className="text-sm text-gray-500">
-                    {filteredCategories.length.toLocaleString('vi-VN')} danh mục phù hợp với bộ lọc hiện tại
-                  </p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[800px]">
-                    <thead className="bg-slate-50/80">
-                      <tr>
-                        <TableHead>Danh mục</TableHead>
-                        <TableHead>Mô tả</TableHead>
-                        <TableHead>Số sách</TableHead>
-                        <TableHead>Ngày tạo</TableHead>
-                        <TableHead align="right">Thao tác</TableHead>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {filteredCategories.map((category) => {
-                        const bookCount = getCategoryBookCount(category.id);
-                        const deleted = isCategoryDeleted(category);
-                        return (
-                          <tr key={category.id} className={`transition-colors hover:bg-orange-50/30 ${deleted ? 'bg-gray-50/80 opacity-80' : 'bg-white'}`}>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
-                                  <FolderTree className="h-5 w-5" />
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-gray-950">{category.name}</p>
-                                  <div className="mt-1 flex items-center gap-2">
-                                    <p className="text-xs text-gray-500">{category.id.slice(0, 8)}</p>
-                                    {deleted && (
-                                      <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">
-                                        Đã xóa mềm
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <p className="max-w-xl line-clamp-2 text-gray-600">
-                                {category.description || 'Chưa có mô tả'}
-                              </p>
-                            </TableCell>
-                            <TableCell>
-                              <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${
-                                bookCount > 0
-                                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-100'
-                                  : 'bg-gray-100 text-gray-600 ring-gray-200'
-                              }`}>
-                                {bookCount.toLocaleString('vi-VN')} sách
-                              </span>
-                            </TableCell>
-                            <TableCell>{formatDate(category.createdAt)}</TableCell>
-                            <TableCell align="right">
-                              <div className="flex flex-wrap justify-end gap-2">
-                                <button
-                                  onClick={() => openEditCategory(category)}
-                                  disabled={deleted}
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-orange-600 ring-1 ring-orange-100 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                  title="Chỉnh sửa danh mục"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleSoftDeleteCategory(category)}
-                                  disabled={deletingCategoryId === category.id || deleted}
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600 ring-1 ring-red-100 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                  title="Xóa mềm danh mục"
-                                >
-                                  <ArchiveX className="h-4 w-4" />
-                                </button>
-                                {deleted && (
-                                  <button
-                                    onClick={() => handleRestoreCategory(category)}
-                                    disabled={deletingCategoryId === category.id}
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600 ring-1 ring-green-100 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                    title="Khôi phục danh mục"
-                                  >
-                                    <RefreshCcw className="h-4 w-4" />
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => handleHardDeleteCategory(category)}
-                                  disabled={deletingCategoryId === category.id}
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-700 ring-1 ring-rose-100 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                  title="Xóa cứng danh mục"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </TableCell>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                {filteredCategories.length === 0 && <EmptyState text="Không có danh mục phù hợp." />}
-              </div>
-            </div>
+            <CategoriesView
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              categoryVisibilityFilter={categoryVisibilityFilter}
+              setCategoryVisibilityFilter={setCategoryVisibilityFilter}
+              categoryBookFilter={categoryBookFilter}
+              setCategoryBookFilter={setCategoryBookFilter}
+              activeCategories={activeCategories}
+              filteredCategories={filteredCategories}
+              openCreateCategory={openCreateCategory}
+              openEditCategory={openEditCategory}
+              handleSoftDeleteCategory={handleSoftDeleteCategory}
+              handleRestoreCategory={handleRestoreCategory}
+              handleHardDeleteCategory={handleHardDeleteCategory}
+              deletingCategoryId={deletingCategoryId}
+              getCategoryBookCount={getCategoryBookCount}
+              isCategoryDeleted={isCategoryDeleted}
+            />
           )}
 
           {currentView === 'orders' && (
-            <div className="space-y-6">
-              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-wrap gap-2">
-                  {orderWorkflowTabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => goToOrderWorkflowTab(tab.id)}
-                      className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                        orderWorkflowTab === tab.id
-                          ? 'bg-orange-500 text-white'
-                          : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {tab.label}
-                      <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
-                        orderWorkflowTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {tab.count.toLocaleString('vi-VN')}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1.4fr_0.9fr_0.9fr_0.8fr_auto]">
-                  <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm mã đơn, SĐT, tên khách..." />
-                  <select
-                    value={orderPaymentMethodFilter}
-                    onChange={(event) => setOrderPaymentMethodFilter(event.target.value as 'all' | AdminPaymentMethod)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  >
-                    <option value="all">Tất cả thanh toán</option>
-                    {ORDER_PAYMENT_METHOD_OPTIONS.map((method) => (
-                      <option key={method} value={method}>{getPaymentMethodText(method)}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={orderPaymentStatusFilter}
-                    onChange={(event) => setOrderPaymentStatusFilter(event.target.value as 'all' | AdminPaymentStatus)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  >
-                    <option value="all">Tất cả trạng thái TT</option>
-                    {ORDER_PAYMENT_STATUS_OPTIONS.map((status) => (
-                      <option key={status} value={status}>{getPaymentStatusText(status)}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="date"
-                    value={orderDateFrom}
-                    onChange={(event) => setOrderDateFrom(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                  <div className="flex gap-2">
-                    <input
-                      type="date"
-                      value={orderDateTo}
-                      onChange={(event) => setOrderDateTo(event.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={clearOrderFilters}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                    >
-                      Xóa lọc
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1040px]">
-                    <thead className="border-b border-gray-100 bg-gray-50">
-                      <tr>
-                        <TableHead className="w-[190px]">Đơn hàng</TableHead>
-                        <TableHead className="w-[330px]">Khách & giao hàng</TableHead>
-                        <TableHead className="w-[210px]">Thanh toán</TableHead>
-                        <TableHead className="w-[220px]">Trạng thái</TableHead>
-                        <TableHead align="right" className="w-[220px]">Thao tác</TableHead>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                      {filteredOrders.map((order) => (
-                        <tr key={order.id} className="transition-colors hover:bg-orange-50/30">
-                          <TableCell className="py-5">
-                            <div className="space-y-2">
-                              <p className="font-semibold text-gray-950">{order.orderCode || order.id.slice(0, 8)}</p>
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                                <span>{formatDate(order.createdAt)}</span>
-                                <span className="h-1 w-1 rounded-full bg-gray-300" />
-                                <span>{order.totalItems || 0} SP</span>
-                              </div>
-                              {hasPendingCustomerCancelRequest(order) && (
-                                <span className="inline-flex w-fit rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-100">
-                                  Khách yêu cầu hủy
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-5">
-                            <div className="space-y-1.5">
-                              <p className="font-semibold text-gray-900">{order.customerName || 'Khách hàng'}</p>
-                              <p className="text-sm text-gray-500">{order.customerEmail || 'Chưa có email'}</p>
-                              {order.customerPhone && <p className="text-sm font-medium text-gray-700">{order.customerPhone}</p>}
-                              <p className="line-clamp-2 max-w-md text-sm leading-6 text-gray-600">{order.addressSummary || 'Đang cập nhật địa chỉ'}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-5">
-                            <div className="space-y-2">
-                              <p className="text-base font-bold text-gray-950">{formatCurrency(order.totalAmount)}</p>
-                              <p className="text-sm font-medium text-gray-800">{getPaymentMethodText(order.paymentMethod || undefined)}</p>
-                              <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getPaymentStatusPillClass(order.paymentStatus)}`}>
-                                {getPaymentStatusText(order.paymentStatus || undefined)}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-5">
-                            <div className="space-y-2">
-                              <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getOrderStatusPillClass(order.status)}`}>
-                                {getOrderStatusText(order.status)}
-                              </span>
-                              <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getOrderTaskPillClass(order)}`}>
-                                {getOrderTaskText(order)}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell align="right" className="py-5">
-                            <div className="flex flex-col items-end gap-2">
-                              {getOrderActions(order, 'table').map((action) => renderOrderActionButton(order, action))}
-                            </div>
-                          </TableCell>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {filteredOrders.length === 0 && <EmptyState text="Không có đơn hàng phù hợp." />}
-                {orderTotal > 0 && (
-                  <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
-                    <p className="text-sm text-gray-500">
-                      {showCancelRequestsOnly
-                        ? `Trang ${orderCurrentPage}/${totalOrderPages} • Hiển thị ${filteredOrders.length} đơn phù hợp trong trang hiện tại`
-                        : `Trang ${orderCurrentPage}/${totalOrderPages} • Hiển thị ${orders.length} / ${orderTotal} đơn`}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setOrderCurrentPage((prev) => Math.max(1, prev - 1))}
-                        disabled={orderCurrentPage === 1 || isLoading}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Trước
-                      </button>
-                      {Array.from({ length: totalOrderPages }, (_, index) => index + 1)
-                        .slice(Math.max(0, orderCurrentPage - 3), Math.max(5, Math.min(totalOrderPages, orderCurrentPage + 2)))
-                        .map((page) => (
-                          <button
-                            key={page}
-                            type="button"
-                            onClick={() => setOrderCurrentPage(page)}
-                            disabled={isLoading}
-                            className={`h-9 min-w-9 rounded-lg px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                              page === orderCurrentPage
-                                ? 'bg-orange-500 text-white'
-                                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        ))}
-                      <button
-                        type="button"
-                        onClick={() => setOrderCurrentPage((prev) => Math.min(totalOrderPages, prev + 1))}
-                        disabled={orderCurrentPage === totalOrderPages || isLoading}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Sau
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <OrdersView
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              orderWorkflowTabs={orderWorkflowTabs}
+              orderWorkflowTab={orderWorkflowTab}
+              goToOrderWorkflowTab={goToOrderWorkflowTab}
+              orderPaymentMethodFilter={orderPaymentMethodFilter}
+              setOrderPaymentMethodFilter={setOrderPaymentMethodFilter}
+              orderPaymentStatusFilter={orderPaymentStatusFilter}
+              setOrderPaymentStatusFilter={setOrderPaymentStatusFilter}
+              orderDateFrom={orderDateFrom}
+              setOrderDateFrom={setOrderDateFrom}
+              orderDateTo={orderDateTo}
+              setOrderDateTo={setOrderDateTo}
+              clearOrderFilters={clearOrderFilters}
+              filteredOrders={filteredOrders}
+              orders={orders}
+              getOrderActions={getOrderActions}
+              renderOrderActionButton={renderOrderActionButton}
+              orderTotal={orderTotal}
+              showCancelRequestsOnly={showCancelRequestsOnly}
+              orderCurrentPage={orderCurrentPage}
+              totalOrderPages={totalOrderPages}
+              setOrderCurrentPage={setOrderCurrentPage}
+              isLoading={isLoading}
+            />
           )}
 
           {currentView === 'customers' && (
-            <div className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-4">
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <p className="text-sm text-gray-500">Tổng tài khoản</p>
-                  <p className="mt-2 text-3xl font-bold text-gray-900">{customers.length}</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <p className="text-sm text-gray-500">Đang hoạt động</p>
-                  <p className="mt-2 text-3xl font-bold text-emerald-600">{activeUsers.length}</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <p className="text-sm text-gray-500">Đã khóa</p>
-                  <p className="mt-2 text-3xl font-bold text-red-600">{lockedUsers.length}</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <p className="text-sm text-gray-500">Chưa xác thực</p>
-                  <p className="mt-2 text-3xl font-bold text-amber-600">{unverifiedUsers.length}</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Tạo tài khoản mới</h3>
-                  <p className="mt-1 text-sm text-gray-500">Admin có thể tạo tài khoản khách hàng hoặc nhân viên để sử dụng hệ thống.</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openCreateUserModal('CUSTOMER')}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-orange-200 px-4 py-2 font-semibold text-orange-600 transition-colors hover:bg-orange-50"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Tạo khách hàng
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openCreateUserModal('STAFF')}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-semibold text-white transition-colors hover:bg-orange-600"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Tạo nhân viên
-                  </button>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="grid gap-3 lg:grid-cols-[1fr_180px_180px_180px]">
-                  <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm theo tên, username hoặc email..." />
-                  <select
-                    value={userRoleFilter}
-                    onChange={(event) => setUserRoleFilter(event.target.value as UserRoleFilter)}
-                    className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  >
-                    <option value="all">Tất cả vai trò</option>
-                    <option value="CUSTOMER">Khách hàng</option>
-                    <option value="STAFF">Nhân viên</option>
-                    <option value="ADMIN">Admin</option>
-                    <option value="GUEST">Khách vãng lai</option>
-                  </select>
-                  <select
-                    value={userLockFilter}
-                    onChange={(event) => setUserLockFilter(event.target.value as UserLockFilter)}
-                    className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  >
-                    <option value="all">Tất cả trạng thái</option>
-                    <option value="active">Đang hoạt động</option>
-                    <option value="locked">Đã khóa</option>
-                  </select>
-                  <select
-                    value={userVerifiedFilter}
-                    onChange={(event) => setUserVerifiedFilter(event.target.value as UserVerifiedFilter)}
-                    className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  >
-                    <option value="all">Tất cả xác thực</option>
-                    <option value="verified">Đã xác thực</option>
-                    <option value="unverified">Chưa xác thực</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="border-b border-gray-100 px-5 py-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Danh sách tài khoản</h3>
-                  <p className="text-sm text-gray-500">
-                    {filteredCustomers.length.toLocaleString('vi-VN')} tài khoản phù hợp với bộ lọc hiện tại
-                  </p>
-                </div>
-                <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px]">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <TableHead>Tài khoản</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Vai trò</TableHead>
-                      <TableHead>Xác thực</TableHead>
-                      <TableHead>Ngày tham gia</TableHead>
-                      <TableHead>Trạng thái</TableHead>
-                      <TableHead align="right">Thao tác</TableHead>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredCustomers.map((customer) => (
-                      <tr key={customer.id} className="hover:bg-gray-50">
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(customer.fullName || customer.userName)}&background=F97316&color=fff`}
-                              alt={customer.fullName || customer.userName}
-                              className="w-10 h-10 rounded-full"
-                            />
-                            <div>
-                              <p className="font-medium text-gray-800">{customer.fullName || customer.userName}</p>
-                              <p className="text-xs text-gray-500">{customer.role}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{customer.email}</TableCell>
-                        <TableCell>
-                          <select
-                            value={customer.role}
-                            disabled={updatingUserId === customer.id || customer.id === user?.id}
-                            onChange={(event) => handleChangeUserRole(customer, event.target.value)}
-                            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
-                          >
-                            <option value="CUSTOMER">CUSTOMER</option>
-                            <option value="STAFF">STAFF</option>
-                            <option value="ADMIN">ADMIN</option>
-                            <option value="GUEST">GUEST</option>
-                          </select>
-                        </TableCell>
-                        <TableCell>
-                          <span className={`text-xs px-2 py-1 rounded-full ${customer.isVerified ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {customer.isVerified ? 'Đã xác thực' : 'Chưa xác thực'}
-                          </span>
-                        </TableCell>
-                        <TableCell>{formatDate(customer.createdAt)}</TableCell>
-                        <TableCell>
-                          <span className={`text-xs px-2 py-1 rounded-full ${customer.isLocked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                            {customer.isLocked ? 'Đã khóa' : 'Hoạt động'}
-                          </span>
-                        </TableCell>
-                        <TableCell align="right">
-                          <div className="flex flex-wrap justify-end gap-2">
-                            <button
-                              type="button"
-                              disabled={updatingUserId === customer.id || customer.id === user?.id}
-                              onClick={() => handleToggleUserLock(customer)}
-                              className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors disabled:opacity-50 ${
-                                customer.isLocked
-                                  ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                  : 'bg-red-50 text-red-700 hover:bg-red-100'
-                              }`}
-                            >
-                              {customer.isLocked ? 'Mở khóa' : 'Khóa'}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={updatingUserId === customer.id}
-                              onClick={() => handleResetUserPassword(customer)}
-                              className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
-                            >
-                              Reset MK
-                            </button>
-                          </div>
-                        </TableCell>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                </div>
-                {filteredCustomers.length === 0 && <EmptyState text="Không có khách hàng phù hợp." />}
-              </div>
-            </div>
+            <CustomersView
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              customers={customers}
+              activeUsers={activeUsers}
+              lockedUsers={lockedUsers}
+              unverifiedUsers={unverifiedUsers}
+              filteredCustomers={filteredCustomers}
+              userRoleFilter={userRoleFilter}
+              setUserRoleFilter={setUserRoleFilter}
+              userLockFilter={userLockFilter}
+              setUserLockFilter={setUserLockFilter}
+              userVerifiedFilter={userVerifiedFilter}
+              setUserVerifiedFilter={setUserVerifiedFilter}
+              openCreateUserModal={openCreateUserModal}
+              handleToggleUserLock={handleToggleUserLock}
+              handleChangeUserRole={handleChangeUserRole}
+              handleResetUserPassword={handleResetUserPassword}
+              updatingUserId={updatingUserId}
+              currentUserId={user?.id}
+            />
           )}
 
           {currentView === 'settings' && (
@@ -3777,902 +2476,98 @@ export function AdminPage() {
       </main>
 
       {showUserModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <form onSubmit={handleCreateUser} className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Tạo tài khoản</h3>
-                <p className="text-sm text-gray-500">Tạo tài khoản khách hàng hoặc nhân viên mới.</p>
-              </div>
-              <button
-                type="button"
-                disabled={savingUser}
-                onClick={() => {
-                  setShowUserModal(false);
-                  resetUserForm();
-                }}
-                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="grid gap-4 p-6 md:grid-cols-2">
-              <UserInput
-                label="Tên đăng nhập"
-                required
-                value={userForm.userName}
-                onChange={(value) => setUserForm((prev) => ({ ...prev, userName: value }))}
-              />
-              <UserInput
-                label="Họ và tên"
-                value={userForm.fullName || ''}
-                onChange={(value) => setUserForm((prev) => ({ ...prev, fullName: value }))}
-              />
-              <UserInput
-                label="Email"
-                type="email"
-                required
-                value={userForm.email}
-                onChange={(value) => setUserForm((prev) => ({ ...prev, email: value }))}
-              />
-              <UserInput
-                label="Số điện thoại"
-                value={userForm.phone || ''}
-                onChange={(value) => setUserForm((prev) => ({ ...prev, phone: value }))}
-              />
-              <UserInput
-                label="Mật khẩu"
-                type="password"
-                required
-                value={userForm.password}
-                onChange={(value) => setUserForm((prev) => ({ ...prev, password: value }))}
-              />
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Vai trò <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={userForm.role}
-                  onChange={(event) => setUserForm((prev) => ({ ...prev, role: event.target.value as 'CUSTOMER' | 'STAFF' }))}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="CUSTOMER">Khách hàng</option>
-                  <option value="STAFF">Nhân viên</option>
-                </select>
-              </div>
-              <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 md:col-span-2">
-                <input
-                  type="checkbox"
-                  checked={Boolean(userForm.isVerified)}
-                  onChange={(event) => setUserForm((prev) => ({ ...prev, isVerified: event.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Đánh dấu email đã xác thực</span>
-              </label>
-              <div className="rounded-xl bg-orange-50 p-4 text-sm leading-6 text-orange-700 md:col-span-2">
-                Mật khẩu cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
-              <button
-                type="button"
-                disabled={savingUser}
-                onClick={() => {
-                  setShowUserModal(false);
-                  resetUserForm();
-                }}
-                className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-              >
-                Đóng
-              </button>
-              <button
-                type="submit"
-                disabled={savingUser}
-                className="rounded-lg bg-orange-500 px-5 py-2 font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
-              >
-                {savingUser ? 'Đang tạo...' : 'Tạo tài khoản'}
-              </button>
-            </div>
-          </form>
-        </div>
+        <UserCreateModal
+          userForm={userForm}
+          setUserForm={setUserForm}
+          savingUser={savingUser}
+          closeUserModal={() => {
+            setShowUserModal(false);
+            resetUserForm();
+          }}
+          handleCreateUser={handleCreateUser}
+        />
       )}
 
       {categoryModalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">
-                  {categoryModalMode === 'create' ? 'Thêm danh mục' : 'Chỉnh sửa danh mục'}
-                </h3>
-                <p className="text-sm text-gray-500">Quản lý nhóm sách hiển thị trên website.</p>
-              </div>
-              <button
-                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                onClick={() => {
-                  setCategoryModalMode(null);
-                  resetCategoryForm();
-                }}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-5 px-6 py-5">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Tên danh mục <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={categoryForm.name}
-                  onChange={(event) => handleCategoryInput('name', event.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:ring-2 focus:ring-orange-500"
-                  placeholder="Ví dụ: Kỹ năng sống"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Mô tả <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  rows={4}
-                  value={categoryForm.description}
-                  onChange={(event) => handleCategoryInput('description', event.target.value)}
-                  className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:ring-2 focus:ring-orange-500"
-                  placeholder="Mô tả ngắn giúp khách hàng hiểu nhóm sách này"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col-reverse gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setCategoryModalMode(null);
-                  resetCategoryForm();
-                }}
-                className="rounded-lg border border-gray-300 px-5 py-2.5 font-medium text-gray-700 transition-colors hover:bg-gray-50"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveCategory}
-                disabled={savingCategory}
-                className="rounded-lg bg-orange-500 px-5 py-2.5 font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {savingCategory ? 'Đang lưu...' : 'Lưu danh mục'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <CategoryModal
+          categoryModalMode={categoryModalMode}
+          categoryForm={categoryForm}
+          savingCategory={savingCategory}
+          closeCategoryModal={() => {
+            setCategoryModalMode(null);
+            resetCategoryForm();
+          }}
+          handleCategoryInput={handleCategoryInput}
+          handleSaveCategory={handleSaveCategory}
+        />
       )}
 
       {bookModalMode && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-gray-800">
-                {bookModalMode === 'create' && 'Thêm sách mới'}
-                {bookModalMode === 'edit' && 'Chỉnh sửa sách'}
-                {bookModalMode === 'detail' && 'Chi tiết sách'}
-              </h3>
-              <button
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                onClick={closeBookModal}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {bookModalMode === 'detail' && selectedBook ? (
-              <div className="p-6 space-y-6">
-                {getPromotionForBook(selectedBook.id) && (
-                  <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Percent className="h-5 w-5 text-orange-600" />
-                          <h4 className="font-bold text-orange-900">Sách đang thuộc chương trình khuyến mãi</h4>
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-orange-700 ring-1 ring-orange-200">
-                            {getPromotionStatusLabel(getPromotionForBook(selectedBook.id))}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm leading-6 text-orange-800">
-                          {getPromotionForBook(selectedBook.id)?.name} - giảm {getPromotionForBook(selectedBook.id)?.discountPercent}%.
-                        </p>
-                        <p className="mt-1 text-xs text-orange-700">
-                          Thời gian: {formatDate(getPromotionForBook(selectedBook.id)?.startsAt)} - {formatDate(getPromotionForBook(selectedBook.id)?.endsAt)}
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-white px-4 py-3 text-right ring-1 ring-orange-100">
-                        <p className="text-xs font-medium text-gray-500">Giá sau khuyến mãi</p>
-                        <p className="text-xl font-bold text-red-600">{formatCurrency(selectedBook.price)}</p>
-                        {Number(selectedBook.discount || 0) > 0 && (
-                          <p className="text-xs text-gray-400 line-through">{formatCurrency(selectedBook.originalPrice)}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="flex flex-col gap-6 md:flex-row">
-                  <img
-                    src={getBookImage(selectedBook)}
-                    alt={selectedBook.title}
-                    className="w-full max-w-48 aspect-[3/4] object-cover rounded-lg border border-gray-200"
-                  />
-                  <div className="flex-1 space-y-4">
-                    <div>
-                      <h4 className="text-2xl font-bold text-gray-900">{selectedBook.title}</h4>
-                      <p className="text-gray-600">{selectedBook.author}</p>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <InfoBlock
-                        title="Thông tin bán hàng"
-                        rows={[
-                          ['Danh mục', selectedBook.category?.name || 'Chưa phân loại'],
-                          ['Giá bán', formatCurrency(selectedBook.price)],
-                          ['Giá gốc', formatCurrency(selectedBook.originalPrice)],
-                          ['Tồn kho', String(selectedBook.stock ?? 0)],
-                          ['Đã bán', String(selectedBook.soldCount ?? 0)],
-                        ]}
-                      />
-                      <InfoBlock
-                        title="Thông tin xuất bản"
-                        rows={[
-                          ['ISBN', selectedBook.isbn || 'Đang cập nhật'],
-                          ['NXB', selectedBook.publisher || 'Đang cập nhật'],
-                          ['Năm XB', selectedBook.publishYear ? String(selectedBook.publishYear) : 'Đang cập nhật'],
-                          ['Số trang', selectedBook.pages ? String(selectedBook.pages) : 'Đang cập nhật'],
-                          ['Ngôn ngữ', selectedBook.language || 'Đang cập nhật'],
-                        ]}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <BookImageGallery images={getBookImageItems(selectedBook)} />
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">Mô tả</h4>
-                  <p className="text-gray-800 leading-6 whitespace-pre-line">{selectedBook.description}</p>
-                </div>
-              </div>
-            ) : (
-              <div className="p-6 space-y-5">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <BookInput label="Tên sách" value={bookForm.title} onChange={(value) => handleBookInput('title', value)} required />
-                  <BookInput label="Tác giả" value={bookForm.author} onChange={(value) => handleBookInput('author', value)} required />
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Danh mục <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={bookForm.categoryId}
-                      onChange={(event) => handleBookInput('categoryId', event.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    >
-                      <option value="">Chọn danh mục</option>
-                      {activeCategories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <BookInput label="ISBN" value={bookForm.isbn} onChange={(value) => handleBookInput('isbn', value)} required />
-                  <BookInput label="Giá gốc" type="number" value={bookForm.originalPrice} onChange={(value) => handleBookInput('originalPrice', value)} required />
-                  {bookModalMode === 'edit' && selectedBook && (
-                    <div className="rounded-lg border border-orange-100 bg-orange-50 px-4 py-3">
-                      <p className="text-sm font-medium text-gray-700">Giá bán hiện tại</p>
-                      <p className="mt-1 text-lg font-bold text-orange-600">{formatCurrency(selectedBook.price)}</p>
-                      <p className="mt-1 text-xs text-gray-500">Tự cập nhật theo chương trình khuyến mãi.</p>
-                    </div>
-                  )}
-                  <BookInput label="Tồn kho" type="number" value={bookForm.stock} onChange={(value) => handleBookInput('stock', value)} required />
-                  <BookInput label="Nhà xuất bản" value={bookForm.publisher || ''} onChange={(value) => handleBookInput('publisher', value)} />
-                  <BookInput label="Năm xuất bản" type="number" value={bookForm.publishYear || ''} onChange={(value) => handleBookInput('publishYear', value)} />
-                  <BookInput label="Số trang" type="number" value={bookForm.pages || ''} onChange={(value) => handleBookInput('pages', value)} />
-                  <BookInput label="Ngôn ngữ" value={bookForm.language || ''} onChange={(value) => handleBookInput('language', value)} />
-                  <BookInput label="Ngày phát hành" type="date" value={bookForm.releaseDate || ''} onChange={(value) => handleBookInput('releaseDate', value)} />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mô tả <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={bookForm.description}
-                    onChange={(event) => handleBookInput('description', event.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-                    placeholder="Nhập mô tả sách"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Ảnh sách {bookModalMode === 'create' && <span className="text-red-500">*</span>}
-                  </label>
-                  {bookModalMode === 'edit' && selectedBook && (
-                    <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-gray-700">Ảnh hiện có</p>
-                        {deletedImageIds.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setDeletedImageIds([])}
-                            className="text-xs font-medium text-orange-600 hover:text-orange-700"
-                          >
-                            Hoàn tác xóa ảnh
-                          </button>
-                        )}
-                      </div>
-                      <BookImageGallery
-                        images={getBookImageItems(selectedBook)}
-                        compact
-                        deletedImageIds={deletedImageIds}
-                        onToggleDelete={toggleDeleteImage}
-                      />
-                      {getVisibleBookImageItems(selectedBook).length === 0 && (
-                        <p className="mt-2 text-xs text-red-600">
-                          Bạn đang chọn xóa toàn bộ ảnh hiện có. Hãy upload ít nhất một ảnh mới trước khi lưu.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  <input
-                    ref={bookImageInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    multiple
-                    onChange={(event) => {
-                      const isValid = handleBookImagesChange(event.target.files);
-                      if (!isValid) event.currentTarget.value = '';
-                    }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                  {bookFormError && (
-                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>{bookFormError}</span>
-                    </div>
-                  )}
-                  {bookImagePreviews.length > 0 && (
-                    <div className="mt-4">
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-gray-700">Ảnh vừa chọn</p>
-                        <button
-                          type="button"
-                          onClick={clearSelectedBookImages}
-                          className="text-xs font-medium text-orange-600 hover:text-orange-700"
-                        >
-                          Bỏ chọn ảnh
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-5">
-                        {bookImagePreviews.map((preview, index) => (
-                          <div key={preview.url} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-                            <img
-                              src={preview.url}
-                              alt={`Ảnh vừa chọn ${index + 1}`}
-                              className="h-32 w-full object-cover"
-                            />
-                            <div className="space-y-0.5 px-2 py-1.5">
-                              <p className="truncate text-xs font-medium text-gray-700" title={preview.name}>
-                                {preview.name}
-                              </p>
-                              <p className="text-xs text-gray-500">{formatFileSize(preview.size)}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <p className="text-xs text-gray-500 mt-2">
-                    Hỗ trợ jpg, png, webp. Tối đa 5 ảnh, mỗi ảnh 2MB. Khi sửa, ảnh mới sẽ được thêm vào bộ ảnh hiện có; các ảnh được đánh dấu xóa sẽ bị xóa khi lưu.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3">
-              <button
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-                onClick={closeBookModal}
-              >
-                {bookModalMode === 'detail' ? 'Đóng' : 'Hủy'}
-              </button>
-              {bookModalMode !== 'detail' && (
-                <button
-                  onClick={handleSaveBook}
-                  disabled={savingBook}
-                  className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors flex items-center gap-2"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  {savingBook ? 'Đang lưu...' : 'Lưu sách'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <BookModal
+          bookModalMode={bookModalMode}
+          selectedBook={selectedBook}
+          bookForm={bookForm}
+          activeCategories={activeCategories}
+          deletedImageIds={deletedImageIds}
+          setDeletedImageIds={setDeletedImageIds}
+          bookImagePreviews={bookImagePreviews}
+          bookFormError={bookFormError}
+          savingBook={savingBook}
+          bookImageInputRef={bookImageInputRef}
+          closeBookModal={closeBookModal}
+          handleBookInput={handleBookInput}
+          handleBookImagesChange={handleBookImagesChange}
+          clearSelectedBookImages={clearSelectedBookImages}
+          handleSaveBook={handleSaveBook}
+          getBookImageItems={getBookImageItems}
+          getVisibleBookImageItems={getVisibleBookImageItems}
+          toggleDeleteImage={toggleDeleteImage}
+          getPromotionForBook={getPromotionForBook}
+          getPromotionStatusLabel={getPromotionStatusLabel}
+          formatFileSize={formatFileSize}
+        />
       )}
 
       {promotionModalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">
-                  {promotionModalMode === 'edit' ? 'Sửa chương trình khuyến mãi' : 'Tạo chương trình khuyến mãi'}
-                </h3>
-                <p className="text-sm text-gray-500">Chọn sách để áp dụng giá khuyến mãi tự động.</p>
-              </div>
-              <button
-                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                onClick={() => setPromotionModalMode(null)}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-6 p-6">
-              {promotionFormError && (
-                <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{promotionFormError}</span>
-                </div>
-              )}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Tên chương trình</label>
-                  <input
-                    value={promotionForm.name}
-                    onChange={(event) => handlePromotionFormInput('name', event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    placeholder="Ví dụ: Sale hè 2026"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Phần trăm giảm</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={promotionForm.discountPercent}
-                    onChange={(event) => handlePromotionFormInput('discountPercent', event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Ngày bắt đầu</label>
-                  <input
-                    type="date"
-                    value={promotionForm.startsAt || ''}
-                    onChange={(event) => handlePromotionFormInput('startsAt', event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Ngày kết thúc</label>
-                  <input
-                    type="date"
-                    value={promotionForm.endsAt || ''}
-                    onChange={(event) => handlePromotionFormInput('endsAt', event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Trạng thái</label>
-                  <select
-                    value={promotionForm.status}
-                    onChange={(event) => handlePromotionFormInput('status', event.target.value as AdminPromotionPayload['status'])}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  >
-                    <option value="ACTIVE">Đang áp dụng</option>
-                    <option value="INACTIVE">Tạm tắt</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Số sách đã chọn</label>
-                  <div className="rounded-lg border border-orange-100 bg-orange-50 px-4 py-3 font-semibold text-orange-700">
-                    {promotionForm.bookIds.length} / {promotionBooks.length} sách
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">Mô tả</label>
-                <textarea
-                  rows={3}
-                  value={promotionForm.description || ''}
-                  onChange={(event) => handlePromotionFormInput('description', event.target.value)}
-                  className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Ghi chú ngắn về chương trình"
-                />
-              </div>
-
-              <div className="rounded-xl border border-gray-200 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Ảnh banner slider {promotionModalMode === 'create' && <span className="text-red-500">*</span>}
-                  </label>
-                  {(promotionBannerPreview || promotionForm.bannerImageUrl) && (
-                    <button
-                      type="button"
-                      onClick={clearPromotionBanner}
-                      className="text-xs font-medium text-orange-600 hover:text-orange-700"
-                    >
-                      Bỏ chọn ảnh
-                    </button>
-                  )}
-                </div>
-                <input
-                  ref={promotionBannerInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(event) => {
-                    const isValid = handlePromotionBannerChange(event.target.files);
-                    if (!isValid) event.currentTarget.value = '';
-                  }}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-                <p className="mt-2 text-xs text-gray-500">Hỗ trợ jpg, png, webp. Tối đa 2MB. Ảnh này sẽ hiển thị trên slider trang chủ khi chương trình đang áp dụng.</p>
-                {(promotionBannerPreview || promotionForm.bannerImageUrl) && (
-                  <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
-                    <img
-                      src={promotionBannerPreview || promotionForm.bannerImageUrl || ''}
-                      alt="Ảnh banner khuyến mãi"
-                      className="h-48 w-full object-cover"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-xl border border-gray-200">
-                <div className="border-b border-gray-100 px-4 py-3">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <h4 className="font-semibold text-gray-900">Sách áp dụng</h4>
-                    <span className="text-sm text-gray-500">
-                      Đang hiện {filteredPromotionModalBooks.length} / {promotionBooks.length} sách
-                    </span>
-                  </div>
-                  <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1.3fr_0.9fr_0.9fr_auto]">
-                    <input
-                      value={promotionBookSearch}
-                      onChange={(event) => setPromotionBookSearch(event.target.value)}
-                      placeholder="Tìm theo tên sách, tác giả, ISBN..."
-                      className="rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                    <select
-                      value={promotionCategoryFilter}
-                      onChange={(event) => setPromotionCategoryFilter(event.target.value)}
-                      className="rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    >
-                      <option value="all">Tất cả danh mục</option>
-                      {activeCategories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={promotionStockFilter}
-                      onChange={(event) => setPromotionStockFilter(event.target.value as PromotionBookStockFilter)}
-                      className="rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    >
-                      <option value="all">Tất cả tồn kho</option>
-                      <option value="in_stock">Còn hàng</option>
-                      <option value="low_stock">Sắp hết hàng</option>
-                      <option value="out_of_stock">Hết hàng</option>
-                    </select>
-                    <label className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={showSelectedPromotionBooksOnly}
-                        onChange={(event) => setShowSelectedPromotionBooksOnly(event.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                      />
-                      Đã chọn
-                    </label>
-                  </div>
-                </div>
-                <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto p-4 md:grid-cols-2">
-                  {filteredPromotionModalBooks.map((book) => {
-                    const checked = promotionForm.bookIds.includes(book.id);
-                    return (
-                      <label key={book.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${checked ? 'border-orange-300 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => togglePromotionBook(book.id)}
-                          className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                        />
-                        <img src={getBookImage(book)} alt={book.title} className="h-14 w-10 rounded object-cover ring-1 ring-gray-200" />
-                        <div className="min-w-0">
-                          <p className="line-clamp-1 text-sm font-semibold text-gray-900">{book.title}</p>
-                          <p className="text-xs text-gray-500">{book.author}</p>
-                          <p className="text-xs text-gray-400">{formatCurrency(book.price)}</p>
-                        </div>
-                      </label>
-                    );
-                  })}
-                  {filteredPromotionModalBooks.length === 0 && (
-                    <div className="col-span-full rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-                      Không có sách phù hợp với bộ lọc.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
-              <button
-                className="rounded-lg border border-gray-300 px-6 py-3 text-gray-700 transition-colors hover:bg-gray-100"
-                onClick={() => setPromotionModalMode(null)}
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleSavePromotionProgram}
-                disabled={savingPromotion}
-                className="flex items-center gap-2 rounded-lg bg-orange-500 px-6 py-3 text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
-              >
-                <CheckCircle2 className="h-5 w-5" />
-                {savingPromotion ? 'Đang lưu...' : 'Lưu chương trình'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <PromotionModal
+          promotionModalMode={promotionModalMode}
+          promotionForm={promotionForm}
+          promotionFormError={promotionFormError}
+          promotionBannerPreview={promotionBannerPreview}
+          promotionBannerInputRef={promotionBannerInputRef}
+          promotionBooks={promotionBooks}
+          filteredPromotionModalBooks={filteredPromotionModalBooks}
+          activeCategories={activeCategories}
+          promotionBookSearch={promotionBookSearch}
+          setPromotionBookSearch={setPromotionBookSearch}
+          promotionCategoryFilter={promotionCategoryFilter}
+          setPromotionCategoryFilter={setPromotionCategoryFilter}
+          promotionStockFilter={promotionStockFilter}
+          setPromotionStockFilter={setPromotionStockFilter}
+          showSelectedPromotionBooksOnly={showSelectedPromotionBooksOnly}
+          setShowSelectedPromotionBooksOnly={setShowSelectedPromotionBooksOnly}
+          savingPromotion={savingPromotion}
+          closePromotionModal={() => setPromotionModalMode(null)}
+          handlePromotionFormInput={handlePromotionFormInput}
+          handlePromotionBannerChange={handlePromotionBannerChange}
+          clearPromotionBanner={clearPromotionBanner}
+          togglePromotionBook={togglePromotionBook}
+          handleSavePromotionProgram={handleSavePromotionProgram}
+        />
       )}
 
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-gray-800">
-                Chi tiết đơn {selectedOrder.orderCode || selectedOrder.id.slice(0, 8)}
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handlePrintOrder(selectedOrder)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                >
-                  <Printer className="h-4 w-4" />
-                  In phiếu
-                </button>
-                <button
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  onClick={closeOrderDetail}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <InfoBlock
-                  title="Thông tin đơn hàng"
-                  rows={[
-                    ['Mã đơn', selectedOrder.orderCode || selectedOrder.id],
-                    ['Ngày đặt', formatDate(selectedOrder.createdAt)],
-                    ['Trạng thái', getOrderStatusText(selectedOrder.status)],
-                  ]}
-                />
-                <InfoBlock
-                  title="Thông tin khách hàng"
-                  rows={[
-                    ['Họ tên', selectedOrder.user?.fullName || selectedOrder.user?.userName || 'Khách hàng'],
-                    ['Email', selectedOrder.user?.email || 'Đang cập nhật'],
-                    ['Số điện thoại', selectedOrder.address?.phone || 'Đang cập nhật'],
-                  ]}
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-4">
-                <button
-                  type="button"
-                  onClick={() => handleCopyText(selectedOrder.address?.phone || selectedOrder.customerPhone, 'SĐT')}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                >
-                  <Copy className="h-4 w-4" />
-                  Copy SĐT
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCopyText(getOrderShippingAddress(selectedOrder), 'địa chỉ')}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                >
-                  <Copy className="h-4 w-4" />
-                  Copy địa chỉ
-                </button>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Địa chỉ giao hàng</h4>
-                <p className="text-gray-800">
-                  {[
-                    selectedOrder.address?.addressLine,
-                    selectedOrder.address?.wardName || selectedOrder.address?.ward,
-                    selectedOrder.address?.districtName || selectedOrder.address?.district,
-                    selectedOrder.address?.provinceName || selectedOrder.address?.city,
-                    selectedOrder.address?.country,
-                  ]
-                    .filter(Boolean)
-                    .join(', ') || 'Đang cập nhật'}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <InfoBlock
-                  title="Thanh toán"
-                  rows={[
-                    ['Phương thức', getPaymentMethodText(selectedOrder.payments?.[0]?.method)],
-                    ['Trạng thái', getPaymentStatusText(selectedOrder.payments?.[0]?.status)],
-                    ['Số tiền', formatCurrency(selectedOrder.payments?.[0]?.amount || selectedOrder.totalAmount)],
-                  ]}
-                />
-                <InfoBlock
-                  title="Xử lý đơn"
-                  rows={[
-                    ['Cập nhật lần cuối', formatDate(selectedOrder.updatedAt)],
-                    ['Bước tiếp theo', getNextStatuses(selectedOrder.status).map(getOrderStatusText).join(', ') || 'Không còn thao tác'],
-                  ]}
-                />
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-3">Sản phẩm</h4>
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                  <table className="w-full min-w-[640px]">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <TableHead>Tên sách</TableHead>
-                        <TableHead align="right">Tồn kho</TableHead>
-                        <TableHead align="right">Số lượng</TableHead>
-                        <TableHead align="right">Đơn giá</TableHead>
-                        <TableHead align="right">Thành tiền</TableHead>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {(selectedOrder.items || []).map((item) => (
-                        <tr key={item.id}>
-                          <TableCell>{item.book?.title || 'Sách'}</TableCell>
-                          <TableCell align="right">
-                            <span className={item.book?.stock !== undefined && Number(item.book.stock) < Number(item.quantity || 0) ? 'font-semibold text-red-600' : 'text-gray-700'}>
-                              {item.book?.stock ?? 'N/A'}
-                            </span>
-                          </TableCell>
-                          <TableCell align="right">{item.quantity}</TableCell>
-                          <TableCell align="right">{formatCurrency(item.price)}</TableCell>
-                          <TableCell align="right">{formatCurrency(item.subTotal)}</TableCell>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {(selectedOrder.items || []).some((item) => item.book?.stock !== undefined && Number(item.book.stock) < Number(item.quantity || 0)) && (
-                  <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                    Có sản phẩm không đủ tồn kho so với số lượng khách đặt.
-                  </div>
-                )}
-              </div>
-
-              {selectedOrder.status === 'PROCESSING' && (
-                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                  <h4 className="mb-3 flex items-center gap-2 font-medium text-gray-800">
-                    <ClipboardCheck className="h-5 w-5 text-orange-500" />
-                    Checklist đóng gói
-                  </h4>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {['Đã kiểm tra đúng sách', 'Đã kiểm tra số lượng', 'Đã đóng gói', 'Đã in phiếu'].map((label) => (
-                      <label key={label} className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500" />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="border-t border-gray-200 pt-4 flex items-center justify-between">
-                <span className="text-lg font-medium text-gray-600">Tổng cộng</span>
-                <span className="text-2xl font-bold text-orange-500">{formatCurrency(selectedOrder.totalAmount)}</span>
-              </div>
-
-              {getOrderActions(selectedOrder, 'modal').some((action) => action.group === 'operation') && (
-                <div className="rounded-xl border border-orange-100 bg-orange-50 p-4">
-                  <div className="mb-3">
-                    <h4 className="font-semibold text-gray-900">Xử lý vận hành</h4>
-                    <p className="mt-1 text-sm text-gray-600">
-                      Trạng thái hiện tại: {getOrderStatusText(selectedOrder.status)}. Bước tiếp theo:{' '}
-                      {getNextStatuses(selectedOrder.status)
-                        .filter((status) => status !== 'CANCELLED')
-                        .map(getOrderStatusText)
-                        .join(', ') || 'Không còn thao tác'}
-                    </p>
-                  </div>
-                  <label className="mb-3 block">
-                    <span className="mb-1 block text-sm font-medium text-gray-600">Ghi chú nội bộ</span>
-                    <textarea
-                      value={orderInternalNote}
-                      onChange={(event) => setOrderInternalNote(event.target.value)}
-                      rows={3}
-                      maxLength={500}
-                      placeholder="Ví dụ: Đã gọi xác nhận, khách hẹn giao buổi chiều..."
-                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {getOrderActions(selectedOrder, 'modal')
-                      .filter((action) => action.group === 'operation')
-                      .map((action) => renderOrderActionButton(selectedOrder, action))}
-                  </div>
-                </div>
-              )}
-
-              {getOrderActions(selectedOrder, 'modal').some((action) => action.group === 'cancel') && (
-                <div className="rounded-xl border border-red-100 bg-red-50 p-4">
-                  <div className="mb-3">
-                    <h4 className="font-semibold text-red-900">Xử lý hủy</h4>
-                    <p className="mt-1 text-sm leading-6 text-red-700">
-                      {hasPendingCustomerCancelRequest(selectedOrder)
-                        ? getLatestCancelNote(selectedOrder) || 'Khách đã gửi yêu cầu hủy đơn hàng này.'
-                        : 'Admin có thể hủy thủ công đơn chưa chuyển sang giao hàng.'}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {getOrderActions(selectedOrder, 'modal')
-                      .filter((action) => action.group === 'cancel')
-                      .map((action) => renderOrderActionButton(selectedOrder, action))}
-                  </div>
-                </div>
-              )}
-
-              {selectedOrder.status === 'CANCELLED' && getLatestCancelNote(selectedOrder) && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-                    <div>
-                      <h4 className="font-semibold text-red-800">Lý do hủy đơn</h4>
-                      <p className="mt-1 text-sm leading-6 text-red-700">{getLatestCancelNote(selectedOrder)}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {(selectedOrder.statusLogs || []).length > 0 && (
-                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                  <h4 className="font-medium text-gray-800 mb-4">Lịch sử xử lý</h4>
-                  <div className="space-y-3">
-                    {[...(selectedOrder.statusLogs || [])]
-                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                      .map((log) => (
-                        <div key={log.id} className="rounded-lg bg-gray-50 p-3">
-                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="text-sm font-semibold text-gray-800">
-                              {getOrderStatusText(log.fromStatus)} → {getOrderStatusText(log.toStatus)}
-                            </div>
-                            <div className="text-xs text-gray-500">{formatDate(log.createdAt)}</div>
-                          </div>
-                          <div className="mt-1 text-xs text-gray-500">
-                            Người cập nhật:{' '}
-                            {log.changedByUser?.fullName || log.changedByUser?.userName || log.changedByUser?.email || 'Khách hàng / hệ thống'}
-                          </div>
-                          {log.note && <p className="mt-2 text-sm leading-6 text-gray-700">{log.note}</p>}
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </div>
-        </div>
+        <OrderDetailModal
+          selectedOrder={selectedOrder}
+          orderInternalNote={orderInternalNote}
+          setOrderInternalNote={setOrderInternalNote}
+          closeOrderDetail={closeOrderDetail}
+          handlePrintOrder={handlePrintOrder}
+          handleCopyText={handleCopyText}
+          getOrderActions={getOrderActions}
+          renderOrderActionButton={renderOrderActionButton}
+        />
       )}
     </div>
   );
 }
-

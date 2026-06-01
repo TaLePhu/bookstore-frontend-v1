@@ -29,6 +29,7 @@ export type OrderAction =
   | { key: 'view'; label: string; group: 'view'; variant: 'icon' };
 export type PopupMessage = { type: 'success' | 'error'; text: string } | null;
 export type BookImagePreview = { name: string; url: string; size: number };
+export type BookModalMode = 'create' | 'edit' | 'detail' | null;
 export type PromotionModalMode = 'create' | 'edit' | null;
 export type ConfirmDialog = {
   title: string;
