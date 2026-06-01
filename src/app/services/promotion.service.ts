@@ -39,6 +39,7 @@ export interface PromotionBanner {
   image: string;
   startsAt?: string | null;
   endsAt?: string | null;
+  createdAt?: string | null;
 }
 
 export interface PromotionProgram {

@@ -13,6 +13,12 @@ type HeroSlide = {
   to: string;
 };
 
+const getPromotionTime = (banner: PromotionBanner) => {
+  const dateValue = banner.createdAt || banner.startsAt || banner.endsAt;
+  const time = dateValue ? new Date(dateValue).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+};
+
 const isPromotionActive = (banner: PromotionBanner) => {
   const now = Date.now();
   const startsAt = banner.startsAt ? new Date(banner.startsAt).getTime() : null;
@@ -55,6 +61,8 @@ export function HeroCarousel() {
 
     const promotionSlides = promotionBanners
       .filter((banner) => banner.image && isPromotionActive(banner))
+      .sort((left, right) => getPromotionTime(right) - getPromotionTime(left))
+      .slice(0, 4)
       .map((banner) => ({
         id: banner.id,
         image: banner.image,
