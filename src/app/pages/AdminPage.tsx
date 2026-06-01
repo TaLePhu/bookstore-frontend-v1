@@ -913,7 +913,23 @@ export function AdminPage() {
 
   const isBookDeleted = (book: ApiBook) => Boolean(book.deletedAt || book.status === 'deleted');
   const isCategoryDeleted = (category: AdminCategory) => Boolean(category.deletedAt);
-  const activeCategories = categories.filter((category) => !isCategoryDeleted(category));
+  const bookDerivedCategories = Array.from(
+    books.reduce((map, book) => {
+      const categoryId = book.categoryId || book.category?.id;
+      const categoryName = book.category?.name;
+      if (categoryId && categoryName && !map.has(categoryId)) {
+        map.set(categoryId, {
+          id: categoryId,
+          name: categoryName,
+          description: book.category?.description || null,
+        });
+      }
+      return map;
+    }, new Map<string, AdminCategory>())
+  )
+    .map(([, category]) => category)
+    .sort((left, right) => left.name.localeCompare(right.name, 'vi'));
+  const activeCategories = categories.length > 0 ? categories.filter((category) => !isCategoryDeleted(category)) : bookDerivedCategories;
   const outOfStockBooks = books.filter((book) => !isBookDeleted(book) && Number(book.stock || 0) <= 0);
   const lowStockBooks = books.filter((book) => {
     const stock = Number(book.stock || 0);
