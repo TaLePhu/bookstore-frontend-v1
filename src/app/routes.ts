@@ -13,6 +13,7 @@ import { PromotionsPage } from './pages/PromotionsPage';
 import { PromotionBooksPage } from './pages/PromotionBooksPage';
 import { NewBooksPage } from './pages/NewBooksPage';
 import { AIAdvisorPage } from './pages/AIAdvisorPage';
+import { SearchResultsPage } from './pages/SearchResultsPage';
 import { AdminPage } from './pages/AdminPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
       { path: 'track-order', Component: TrackOrderPage },
       { path: 'bestsellers', Component: BestSellersPage },
       { path: 'new-books', Component: NewBooksPage },
+      { path: 'search', Component: SearchResultsPage },
       { path: 'ai-advisor', Component: AIAdvisorPage },
       { path: 'category/:category', Component: CategoryPage },
       { path: 'promotions', Component: PromotionsPage },

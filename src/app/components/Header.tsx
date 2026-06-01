@@ -26,20 +26,29 @@ export function Header() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchMessage, setSearchMessage] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [isSearchFallback, setIsSearchFallback] = useState(false);
   const role = user?.role?.toUpperCase();
   const canManage = role === 'ADMIN' || role === 'STAFF';
 
   useEffect(() => {
+    const trimmedQuery = searchQuery.trim();
+    const controller = new AbortController();
+
     const timer = setTimeout(async () => {
-      if (!searchQuery.trim()) {
+      if (trimmedQuery.length < 2) {
         setSearchResults([]);
         setSearchMessage('');
+        setIsSearchFallback(false);
+        setIsSearchLoading(false);
         return;
       }
 
       try {
-        const result = await smartSearchBooks(searchQuery, 1, 5);
+        setIsSearchLoading(true);
+        const result = await smartSearchBooks(trimmedQuery, 1, 5, controller.signal);
         setSearchMessage(result.message);
+        setIsSearchFallback(result.isFallback);
         setSearchResults(
           result.data.map((book) => ({
             id: book.id,
@@ -49,14 +58,31 @@ export function Header() {
           }))
         );
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error('Header search error:', error);
         setSearchResults([]);
-        setSearchMessage('He thong dang gap truc trac nho, ban thu lai sau it phut nhe.');
+        setSearchMessage('Hệ thống đang gặp trục trặc nhỏ, bạn thử lại sau ít phút nhé.');
+        setIsSearchFallback(false);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsSearchLoading(false);
+        }
       }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
   }, [searchQuery]);
+
+  const submitSearch = () => {
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery.length < 2) return;
+
+    navigate(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+    setShowSearchResults(false);
+  };
 
   const handleAccountClick = () => {
     if (isAuthenticated) {
@@ -91,7 +117,13 @@ export function Header() {
           </button>
 
           <div className="order-3 w-full basis-full lg:order-none lg:basis-auto lg:flex-1 lg:max-w-2xl">
-            <div className="relative">
+            <form
+              className="relative"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitSearch();
+              }}
+            >
               <input
                 type="text"
                 value={searchQuery}
@@ -100,32 +132,33 @@ export function Header() {
                   setShowSearchResults(true);
                 }}
                 onFocus={() => setShowSearchResults(true)}
-                placeholder="Tìm sách, tác giả, thể loại..."
+                placeholder="Tìm sách, tác giả, thể loại hoặc nhu cầu đọc..."
                 className="w-full rounded-xl border border-blue-200 px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 sm:text-base"
               />
               <button
-                onClick={() => {
-                  if (searchResults[0]) {
-                    navigate(`/book/${searchResults[0].id}`);
-                    setShowSearchResults(false);
-                    setSearchQuery('');
-                  }
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-900"
+                type="submit"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
+                aria-label="Tìm kiếm"
               >
                 <Search className="w-5 h-5" />
               </button>
 
-              {showSearchResults && searchQuery.trim() && (
+              {showSearchResults && searchQuery.trim().length >= 2 && (
                 <div className="absolute z-50 mt-2 w-full rounded-xl border bg-white shadow-lg">
                   {searchMessage && (
-                    <div className="border-b border-gray-100 px-4 py-3 text-sm text-blue-700">{searchMessage}</div>
+                    <div className="border-b border-gray-100 px-4 py-3 text-sm text-blue-700">
+                      {searchMessage}
+                      {isSearchFallback && <div className="mt-1 text-xs text-gray-500">Đây là gợi ý tham khảo, không phải kết quả khớp chính xác.</div>}
+                    </div>
                   )}
-                  {searchResults.length > 0 ? (
+                  {isSearchLoading ? (
+                    <div className="p-4 text-sm text-gray-500">Đang tìm sách phù hợp...</div>
+                  ) : searchResults.length > 0 ? (
                     <div className="max-h-80 overflow-y-auto p-2">
                       {searchResults.map((result) => (
                         <button
                           key={result.id}
+                          type="button"
                           onClick={() => {
                             navigate(`/book/${result.id}`);
                             setShowSearchResults(false);
@@ -140,15 +173,21 @@ export function Header() {
                           </div>
                         </button>
                       ))}
+                      <button
+                        type="button"
+                        onClick={submitSearch}
+                        className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-orange-600 hover:bg-orange-50"
+                      >
+                        Xem tất cả kết quả cho "{searchQuery.trim()}"
+                      </button>
                     </div>
                   ) : (
-                    <div className="p-4 text-sm text-gray-500">Không tìm thấy kết quả phù hợp.</div>
+                    <div className="p-4 text-sm text-gray-500">Chưa tìm thấy kết quả phù hợp.</div>
                   )}
                 </div>
               )}
-            </div>
+            </form>
           </div>
-
           <div className={`grid w-auto shrink-0 ${canManage ? 'grid-cols-4' : 'grid-cols-3'} gap-1 rounded-2xl border border-blue-100 bg-white p-1.5 shadow-sm sm:gap-2 sm:p-2 lg:flex lg:w-auto lg:flex-nowrap lg:items-center lg:justify-end lg:gap-3 lg:px-3 lg:py-2`}>
             {canManage && (
               <button
