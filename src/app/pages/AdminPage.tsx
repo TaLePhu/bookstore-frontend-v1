@@ -6,6 +6,8 @@ import {
   BarChart3,
   BookOpen,
   CheckCircle2,
+  ClipboardCheck,
+  Copy,
   DollarSign,
   Edit,
   Eye,
@@ -80,6 +82,8 @@ import {
   type AdminDashboardResponse,
   type AdminOrder,
   type AdminOrderDetail,
+  type AdminPaymentMethod,
+  type AdminPaymentStatus,
   type AdminOrderStatus,
   type AdminPromotion,
   type AdminPromotionPayload,
@@ -102,6 +106,7 @@ type CategoryBookFilter = 'all' | 'with_books' | 'empty';
 type UserRoleFilter = 'all' | 'CUSTOMER' | 'STAFF' | 'ADMIN' | 'GUEST';
 type UserLockFilter = 'all' | 'active' | 'locked';
 type UserVerifiedFilter = 'all' | 'verified' | 'unverified';
+type OrderWorkflowTab = 'all' | 'pending' | 'processing' | 'shipped' | 'cancel_requests';
 type PopupMessage = { type: 'success' | 'error'; text: string } | null;
 type BookImagePreview = { name: string; url: string; size: number };
 type PromotionModalMode = 'create' | 'edit' | null;
@@ -123,6 +128,8 @@ const MAX_BOOK_IMAGES = 5;
 const MAX_BOOK_IMAGE_SIZE = 2 * 1024 * 1024;
 const ACCEPTED_BOOK_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ORDER_STATUS_OPTIONS: AdminOrderStatus[] = ['PENDING', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
+const ORDER_PAYMENT_METHOD_OPTIONS: AdminPaymentMethod[] = ['COD', 'MOMO'];
+const ORDER_PAYMENT_STATUS_OPTIONS: AdminPaymentStatus[] = ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'];
 const ADMIN_BOOKS_PAGE_SIZE = 10;
 const ADMIN_ORDERS_PAGE_SIZE = 10;
 const EMPTY_ORDER_STATUS_TOTALS: Record<AdminOrderStatus, number> = {
@@ -416,6 +423,11 @@ export function AdminPage() {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | AdminOrderStatus>('all');
+  const [orderWorkflowTab, setOrderWorkflowTab] = useState<OrderWorkflowTab>('all');
+  const [orderPaymentMethodFilter, setOrderPaymentMethodFilter] = useState<'all' | AdminPaymentMethod>('all');
+  const [orderPaymentStatusFilter, setOrderPaymentStatusFilter] = useState<'all' | AdminPaymentStatus>('all');
+  const [orderDateFrom, setOrderDateFrom] = useState('');
+  const [orderDateTo, setOrderDateTo] = useState('');
   const [showCancelRequestsOnly, setShowCancelRequestsOnly] = useState(false);
   const [bookVisibilityFilter, setBookVisibilityFilter] = useState<BookVisibilityFilter>('active');
   const [bookStockFilter, setBookStockFilter] = useState<BookStockFilter>('all');
@@ -524,17 +536,27 @@ export function AdminPage() {
     }
   }, [currentView, visibleMenuItems]);
 
+  const orderSearchQuery = currentView === 'orders' ? searchQuery.trim() : '';
+
   const loadData = async () => {
     setIsLoading(true);
     setError('');
     try {
+      const orderRequestParams = {
+        page: orderCurrentPage,
+        limit: ADMIN_ORDERS_PAGE_SIZE,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        q: orderSearchQuery || undefined,
+        cancelRequested: showCancelRequestsOnly || undefined,
+        paymentMethod: orderPaymentMethodFilter === 'all' ? undefined : orderPaymentMethodFilter,
+        paymentStatus: orderPaymentStatusFilter === 'all' ? undefined : orderPaymentStatusFilter,
+        dateFrom: orderDateFrom || undefined,
+        dateTo: orderDateTo || undefined,
+      };
+
       if (!isAdmin) {
         const [ordersData, booksData, promotionsData, orderStatusResults] = await Promise.all([
-          getAdminOrders({
-            page: orderCurrentPage,
-            limit: ADMIN_ORDERS_PAGE_SIZE,
-            status: statusFilter === 'all' ? undefined : statusFilter,
-          }),
+          getAdminOrders(orderRequestParams),
           getManagementBooks({ limit: 50 }),
           getPromotions(),
           Promise.all(ORDER_STATUS_OPTIONS.map((status) => getAdminOrders({ limit: 1, status }))),
@@ -575,11 +597,7 @@ export function AdminPage() {
         }),
         getAdminPromotions(),
         getAdminCategories({ includeDeleted: true }),
-        getAdminOrders({
-          page: orderCurrentPage,
-          limit: ADMIN_ORDERS_PAGE_SIZE,
-          status: statusFilter === 'all' ? undefined : statusFilter,
-        }),
+        getAdminOrders(orderRequestParams),
         getAdminCustomers({
           limit: 50,
           role: userRoleFilter === 'all' ? undefined : userRoleFilter,
@@ -617,7 +635,22 @@ export function AdminPage() {
 
   useEffect(() => {
     loadData();
-  }, [isAdmin, statusFilter, orderCurrentPage, bookVisibilityFilter, userRoleFilter, userLockFilter, userVerifiedFilter]);
+  }, [
+    isAdmin,
+    currentView,
+    orderSearchQuery,
+    statusFilter,
+    showCancelRequestsOnly,
+    orderCurrentPage,
+    orderPaymentMethodFilter,
+    orderPaymentStatusFilter,
+    orderDateFrom,
+    orderDateTo,
+    bookVisibilityFilter,
+    userRoleFilter,
+    userLockFilter,
+    userVerifiedFilter,
+  ]);
 
   useEffect(() => {
     setPromotionDrafts((prev) => {
@@ -757,7 +790,15 @@ export function AdminPage() {
     if (currentView === 'orders') {
       setOrderCurrentPage(1);
     }
-  }, [currentView, searchQuery, showCancelRequestsOnly]);
+  }, [
+    currentView,
+    searchQuery,
+    showCancelRequestsOnly,
+    orderPaymentMethodFilter,
+    orderPaymentStatusFilter,
+    orderDateFrom,
+    orderDateTo,
+  ]);
 
   const filteredCustomers = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -819,12 +860,29 @@ export function AdminPage() {
     return !isBookDeleted(book) && stock > 0 && stock <= LOW_STOCK_THRESHOLD;
   });
   const cancelRequestOrders = orders.filter((order) => hasPendingCustomerCancelRequest(order));
+  const cancelRequestCount = showCancelRequestsOnly ? orderTotal : cancelRequestOrders.length;
   const orderStatusSummary = ORDER_STATUS_OPTIONS.map((status) => ({
     status,
     label: getOrderStatusText(status),
     count: orderStatusTotals[status] || 0,
     className: getOrderStatusColor(status),
   }));
+  const orderWorkflowTabs: Array<{
+    id: OrderWorkflowTab;
+    label: string;
+    count: number;
+    status?: AdminOrderStatus;
+  }> = [
+    {
+      id: 'all',
+      label: 'Tất cả',
+      count: ORDER_STATUS_OPTIONS.reduce((sum, status) => sum + (orderStatusTotals[status] || 0), 0),
+    },
+    { id: 'pending', label: 'Chờ xác nhận', count: orderStatusTotals.PENDING || 0, status: 'PENDING' },
+    { id: 'processing', label: 'Đang chuẩn bị', count: orderStatusTotals.PROCESSING || 0, status: 'PROCESSING' },
+    { id: 'shipped', label: 'Đang giao', count: orderStatusTotals.SHIPPED || 0, status: 'SHIPPED' },
+    { id: 'cancel_requests', label: 'Yêu cầu hủy', count: cancelRequestCount },
+  ];
   const activeUsers = customers.filter((customer) => !customer.isLocked);
   const lockedUsers = customers.filter((customer) => customer.isLocked);
   const verifiedUsers = customers.filter((customer) => customer.isVerified);
@@ -842,6 +900,15 @@ export function AdminPage() {
   const goToOrders = (status?: AdminOrderStatus) => {
     setStatusFilter(status || 'all');
     setOrderCurrentPage(1);
+    setOrderWorkflowTab(
+      status === 'PENDING'
+        ? 'pending'
+        : status === 'PROCESSING'
+          ? 'processing'
+          : status === 'SHIPPED'
+            ? 'shipped'
+            : 'all'
+    );
     setShowCancelRequestsOnly(false);
     setSearchQuery('');
     setCurrentView('orders');
@@ -850,9 +917,27 @@ export function AdminPage() {
   const goToCancelRequests = () => {
     setStatusFilter('all');
     setOrderCurrentPage(1);
+    setOrderWorkflowTab('cancel_requests');
     setShowCancelRequestsOnly(true);
     setSearchQuery('');
     setCurrentView('orders');
+  };
+
+  const goToOrderWorkflowTab = (tab: OrderWorkflowTab) => {
+    const nextStatus = orderWorkflowTabs.find((item) => item.id === tab)?.status;
+    setOrderWorkflowTab(tab);
+    setStatusFilter(nextStatus || 'all');
+    setShowCancelRequestsOnly(tab === 'cancel_requests');
+    setOrderCurrentPage(1);
+  };
+
+  const clearOrderFilters = () => {
+    setSearchQuery('');
+    setOrderPaymentMethodFilter('all');
+    setOrderPaymentStatusFilter('all');
+    setOrderDateFrom('');
+    setOrderDateTo('');
+    setOrderCurrentPage(1);
   };
 
   const goToStockAlerts = (filter: BookStockFilter = 'all') => {
@@ -948,12 +1033,6 @@ export function AdminPage() {
     promotionStockFilter,
     showSelectedPromotionBooksOnly,
   ]);
-
-  useEffect(() => {
-    if (showCancelRequestsOnly && cancelRequestOrders.length === 0) {
-      setShowCancelRequestsOnly(false);
-    }
-  }, [cancelRequestOrders.length, showCancelRequestsOnly]);
 
   const showPopup = (message: Exclude<PopupMessage, null>) => {
     setPopupMessage(message);
@@ -1060,6 +1139,56 @@ export function AdminPage() {
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
+  };
+
+  const handlePrintOrderFromList = async (order: AdminOrder) => {
+    try {
+      const detail = await getAdminOrderDetail(order.id);
+      handlePrintOrder(detail);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Không thể tải chi tiết đơn hàng để in phiếu');
+    }
+  };
+
+  const handleCopyText = async (value?: string | null, label = 'Nội dung') => {
+    const text = value?.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showPopup({ type: 'success', text: `Đã copy ${label}.` });
+    } catch {
+      showPopup({ type: 'error', text: `Không thể copy ${label}.` });
+    }
+  };
+
+  const confirmOrderStatusUpdate = (order: AdminOrder, status: AdminOrderStatus) => {
+    const orderCode = order.orderCode || order.id.slice(0, 8);
+    const messages: Record<AdminOrderStatus, string> = {
+      PENDING: '',
+      PROCESSING: `Xác nhận đơn ${orderCode} và chuyển sang đang chuẩn bị?`,
+      SHIPPED: `Đơn ${orderCode} đã được đóng gói và sẵn sàng bàn giao vận chuyển?`,
+      COMPLETED: `Xác nhận đơn ${orderCode} đã giao thành công?`,
+      CANCELLED: `Hủy đơn ${orderCode}?`,
+    };
+
+    setConfirmDialog({
+      title: getOrderStatusText(status),
+      message: messages[status] || `Chuyển đơn ${orderCode} sang trạng thái ${getOrderStatusText(status)}?`,
+      confirmLabel: 'Xác nhận',
+      variant: status === 'CANCELLED' ? 'danger' : 'warning',
+      onConfirm: async () => {
+        const note =
+          status === 'PROCESSING'
+            ? 'Staff xác nhận đơn hàng'
+            : status === 'SHIPPED'
+              ? 'Staff đã đóng gói và bàn giao vận chuyển'
+              : status === 'COMPLETED'
+                ? 'Staff xác nhận giao hàng thành công'
+                : undefined;
+        await updateAdminOrderStatus(order.id, status, note);
+        await loadData();
+      },
+    });
   };
 
   const formatFileSize = (size: number) => `${(size / 1024 / 1024).toFixed(1)}MB`;
@@ -1850,12 +1979,8 @@ export function AdminPage() {
     );
   };
 
-  const handleUpdateStatus = async (status: AdminOrderStatus) => {
+  const executeSelectedOrderStatusUpdate = async (status: AdminOrderStatus) => {
     if (!selectedOrder) return;
-    if (status === 'CANCELLED') {
-      openCancelDecisionDialog('approve');
-      return;
-    }
 
     try {
       setUpdatingStatus(true);
@@ -1869,6 +1994,31 @@ export function AdminPage() {
     } finally {
       setUpdatingStatus(false);
     }
+  };
+
+  const handleUpdateStatus = async (status: AdminOrderStatus) => {
+    if (!selectedOrder) return;
+    if (status === 'CANCELLED') {
+      openCancelDecisionDialog('approve');
+      return;
+    }
+
+    const orderCode = selectedOrder.orderCode || selectedOrder.id.slice(0, 8);
+    const messages: Record<AdminOrderStatus, string> = {
+      PENDING: '',
+      PROCESSING: `Xác nhận đơn ${orderCode} và chuyển sang đang chuẩn bị?`,
+      SHIPPED: `Đơn ${orderCode} đã được đóng gói và bàn giao vận chuyển?`,
+      COMPLETED: `Xác nhận đơn ${orderCode} đã giao thành công?`,
+      CANCELLED: `Hủy đơn ${orderCode}?`,
+    };
+
+    setConfirmDialog({
+      title: getOrderStatusText(status),
+      message: messages[status] || `Chuyển đơn ${orderCode} sang trạng thái ${getOrderStatusText(status)}?`,
+      confirmLabel: 'Xác nhận',
+      variant: 'warning',
+      onConfirm: async () => executeSelectedOrderStatusUpdate(status),
+    });
   };
 
   const openCancelDecisionDialog = (action: 'approve' | 'reject') => {
@@ -3197,7 +3347,15 @@ export function AdminPage() {
                   <button
                     key={item.status}
                     type="button"
-                    onClick={() => setStatusFilter(item.status)}
+                    onClick={() => {
+                      if (item.status === 'PENDING') return goToOrderWorkflowTab('pending');
+                      if (item.status === 'PROCESSING') return goToOrderWorkflowTab('processing');
+                      if (item.status === 'SHIPPED') return goToOrderWorkflowTab('shipped');
+                      setOrderWorkflowTab('all');
+                      setShowCancelRequestsOnly(false);
+                      setStatusFilter(item.status);
+                      setOrderCurrentPage(1);
+                    }}
                     className={`rounded-2xl border p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
                       statusFilter === item.status ? 'border-orange-300 bg-orange-50' : 'border-gray-200 bg-white'
                     }`}
@@ -3231,7 +3389,7 @@ export function AdminPage() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => setShowCancelRequestsOnly((value) => !value)}
+                      onClick={() => (showCancelRequestsOnly ? goToOrderWorkflowTab('all') : goToOrderWorkflowTab('cancel_requests'))}
                       className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                         showCancelRequestsOnly
                           ? 'bg-yellow-700 text-white hover:bg-yellow-800'
@@ -3254,31 +3412,102 @@ export function AdminPage() {
               </div>
               )}
 
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm mã đơn, SĐT, tên khách..." />
-                <select
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value as 'all' | AdminOrderStatus)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="all">Tất cả trạng thái</option>
-                  <option value="PENDING">Chờ xử lý</option>
-                  <option value="PROCESSING">Đang xử lý</option>
-                  <option value="SHIPPED">Đang giao</option>
-                  <option value="COMPLETED">Hoàn thành</option>
-                  <option value="CANCELLED">Đã hủy</option>
-                </select>
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap gap-2">
+                  {orderWorkflowTabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => goToOrderWorkflowTab(tab.id)}
+                      className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                        orderWorkflowTab === tab.id
+                          ? 'bg-orange-500 text-white'
+                          : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {tab.label}
+                      <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
+                        orderWorkflowTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {tab.count.toLocaleString('vi-VN')}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1.4fr_0.9fr_0.9fr_0.8fr_0.8fr_auto]">
+                  <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm mã đơn, SĐT, tên khách..." />
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => {
+                      const value = event.target.value as 'all' | AdminOrderStatus;
+                      setStatusFilter(value);
+                      setOrderWorkflowTab('all');
+                      setShowCancelRequestsOnly(false);
+                    }}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="PENDING">Chờ xử lý</option>
+                    <option value="PROCESSING">Đang chuẩn bị</option>
+                    <option value="SHIPPED">Đang giao</option>
+                    <option value="COMPLETED">Hoàn thành</option>
+                    <option value="CANCELLED">Đã hủy</option>
+                  </select>
+                  <select
+                    value={orderPaymentMethodFilter}
+                    onChange={(event) => setOrderPaymentMethodFilter(event.target.value as 'all' | AdminPaymentMethod)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="all">Tất cả thanh toán</option>
+                    {ORDER_PAYMENT_METHOD_OPTIONS.map((method) => (
+                      <option key={method} value={method}>{getPaymentMethodText(method)}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={orderPaymentStatusFilter}
+                    onChange={(event) => setOrderPaymentStatusFilter(event.target.value as 'all' | AdminPaymentStatus)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="all">Tất cả trạng thái TT</option>
+                    {ORDER_PAYMENT_STATUS_OPTIONS.map((status) => (
+                      <option key={status} value={status}>{getPaymentStatusText(status)}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="date"
+                    value={orderDateFrom}
+                    onChange={(event) => setOrderDateFrom(event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={orderDateTo}
+                      onChange={(event) => setOrderDateTo(event.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearOrderFilters}
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                    >
+                      Xóa lọc
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
-                <table className="w-full min-w-[860px]">
+                <table className="w-full min-w-[1100px]">
                   <thead className="bg-gray-50">
                     <tr>
                       <TableHead>Mã đơn</TableHead>
                       <TableHead>Khách hàng</TableHead>
+                      <TableHead>Giao hàng</TableHead>
                       <TableHead>Ngày đặt</TableHead>
                       <TableHead>Sản phẩm</TableHead>
                       <TableHead>Tổng tiền</TableHead>
+                      <TableHead>Thanh toán</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       <TableHead align="right">Thao tác</TableHead>
                     </tr>
@@ -3294,9 +3523,26 @@ export function AdminPage() {
                           <p className="text-sm text-gray-500">{order.customerEmail}</p>
                           {order.customerPhone && <p className="text-sm text-gray-500">{order.customerPhone}</p>}
                         </TableCell>
+                        <TableCell>
+                          <p className="line-clamp-2 max-w-xs text-sm text-gray-600">{order.addressSummary || 'Đang cập nhật'}</p>
+                        </TableCell>
                         <TableCell>{formatDate(order.createdAt)}</TableCell>
                         <TableCell>{order.totalItems || 0}</TableCell>
                         <TableCell>{formatCurrency(order.totalAmount)}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm font-medium text-gray-800">{getPaymentMethodText(order.paymentMethod || undefined)}</span>
+                            <span className={`w-fit rounded-full px-2 py-1 text-xs ${
+                              order.paymentStatus === 'COMPLETED'
+                                ? 'bg-green-100 text-green-700'
+                                : order.paymentStatus === 'FAILED'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {getPaymentStatusText(order.paymentStatus || undefined)}
+                            </span>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <span className={`text-xs px-2 py-1 rounded-full ${getOrderStatusColor(order.status)}`}>
                             {getOrderStatusText(order.status)}
@@ -3317,6 +3563,42 @@ export function AdminPage() {
                                 Xử lý hủy
                               </button>
                             )}
+                            {order.status === 'PENDING' && (
+                              <button
+                                type="button"
+                                onClick={() => confirmOrderStatusUpdate(order, 'PROCESSING')}
+                                className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+                              >
+                                Xác nhận
+                              </button>
+                            )}
+                            {order.status === 'PROCESSING' && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handlePrintOrderFromList(order)}
+                                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                                >
+                                  In phiếu
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => confirmOrderStatusUpdate(order, 'SHIPPED')}
+                                  className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                                >
+                                  Chuyển giao
+                                </button>
+                              </>
+                            )}
+                            {order.status === 'SHIPPED' && (
+                              <button
+                                type="button"
+                                onClick={() => confirmOrderStatusUpdate(order, 'COMPLETED')}
+                                className="rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700"
+                              >
+                                Hoàn thành
+                              </button>
+                            )}
                             <button
                               onClick={() => openOrderDetail(order)}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -3334,7 +3616,7 @@ export function AdminPage() {
                 {orderTotal > 0 && (
                   <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
                     <p className="text-sm text-gray-500">
-                      {searchQuery.trim() || showCancelRequestsOnly
+                      {showCancelRequestsOnly
                         ? `Trang ${orderCurrentPage}/${totalOrderPages} • Hiển thị ${filteredOrders.length} đơn phù hợp trong trang hiện tại`
                         : `Trang ${orderCurrentPage}/${totalOrderPages} • Hiển thị ${orders.length} / ${orderTotal} đơn`}
                     </p>
@@ -4284,6 +4566,25 @@ export function AdminPage() {
                 />
               </div>
 
+              <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-4">
+                <button
+                  type="button"
+                  onClick={() => handleCopyText(selectedOrder.address?.phone || selectedOrder.customerPhone, 'SĐT')}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copy SĐT
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCopyText(getOrderShippingAddress(selectedOrder), 'địa chỉ')}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copy địa chỉ
+                </button>
+              </div>
+
               {hasPendingCustomerCancelRequest(selectedOrder) && (
                 <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
                   <div className="flex items-start gap-3">
@@ -4388,6 +4689,7 @@ export function AdminPage() {
                     <thead className="bg-gray-50">
                       <tr>
                         <TableHead>Tên sách</TableHead>
+                        <TableHead align="right">Tồn kho</TableHead>
                         <TableHead align="right">Số lượng</TableHead>
                         <TableHead align="right">Đơn giá</TableHead>
                         <TableHead align="right">Thành tiền</TableHead>
@@ -4397,6 +4699,11 @@ export function AdminPage() {
                       {(selectedOrder.items || []).map((item) => (
                         <tr key={item.id}>
                           <TableCell>{item.book?.title || 'Sách'}</TableCell>
+                          <TableCell align="right">
+                            <span className={item.book?.stock !== undefined && Number(item.book.stock) < Number(item.quantity || 0) ? 'font-semibold text-red-600' : 'text-gray-700'}>
+                              {item.book?.stock ?? 'N/A'}
+                            </span>
+                          </TableCell>
                           <TableCell align="right">{item.quantity}</TableCell>
                           <TableCell align="right">{formatCurrency(item.price)}</TableCell>
                           <TableCell align="right">{formatCurrency(item.subTotal)}</TableCell>
@@ -4405,7 +4712,29 @@ export function AdminPage() {
                     </tbody>
                   </table>
                 </div>
+                {(selectedOrder.items || []).some((item) => item.book?.stock !== undefined && Number(item.book.stock) < Number(item.quantity || 0)) && (
+                  <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                    Có sản phẩm không đủ tồn kho so với số lượng khách đặt.
+                  </div>
+                )}
               </div>
+
+              {selectedOrder.status === 'PROCESSING' && (
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <h4 className="mb-3 flex items-center gap-2 font-medium text-gray-800">
+                    <ClipboardCheck className="h-5 w-5 text-orange-500" />
+                    Checklist đóng gói
+                  </h4>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {['Đã kiểm tra đúng sách', 'Đã kiểm tra số lượng', 'Đã đóng gói', 'Đã in phiếu'].map((label) => (
+                      <label key={label} className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500" />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="border-t border-gray-200 pt-4 flex items-center justify-between">
                 <span className="text-lg font-medium text-gray-600">Tổng cộng</span>

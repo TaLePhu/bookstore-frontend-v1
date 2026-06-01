@@ -2,6 +2,8 @@ import api from './api';
 import type { ApiBook } from './book.service';
 
 export type AdminOrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED';
+export type AdminPaymentMethod = 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'WALLET' | 'MOMO' | 'COD';
+export type AdminPaymentStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
 
 export interface AdminDashboardResponse {
   stats: {
@@ -29,6 +31,9 @@ export interface AdminOrder {
   customerName?: string;
   customerEmail?: string | null;
   customerPhone?: string | null;
+  addressSummary?: string | null;
+  paymentMethod?: AdminPaymentMethod | null;
+  paymentStatus?: AdminPaymentStatus | null;
   createdAt: string;
   updatedAt?: string;
   totalItems?: number;
@@ -385,12 +390,24 @@ export const getAdminOrders = async (params?: {
   page?: number;
   limit?: number;
   status?: AdminOrderStatus;
+  q?: string;
+  cancelRequested?: boolean;
+  paymentMethod?: AdminPaymentMethod;
+  paymentStatus?: AdminPaymentStatus;
+  dateFrom?: string;
+  dateTo?: string;
 }): Promise<{ data: AdminOrder[]; total: number }> => {
   const res = await api.get('/management/orders', {
     params: {
       page: params?.page ?? 1,
       limit: params?.limit ?? 20,
       status: params?.status,
+      q: params?.q,
+      cancelRequested: params?.cancelRequested,
+      paymentMethod: params?.paymentMethod,
+      paymentStatus: params?.paymentStatus,
+      dateFrom: params?.dateFrom,
+      dateTo: params?.dateTo,
     },
   });
 
