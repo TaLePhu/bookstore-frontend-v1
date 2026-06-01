@@ -14,6 +14,7 @@ import { PromotionBooksPage } from './pages/PromotionBooksPage';
 import { NewBooksPage } from './pages/NewBooksPage';
 import { AIAdvisorPage } from './pages/AIAdvisorPage';
 import { SearchResultsPage } from './pages/SearchResultsPage';
+import { MomoDemoPaymentPage } from './pages/MomoDemoPaymentPage';
 import { AdminPage } from './pages/AdminPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -65,5 +66,9 @@ export const router = createBrowserRouter([
   {
     path: '/register',
     Component: RegisterPage,
+  },
+  {
+    path: '/momo-demo/payment',
+    Component: MomoDemoPaymentPage,
   },
 ]);

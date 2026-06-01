@@ -6,9 +6,7 @@ import {
   User,
   Phone,
   Mail,
-  CreditCard,
   Wallet,
-  Building2,
   Truck,
   Package,
   Clock,
@@ -45,7 +43,6 @@ export function CheckoutPage() {
   } = useCart();
   const { isAuthenticated, user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCompletingMomoDemo, setIsCompletingMomoDemo] = useState(false);
   const [addresses, setAddresses] = useState<AddressItem[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [loadingAddresses, setLoadingAddresses] = useState(false);
@@ -98,8 +95,6 @@ export function CheckoutPage() {
   const paymentMethods = [
     { id: 'cod', name: 'Thanh toán khi nhận hàng (COD)', description: 'Thanh toán bằng tiền mặt khi nhận hàng', icon: Wallet },
     { id: 'momo', name: 'MoMo', description: 'Quét QR hoặc mở ứng dụng MoMo để thanh toán', icon: QrCode },
-    { id: 'card', name: 'Thẻ tín dụng/Ghi nợ', description: 'Visa, Mastercard, JCB', icon: CreditCard },
-    { id: 'bank', name: 'Chuyển khoản ngân hàng', description: 'Chuyển khoản qua Internet Banking', icon: Building2 },
   ];
 
   const shippingFee = shippingOptions.find((opt) => opt.id === selectedShipping)?.price || 0;
@@ -193,8 +188,6 @@ export function CheckoutPage() {
   };
 
   const mapPaymentMethod = () => {
-    if (selectedPayment === 'card') return 'CREDIT_CARD';
-    if (selectedPayment === 'bank') return 'BANK_TRANSFER';
     if (selectedPayment === 'momo') return 'MOMO';
     return 'COD';
   };
@@ -240,23 +233,6 @@ export function CheckoutPage() {
 
     return () => window.clearInterval(timer);
   }, [lookupOrderCode, momoPayment]);
-
-  const completeMomoDemoPayment = async () => {
-    if (!lookupOrderCode) return;
-
-    try {
-      setIsCompletingMomoDemo(true);
-      const res = await authApi.post('/payments/momo/demo-complete', { orderCode: lookupOrderCode });
-      const payment = res.data?.data;
-      setSuccessOrder((prev: any) => prev ? { ...prev, payments: [payment], momoPayment: null } : prev);
-      toast.success('Đã giả lập thanh toán MoMo thành công');
-    } catch (error: any) {
-      console.error('Complete MoMo demo payment error:', error);
-      toast.error(error?.response?.data?.message || 'Không thể hoàn tất thanh toán demo');
-    } finally {
-      setIsCompletingMomoDemo(false);
-    }
-  };
 
   const placeOrder = async () => {
     if (!checkoutItems.length) {
@@ -553,7 +529,7 @@ export function CheckoutPage() {
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <CreditCard className="w-5 h-5 text-green-600" />
+                  <QrCode className="w-5 h-5 text-green-600" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900">Phương thức thanh toán</h2>
               </div>
@@ -790,15 +766,14 @@ export function CheckoutPage() {
                   />
                 )}
                 <p className="mt-3 text-sm text-pink-700">
-                  Đây là QR demo, không phát sinh giao dịch thật. Dùng nút bên dưới để giả lập thanh toán thành công.
+                  Quét mã hoặc tiếp tục sang cổng thanh toán MoMo để hoàn tất giao dịch.
                 </p>
                 <button
                   type="button"
-                  onClick={completeMomoDemoPayment}
-                  disabled={isCompletingMomoDemo}
+                  onClick={() => navigate(`/momo-demo/payment?orderCode=${encodeURIComponent(lookupOrderCode)}`)}
                   className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-pink-600 px-5 py-3 font-semibold text-white transition-colors hover:bg-pink-700 disabled:opacity-70"
                 >
-                  {isCompletingMomoDemo ? 'Đang cập nhật...' : 'Hoàn tất thanh toán'}
+                  Tiếp tục thanh toán
                 </button>
                 {momoPayment.payUrl && (
                   <a
@@ -807,7 +782,7 @@ export function CheckoutPage() {
                     rel="noreferrer"
                     className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-pink-200 bg-white px-5 py-3 font-semibold text-pink-700 transition-colors hover:bg-pink-100"
                   >
-                    Mở trang tra cứu đơn
+                    Tra cứu đơn hàng
                   </a>
                 )}
               </div>
