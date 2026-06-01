@@ -15,6 +15,7 @@ import {
   Package,
   Percent,
   Plus,
+  Printer,
   RefreshCcw,
   Search,
   Settings,
@@ -204,6 +205,114 @@ const getPaymentStatusText = (status?: string) => {
   return labels[status || ''] || status || 'Đang cập nhật';
 };
 
+const escapeHtml = (value: unknown) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const getOrderShippingAddress = (order: AdminOrderDetail) =>
+  [
+    order.address?.addressLine,
+    order.address?.wardName || order.address?.ward,
+    order.address?.districtName || order.address?.district,
+    order.address?.provinceName || order.address?.city,
+    order.address?.country,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+const buildOrderPrintHtml = (order: AdminOrderDetail) => {
+  const orderCode = order.orderCode || order.id.slice(0, 8);
+  const receiverName =
+    order.address?.receiverName ||
+    order.address?.fullName ||
+    order.user?.fullName ||
+    order.user?.userName ||
+    order.customerName ||
+    'Khách hàng';
+  const phone = order.address?.phone || order.customerPhone || 'Đang cập nhật';
+  const address = getOrderShippingAddress(order) || 'Đang cập nhật';
+  const itemRows = (order.items || [])
+    .map(
+      (item, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(item.book?.title || 'Sách')}</td>
+          <td class="number">${item.quantity}</td>
+          <td class="number">${escapeHtml(formatCurrency(item.price))}</td>
+          <td class="number">${escapeHtml(formatCurrency(item.subTotal))}</td>
+        </tr>`
+    )
+    .join('');
+
+  return `<!doctype html>
+    <html lang="vi">
+      <head>
+        <meta charset="utf-8" />
+        <title>Phiếu đóng gói ${escapeHtml(orderCode)}</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; color: #111827; margin: 32px; }
+          h1 { font-size: 24px; margin: 0 0 4px; }
+          h2 { font-size: 16px; margin: 24px 0 8px; }
+          .muted { color: #6b7280; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+          .box { border: 1px solid #d1d5db; border-radius: 8px; padding: 14px; }
+          .row { margin: 6px 0; }
+          table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+          th, td { border: 1px solid #d1d5db; padding: 10px; text-align: left; vertical-align: top; }
+          th { background: #f3f4f6; }
+          .number { text-align: right; white-space: nowrap; }
+          .total { display: flex; justify-content: flex-end; gap: 16px; margin-top: 16px; font-size: 18px; font-weight: 700; }
+          .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 48px; text-align: center; }
+          @media print { body { margin: 20mm; } }
+        </style>
+      </head>
+      <body>
+        <h1>Phiếu đóng gói / giao hàng</h1>
+        <div class="muted">Mã đơn: ${escapeHtml(orderCode)} - Ngày đặt: ${escapeHtml(formatDate(order.createdAt))}</div>
+
+        <div class="grid">
+          <div class="box">
+            <h2>Thông tin khách hàng</h2>
+            <div class="row"><strong>Người nhận:</strong> ${escapeHtml(receiverName)}</div>
+            <div class="row"><strong>Số điện thoại:</strong> ${escapeHtml(phone)}</div>
+            <div class="row"><strong>Địa chỉ:</strong> ${escapeHtml(address)}</div>
+          </div>
+          <div class="box">
+            <h2>Thông tin xử lý</h2>
+            <div class="row"><strong>Trạng thái:</strong> ${escapeHtml(getOrderStatusText(order.status))}</div>
+            <div class="row"><strong>Thanh toán:</strong> ${escapeHtml(getPaymentMethodText(order.payments?.[0]?.method))}</div>
+            <div class="row"><strong>Tình trạng thanh toán:</strong> ${escapeHtml(getPaymentStatusText(order.payments?.[0]?.status))}</div>
+          </div>
+        </div>
+
+        <h2>Sản phẩm</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Tên sách</th>
+              <th class="number">SL</th>
+              <th class="number">Đơn giá</th>
+              <th class="number">Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>${itemRows || '<tr><td colspan="5">Không có sản phẩm</td></tr>'}</tbody>
+        </table>
+        <div class="total"><span>Tổng cộng</span><span>${escapeHtml(formatCurrency(order.totalAmount))}</span></div>
+
+        <div class="signatures">
+          <div><strong>Nhân viên đóng gói</strong><br /><span class="muted">(Ký, ghi rõ họ tên)</span></div>
+          <div><strong>Đơn vị giao hàng / khách nhận</strong><br /><span class="muted">(Ký, ghi rõ họ tên)</span></div>
+        </div>
+      </body>
+    </html>`;
+};
+
 const getLatestCancelNote = (order?: AdminOrderDetail | null) =>
   [...(order?.statusLogs || [])]
     .reverse()
@@ -366,6 +475,7 @@ export function AdminPage() {
   const [bookImagePreviews, setBookImagePreviews] = useState<BookImagePreview[]>([]);
   const [bookFormError, setBookFormError] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [orderInternalNote, setOrderInternalNote] = useState('');
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const [promotionDrafts, setPromotionDrafts] = useState<Record<string, PromotionDraft>>({});
   const [updatingPromotionBookId, setUpdatingPromotionBookId] = useState<string | null>(null);
@@ -613,7 +723,7 @@ export function AdminPage() {
     let result = showCancelRequestsOnly ? orders.filter((order) => hasPendingCustomerCancelRequest(order)) : orders;
     if (currentView !== 'orders' || !keyword) return result;
     return result.filter((order) =>
-      [order.orderCode, order.customerName, order.customerEmail, order.id]
+      [order.orderCode, order.customerName, order.customerEmail, order.customerPhone, order.id]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -897,9 +1007,29 @@ export function AdminPage() {
     try {
       const detail = await getAdminOrderDetail(order.id);
       setSelectedOrder(detail);
+      setOrderInternalNote('');
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Không thể tải chi tiết đơn hàng');
     }
+  };
+
+  const closeOrderDetail = () => {
+    setSelectedOrder(null);
+    setOrderInternalNote('');
+  };
+
+  const handlePrintOrder = (order: AdminOrderDetail) => {
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+      showPopup({ type: 'error', text: 'Trình duyệt đang chặn cửa sổ in. Vui lòng cho phép popup và thử lại.' });
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(buildOrderPrintHtml(order));
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   const formatFileSize = (size: number) => `${(size / 1024 / 1024).toFixed(1)}MB`;
@@ -1699,8 +1829,10 @@ export function AdminPage() {
 
     try {
       setUpdatingStatus(true);
-      const updatedOrder = await updateAdminOrderStatus(selectedOrder.id, status);
+      const note = orderInternalNote.trim();
+      const updatedOrder = await updateAdminOrderStatus(selectedOrder.id, status, note || undefined);
       setSelectedOrder(updatedOrder);
+      setOrderInternalNote('');
       await loadData();
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Không thể cập nhật trạng thái đơn hàng');
@@ -3093,7 +3225,7 @@ export function AdminPage() {
               )}
 
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm đơn theo mã, khách hàng, email..." />
+                <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm mã đơn, SĐT, tên khách..." />
                 <select
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value as 'all' | AdminOrderStatus)}
@@ -3130,6 +3262,7 @@ export function AdminPage() {
                         <TableCell>
                           <p className="text-gray-800">{order.customerName || 'Khách hàng'}</p>
                           <p className="text-sm text-gray-500">{order.customerEmail}</p>
+                          {order.customerPhone && <p className="text-sm text-gray-500">{order.customerPhone}</p>}
                         </TableCell>
                         <TableCell>{formatDate(order.createdAt)}</TableCell>
                         <TableCell>{order.totalItems || 0}</TableCell>
@@ -4039,12 +4172,22 @@ export function AdminPage() {
               <h3 className="text-xl font-bold text-gray-800">
                 Chi tiết đơn {selectedOrder.orderCode || selectedOrder.id.slice(0, 8)}
               </h3>
-              <button
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                onClick={() => setSelectedOrder(null)}
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrintOrder(selectedOrder)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                >
+                  <Printer className="h-4 w-4" />
+                  In phiếu
+                </button>
+                <button
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  onClick={closeOrderDetail}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-6">
@@ -4223,6 +4366,17 @@ export function AdminPage() {
               {getNextStatuses(selectedOrder.status).length > 0 && (
                 <div className="rounded-xl bg-gray-50 p-4">
                   <h4 className="font-medium text-gray-800 mb-3">Cập nhật trạng thái</h4>
+                  <label className="mb-3 block">
+                    <span className="mb-1 block text-sm font-medium text-gray-600">Ghi chú nội bộ</span>
+                    <textarea
+                      value={orderInternalNote}
+                      onChange={(event) => setOrderInternalNote(event.target.value)}
+                      rows={3}
+                      maxLength={500}
+                      placeholder="Ví dụ: Đã gọi xác nhận, khách hẹn giao buổi chiều..."
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     {getNextStatuses(selectedOrder.status).map((status) => (
                       <button

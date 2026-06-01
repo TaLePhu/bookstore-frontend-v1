@@ -28,6 +28,7 @@ export interface AdminOrder {
   orderCode?: string | null;
   customerName?: string;
   customerEmail?: string | null;
+  customerPhone?: string | null;
   createdAt: string;
   updatedAt?: string;
   totalItems?: number;
