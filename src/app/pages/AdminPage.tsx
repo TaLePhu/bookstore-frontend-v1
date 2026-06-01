@@ -185,6 +185,7 @@ const getPaymentMethodText = (method?: string) => {
     DEBIT_CARD: 'Thẻ ghi nợ',
     BANK_TRANSFER: 'Chuyển khoản',
     WALLET: 'Ví điện tử',
+    MOMO: 'MoMo',
   };
   return labels[method || ''] || method || 'Đang cập nhật';
 };

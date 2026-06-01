@@ -45,6 +45,7 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   DEBIT_CARD: 'Thẻ ghi nợ',
   BANK_TRANSFER: 'Chuyển khoản ngân hàng',
   WALLET: 'Ví điện tử',
+  MOMO: 'MoMo',
 };
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
