@@ -190,6 +190,36 @@ const getOrderStatusColor = (status: AdminOrderStatus) => {
   return colors[status] || 'bg-gray-100 text-gray-700';
 };
 
+const getOrderStatusPillClass = (status: AdminOrderStatus) => {
+  const colors: Record<AdminOrderStatus, string> = {
+    PENDING: 'bg-amber-50 text-amber-700 ring-amber-100',
+    PROCESSING: 'bg-blue-50 text-blue-700 ring-blue-100',
+    SHIPPED: 'bg-indigo-50 text-indigo-700 ring-indigo-100',
+    COMPLETED: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+    CANCELLED: 'bg-rose-50 text-rose-700 ring-rose-100',
+  };
+  return colors[status] || 'bg-gray-50 text-gray-700 ring-gray-100';
+};
+
+const getPaymentStatusPillClass = (status?: string | null) => {
+  if (status === 'COMPLETED') return 'bg-emerald-50 text-emerald-700 ring-emerald-100';
+  if (status === 'FAILED') return 'bg-rose-50 text-rose-700 ring-rose-100';
+  if (status === 'REFUNDED') return 'bg-sky-50 text-sky-700 ring-sky-100';
+  return 'bg-amber-50 text-amber-700 ring-amber-100';
+};
+
+const getOrderTaskPillClass = (order: AdminOrder | AdminOrderDetail) => {
+  if (hasPendingCustomerCancelRequest(order)) return 'bg-rose-50 text-rose-700 ring-rose-100';
+  const colors: Record<AdminOrderStatus, string> = {
+    PENDING: 'bg-orange-50 text-orange-700 ring-orange-100',
+    PROCESSING: 'bg-blue-50 text-blue-700 ring-blue-100',
+    SHIPPED: 'bg-indigo-50 text-indigo-700 ring-indigo-100',
+    COMPLETED: 'bg-gray-50 text-gray-600 ring-gray-100',
+    CANCELLED: 'bg-gray-50 text-gray-600 ring-gray-100',
+  };
+  return colors[order.status] || 'bg-gray-50 text-gray-600 ring-gray-100';
+};
+
 const getNextStatuses = (status: AdminOrderStatus): AdminOrderStatus[] => {
   const transitions: Record<AdminOrderStatus, AdminOrderStatus[]> = {
     PENDING: ['PROCESSING', 'CANCELLED'],
@@ -1307,17 +1337,17 @@ export function AdminPage() {
   };
 
   const getOrderActionClassName = (action: OrderAction) => {
-    if (action.variant === 'icon') return 'p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors';
+    if (action.variant === 'icon') return 'inline-flex h-9 w-9 items-center justify-center rounded-lg text-indigo-600 ring-1 ring-indigo-100 transition-colors hover:bg-indigo-50';
     if (action.variant === 'danger') {
-      return 'rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50';
+      return 'inline-flex min-w-[132px] items-center justify-center rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:opacity-50';
     }
     if (action.variant === 'success') {
-      return 'rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50';
+      return 'inline-flex min-w-[132px] items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50';
     }
     if (action.variant === 'primary') {
-      return 'rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50';
+      return 'inline-flex min-w-[132px] items-center justify-center rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50';
     }
-    return 'rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50';
+    return 'inline-flex min-w-[132px] items-center justify-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 transition-colors hover:bg-gray-50 disabled:opacity-50';
   };
 
   const renderOrderActionButton = (order: AdminOrder | AdminOrderDetail, action: OrderAction) => (
@@ -3524,75 +3554,73 @@ export function AdminPage() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
-                <table className="w-full min-w-[1100px]">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <TableHead>Mã đơn</TableHead>
-                      <TableHead>Khách hàng</TableHead>
-                      <TableHead>Giao hàng</TableHead>
-                      <TableHead>Ngày đặt</TableHead>
-                      <TableHead>Sản phẩm</TableHead>
-                      <TableHead>Tổng tiền</TableHead>
-                      <TableHead>Thanh toán</TableHead>
-                      <TableHead>Trạng thái</TableHead>
-                      <TableHead>Việc cần làm</TableHead>
-                      <TableHead align="right">Thao tác</TableHead>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredOrders.map((order) => (
-                      <tr key={order.id} className="hover:bg-gray-50">
-                        <TableCell>
-                          <p className="font-medium text-gray-800">{order.orderCode || order.id.slice(0, 8)}</p>
-                        </TableCell>
-                        <TableCell>
-                          <p className="text-gray-800">{order.customerName || 'Khách hàng'}</p>
-                          <p className="text-sm text-gray-500">{order.customerEmail}</p>
-                          {order.customerPhone && <p className="text-sm text-gray-500">{order.customerPhone}</p>}
-                        </TableCell>
-                        <TableCell>
-                          <p className="line-clamp-2 max-w-xs text-sm text-gray-600">{order.addressSummary || 'Đang cập nhật'}</p>
-                        </TableCell>
-                        <TableCell>{formatDate(order.createdAt)}</TableCell>
-                        <TableCell>{order.totalItems || 0}</TableCell>
-                        <TableCell>{formatCurrency(order.totalAmount)}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            <span className="text-sm font-medium text-gray-800">{getPaymentMethodText(order.paymentMethod || undefined)}</span>
-                            <span className={`w-fit rounded-full px-2 py-1 text-xs ${
-                              order.paymentStatus === 'COMPLETED'
-                                ? 'bg-green-100 text-green-700'
-                                : order.paymentStatus === 'FAILED'
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-yellow-100 text-yellow-700'
-                            }`}>
-                              {getPaymentStatusText(order.paymentStatus || undefined)}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className={`text-xs px-2 py-1 rounded-full ${getOrderStatusColor(order.status)}`}>
-                            {getOrderStatusText(order.status)}
-                          </span>
-                          {hasPendingCustomerCancelRequest(order) && (
-                            <span className="ml-2 inline-flex rounded-full bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800">
-                              Khách yêu cầu hủy
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm font-medium text-gray-700">{getOrderTaskText(order)}</span>
-                        </TableCell>
-                        <TableCell align="right">
-                          <div className="flex flex-wrap justify-end gap-2">
-                            {getOrderActions(order, 'table').map((action) => renderOrderActionButton(order, action))}
-                          </div>
-                        </TableCell>
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1040px]">
+                    <thead className="border-b border-gray-100 bg-gray-50">
+                      <tr>
+                        <TableHead className="w-[190px]">Đơn hàng</TableHead>
+                        <TableHead className="w-[330px]">Khách & giao hàng</TableHead>
+                        <TableHead className="w-[210px]">Thanh toán</TableHead>
+                        <TableHead className="w-[220px]">Trạng thái</TableHead>
+                        <TableHead align="right" className="w-[220px]">Thao tác</TableHead>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {filteredOrders.map((order) => (
+                        <tr key={order.id} className="transition-colors hover:bg-orange-50/30">
+                          <TableCell className="py-5">
+                            <div className="space-y-2">
+                              <p className="font-semibold text-gray-950">{order.orderCode || order.id.slice(0, 8)}</p>
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                <span>{formatDate(order.createdAt)}</span>
+                                <span className="h-1 w-1 rounded-full bg-gray-300" />
+                                <span>{order.totalItems || 0} SP</span>
+                              </div>
+                              {hasPendingCustomerCancelRequest(order) && (
+                                <span className="inline-flex w-fit rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-100">
+                                  Khách yêu cầu hủy
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-5">
+                            <div className="space-y-1.5">
+                              <p className="font-semibold text-gray-900">{order.customerName || 'Khách hàng'}</p>
+                              <p className="text-sm text-gray-500">{order.customerEmail || 'Chưa có email'}</p>
+                              {order.customerPhone && <p className="text-sm font-medium text-gray-700">{order.customerPhone}</p>}
+                              <p className="line-clamp-2 max-w-md text-sm leading-6 text-gray-600">{order.addressSummary || 'Đang cập nhật địa chỉ'}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-5">
+                            <div className="space-y-2">
+                              <p className="text-base font-bold text-gray-950">{formatCurrency(order.totalAmount)}</p>
+                              <p className="text-sm font-medium text-gray-800">{getPaymentMethodText(order.paymentMethod || undefined)}</p>
+                              <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getPaymentStatusPillClass(order.paymentStatus)}`}>
+                                {getPaymentStatusText(order.paymentStatus || undefined)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-5">
+                            <div className="space-y-2">
+                              <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getOrderStatusPillClass(order.status)}`}>
+                                {getOrderStatusText(order.status)}
+                              </span>
+                              <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getOrderTaskPillClass(order)}`}>
+                                {getOrderTaskText(order)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell align="right" className="py-5">
+                            <div className="flex flex-col items-end gap-2">
+                              {getOrderActions(order, 'table').map((action) => renderOrderActionButton(order, action))}
+                            </div>
+                          </TableCell>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 {filteredOrders.length === 0 && <EmptyState text="Không có đơn hàng phù hợp." />}
                 {orderTotal > 0 && (
                   <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
