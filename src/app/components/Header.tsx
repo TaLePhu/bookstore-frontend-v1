@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, Bell, ShoppingCart, User, LogOut, ChevronDown, ShieldCheck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router';
@@ -14,7 +14,18 @@ interface SearchResult {
   title: string;
   author: string;
   image: string;
+  category?: string;
 }
+
+const SEARCH_HISTORY_KEY = 'tram-sach-search-history';
+const DEFAULT_SEARCH_SUGGESTIONS = [
+  'Sách mới phát hành',
+  'Sách bán chạy',
+  'Kỹ năng sống',
+  'Văn học Việt Nam',
+  'Kinh doanh',
+  'Sách thiếu nhi',
+];
 
 export function Header() {
   const { totalItems } = useCart();
@@ -28,8 +39,21 @@ export function Header() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [isSearchFallback, setIsSearchFallback] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const role = user?.role?.toUpperCase();
   const canManage = role === 'ADMIN' || role === 'STAFF';
+
+  useEffect(() => {
+    try {
+      const rawHistory = localStorage.getItem(SEARCH_HISTORY_KEY);
+      const parsedHistory = rawHistory ? JSON.parse(rawHistory) : [];
+      if (Array.isArray(parsedHistory)) {
+        setSearchHistory(parsedHistory.filter((item): item is string => typeof item === 'string').slice(0, 8));
+      }
+    } catch {
+      setSearchHistory([]);
+    }
+  }, []);
 
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
@@ -55,6 +79,7 @@ export function Header() {
             title: book.title,
             author: book.author,
             image: getBookImage(book),
+            category: book.category?.name,
           }))
         );
       } catch (error) {
@@ -76,13 +101,44 @@ export function Header() {
     };
   }, [searchQuery]);
 
-  const submitSearch = () => {
-    const trimmedQuery = searchQuery.trim();
+  const saveSearchHistory = (value: string) => {
+    const trimmedValue = value.trim();
+    if (trimmedValue.length < 2) return;
+
+    const nextHistory = [
+      trimmedValue,
+      ...searchHistory.filter((item) => item.toLowerCase() !== trimmedValue.toLowerCase()),
+    ].slice(0, 8);
+
+    setSearchHistory(nextHistory);
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(nextHistory));
+  };
+
+  const submitSearch = (value = searchQuery) => {
+    const trimmedQuery = value.trim();
     if (trimmedQuery.length < 2) return;
 
+    saveSearchHistory(trimmedQuery);
     navigate(`/search?q=${encodeURIComponent(trimmedQuery)}`);
     setShowSearchResults(false);
   };
+
+  const removeHistoryItem = (value: string) => {
+    const nextHistory = searchHistory.filter((item) => item !== value);
+    setSearchHistory(nextHistory);
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(nextHistory));
+  };
+
+  const keywordSuggestions = useMemo(() => {
+    const trimmedQuery = searchQuery.trim().toLowerCase();
+    const source = searchQuery.trim().length >= 2
+      ? searchResults.flatMap((result) => [result.title, result.author, result.category].filter(Boolean) as string[])
+      : [...searchHistory, ...DEFAULT_SEARCH_SUGGESTIONS];
+
+    return Array.from(new Set(source))
+      .filter((item) => !trimmedQuery || item.toLowerCase().includes(trimmedQuery))
+      .slice(0, 8);
+  }, [searchHistory, searchQuery, searchResults]);
 
   const handleAccountClick = () => {
     if (isAuthenticated) {
@@ -143,46 +199,119 @@ export function Header() {
                 <Search className="w-5 h-5" />
               </button>
 
-              {showSearchResults && searchQuery.trim().length >= 2 && (
+              {showSearchResults && (
                 <div className="absolute z-50 mt-2 w-full rounded-xl border bg-white shadow-lg">
-                  {searchMessage && (
+                  {searchQuery.trim().length < 2 ? (
+                    <div className="p-3">
+                      {searchHistory.length > 0 && (
+                        <div className="mb-3">
+                          <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Lịch sử tìm kiếm</div>
+                          <div className="space-y-1">
+                            {searchHistory.slice(0, 5).map((item) => (
+                              <div key={item} className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => submitSearch(item)}
+                                  className="min-w-0 flex-1 rounded-lg px-3 py-2 text-left text-sm text-gray-800 hover:bg-orange-50"
+                                >
+                                  <span className="block truncate">{item}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeHistoryItem(item)}
+                                  className="rounded-lg px-2 py-2 text-xs font-semibold text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                                  aria-label={`Xóa lịch sử ${item}`}
+                                >
+                                  Xóa
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Gợi ý từ khóa</div>
+                        <div className="flex flex-wrap gap-2">
+                          {DEFAULT_SEARCH_SUGGESTIONS.map((item) => (
+                            <button
+                              key={item}
+                              type="button"
+                              onClick={() => submitSearch(item)}
+                              className="rounded-full bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700 hover:bg-orange-100"
+                            >
+                              {item}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {searchMessage && (
                     <div className="border-b border-gray-100 px-4 py-3 text-sm text-blue-700">
                       {searchMessage}
                       {isSearchFallback && <div className="mt-1 text-xs text-gray-500">Đây là gợi ý tham khảo, không phải kết quả khớp chính xác.</div>}
                     </div>
-                  )}
-                  {isSearchLoading ? (
-                    <div className="p-4 text-sm text-gray-500">Đang tìm sách phù hợp...</div>
-                  ) : searchResults.length > 0 ? (
-                    <div className="max-h-80 overflow-y-auto p-2">
-                      {searchResults.map((result) => (
-                        <button
-                          key={result.id}
-                          type="button"
-                          onClick={() => {
-                            navigate(`/book/${result.id}`);
-                            setShowSearchResults(false);
-                            setSearchQuery('');
-                          }}
-                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-orange-50"
-                        >
-                          <img src={result.image} alt={result.title} className="h-12 w-10 rounded object-cover" />
-                          <div className="min-w-0">
-                            <div className="truncate font-medium text-gray-900">{result.title}</div>
-                            <div className="truncate text-sm text-gray-600">{result.author}</div>
-                          </div>
-                        </button>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={submitSearch}
-                        className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-orange-600 hover:bg-orange-50"
-                      >
-                        Xem tất cả kết quả cho "{searchQuery.trim()}"
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="p-4 text-sm text-gray-500">Chưa tìm thấy kết quả phù hợp.</div>
+                      )}
+                      {isSearchLoading ? (
+                        <div className="p-4 text-sm text-gray-500">Đang tìm sách phù hợp...</div>
+                      ) : (
+                        <div className="max-h-96 overflow-y-auto p-2">
+                          {keywordSuggestions.length > 0 && (
+                            <div className="border-b border-gray-100 pb-2">
+                              <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Từ khóa phù hợp</div>
+                              {keywordSuggestions.map((item) => (
+                                <button
+                                  key={item}
+                                  type="button"
+                                  onClick={() => submitSearch(item)}
+                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-800 hover:bg-orange-50"
+                                >
+                                  <Search className="h-4 w-4 shrink-0 text-gray-400" />
+                                  <span className="truncate">{item}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {searchResults.length > 0 ? (
+                            <div className="pt-2">
+                              <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Sách liên quan</div>
+                              {searchResults.map((result) => (
+                                <button
+                                  key={result.id}
+                                  type="button"
+                                  onClick={() => {
+                                    saveSearchHistory(searchQuery);
+                                    navigate(`/book/${result.id}`);
+                                    setShowSearchResults(false);
+                                    setSearchQuery('');
+                                  }}
+                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-orange-50"
+                                >
+                                  <img src={result.image} alt={result.title} className="h-12 w-10 rounded object-cover" />
+                                  <div className="min-w-0">
+                                    <div className="truncate font-medium text-gray-900">{result.title}</div>
+                                    <div className="truncate text-sm text-gray-600">{result.author}</div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="p-4 text-sm text-gray-500">Chưa tìm thấy kết quả phù hợp.</div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => submitSearch()}
+                            className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-orange-600 hover:bg-orange-50"
+                          >
+                            Xem tất cả kết quả cho "{searchQuery.trim()}"
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
