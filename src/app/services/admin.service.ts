@@ -234,11 +234,6 @@ export const getManagementBookDetail = async (id: string): Promise<ApiBook> => {
   return res.data.data;
 };
 
-export const updateManagementBookStock = async (id: string, stock: number): Promise<ApiBook> => {
-  const res = await api.patch(`/management/books/${id}/stock`, { stock });
-  return res.data.data;
-};
-
 export const getAdminCategories = async (params?: {
   includeDeleted?: boolean;
   onlyDeleted?: boolean;

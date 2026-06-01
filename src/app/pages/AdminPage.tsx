@@ -69,7 +69,6 @@ import {
   restoreAdminCategory,
   resetAdminUserPassword,
   rejectAdminCancelRequest,
-  updateManagementBookStock,
   updateAdminCategory,
   updateAdminBook,
   updateAdminPromotion,
@@ -1431,14 +1430,6 @@ export function AdminPage() {
   };
 
   const validateBookForm = () => {
-    if (!isAdmin && bookModalMode === 'edit') {
-      const stock = Number(bookForm.stock);
-      if (!Number.isInteger(stock) || stock < 0) {
-        return 'Tồn kho phải là số nguyên không âm.';
-      }
-      return '';
-    }
-
     const requiredFields: Array<[keyof AdminBookPayload, string]> = [
       ['title', 'Tên sách'],
       ['author', 'Tác giả'],
@@ -1525,6 +1516,7 @@ export function AdminPage() {
 
   const openBookDetail = async (book: ApiBook, mode: 'detail' | 'edit') => {
     try {
+      const safeMode = isAdmin ? mode : 'detail';
       const detail = isAdmin ? await getAdminBookDetail(book.id) : await getManagementBookDetail(book.id);
       setSelectedBook(detail);
       setBookForm({
@@ -1546,7 +1538,7 @@ export function AdminPage() {
       setDeletedImageIds([]);
       setBookImagePreviews([]);
       setBookFormError('');
-      setBookModalMode(mode);
+      setBookModalMode(safeMode);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Không thể tải chi tiết sách');
     }
@@ -1597,9 +1589,8 @@ export function AdminPage() {
     try {
       setSavingBook(true);
       const isEditing = bookModalMode === 'edit' && Boolean(selectedBook);
-      if (!isAdmin && isEditing && selectedBook) {
-        await updateManagementBookStock(selectedBook.id, Number(bookForm.stock));
-      } else if (bookModalMode === 'create') {
+      if (!isAdmin) return;
+      if (bookModalMode === 'create') {
         await createAdminBook(bookForm);
       } else if (isEditing && selectedBook) {
         await updateAdminBook(selectedBook.id, {
@@ -2711,7 +2702,7 @@ export function AdminPage() {
                         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                           <div>
                             <h3 className="text-lg font-bold text-gray-900">Cảnh báo tồn kho</h3>
-                            <p className="text-sm text-gray-500">Sách hết hàng và sắp hết cần cập nhật trước.</p>
+                            <p className="text-sm text-gray-500">Sách hết hàng và sắp hết để staff theo dõi và báo quản lý.</p>
                           </div>
                           <button
                             type="button"
@@ -2735,10 +2726,10 @@ export function AdminPage() {
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => openBookDetail(book, 'edit')}
+                                  onClick={() => openBookDetail(book, 'detail')}
                                   className="shrink-0 rounded-lg bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-100 transition-colors hover:bg-orange-100"
                                 >
-                                  Cập nhật
+                                  Xem chi tiết
                                 </button>
                               </div>
                             );
@@ -3093,14 +3084,16 @@ export function AdminPage() {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => openBookDetail(book, 'edit')}
-                              disabled={isBookDeleted(book)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-orange-600 ring-1 ring-orange-100 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
-                              title={isAdmin ? 'Chỉnh sửa' : 'Cập nhật tồn kho'}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => openBookDetail(book, 'edit')}
+                                disabled={isBookDeleted(book)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-orange-600 ring-1 ring-orange-100 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                title="Chỉnh sửa"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
                             {isAdmin && (
                               <button
                                 onClick={() => handleSoftDeleteBook(book)}
@@ -4054,7 +4047,7 @@ export function AdminPage() {
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-800">
                 {bookModalMode === 'create' && 'Thêm sách mới'}
-                {bookModalMode === 'edit' && (isAdmin ? 'Chỉnh sửa sách' : 'Cập nhật tồn kho')}
+                {bookModalMode === 'edit' && 'Chỉnh sửa sách'}
                 {bookModalMode === 'detail' && 'Chi tiết sách'}
               </h3>
               <button
@@ -4134,31 +4127,6 @@ export function AdminPage() {
                 <div>
                   <h4 className="text-sm font-medium text-gray-500 mb-2">Mô tả</h4>
                   <p className="text-gray-800 leading-6 whitespace-pre-line">{selectedBook.description}</p>
-                </div>
-              </div>
-            ) : !isAdmin && bookModalMode === 'edit' && selectedBook ? (
-              <div className="p-6 space-y-5">
-                <div className="flex gap-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
-                  <img
-                    src={getBookImage(selectedBook)}
-                    alt={selectedBook.title}
-                    className="h-24 w-16 flex-shrink-0 rounded-lg object-cover ring-1 ring-gray-200"
-                  />
-                  <div className="min-w-0">
-                    <h4 className="line-clamp-2 font-bold text-gray-900">{selectedBook.title}</h4>
-                    <p className="mt-1 text-sm text-gray-600">{selectedBook.author}</p>
-                    <p className="mt-2 text-sm text-gray-500">Đã bán: {Number(selectedBook.soldCount || 0).toLocaleString('vi-VN')}</p>
-                  </div>
-                </div>
-                <BookInput
-                  label="Tồn kho"
-                  type="number"
-                  value={bookForm.stock}
-                  onChange={(value) => handleBookInput('stock', value)}
-                  required
-                />
-                <div className="rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-700">
-                  Nhân viên chỉ được cập nhật số lượng tồn kho. Các thông tin sách, giá, danh mục và ảnh do quản trị viên quản lý.
                 </div>
               </div>
             ) : (
@@ -4313,7 +4281,7 @@ export function AdminPage() {
                   className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-5 h-5" />
-                  {savingBook ? 'Đang lưu...' : isAdmin ? 'Lưu sách' : 'Cập nhật tồn kho'}
+                  {savingBook ? 'Đang lưu...' : 'Lưu sách'}
                 </button>
               )}
             </div>
