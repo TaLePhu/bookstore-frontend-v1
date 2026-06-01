@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router';
 import {
   AlertCircle,
   ArchiveX,
-  BarChart3,
   BookOpen,
   CheckCircle2,
   ClipboardCheck,
@@ -19,7 +18,6 @@ import {
   Plus,
   Printer,
   RefreshCcw,
-  Search,
   Settings,
   ShoppingCart,
   Store,
@@ -92,386 +90,70 @@ import {
 import type { ApiBook } from '../services/book.service';
 import { getBookImage } from '../utils/book-display';
 import logoUrl from '../../assets/logo.png';
-
-type AdminView = 'dashboard' | 'books' | 'promotions' | 'categories' | 'orders' | 'customers' | 'settings';
-type ExistingBookImage = { id?: string; url: string; isPrimary?: boolean };
-type PromotionDraft = { price: string; originalPrice: string; discount: string };
-type BookVisibilityFilter = 'active' | 'deleted' | 'all';
-type BookStockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
-type BookCategoryFilter = 'all' | 'uncategorized' | string;
-type PromotionBookStockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
-type CategoryVisibilityFilter = 'active' | 'deleted' | 'all';
-type CategoryBookFilter = 'all' | 'with_books' | 'empty';
-type UserRoleFilter = 'all' | 'CUSTOMER' | 'STAFF' | 'ADMIN' | 'GUEST';
-type UserLockFilter = 'all' | 'active' | 'locked';
-type UserVerifiedFilter = 'all' | 'verified' | 'unverified';
-type OrderWorkflowTab = 'all' | 'pending' | 'processing' | 'shipped' | 'completed' | 'cancelled' | 'cancel_requests';
-type OrderAction =
-  | { key: 'confirm'; label: string; group: 'operation'; nextStatus: AdminOrderStatus; variant: 'primary' }
-  | { key: 'handover'; label: string; group: 'operation'; nextStatus: AdminOrderStatus; variant: 'primary' }
-  | { key: 'complete'; label: string; group: 'operation'; nextStatus: AdminOrderStatus; variant: 'success' }
-  | { key: 'print'; label: string; group: 'operation'; variant: 'secondary' }
-  | { key: 'approve_cancel'; label: string; group: 'cancel'; variant: 'danger' }
-  | { key: 'reject_cancel'; label: string; group: 'cancel'; variant: 'secondary' }
-  | { key: 'manual_cancel'; label: string; group: 'cancel'; variant: 'danger' }
-  | { key: 'view_cancel'; label: string; group: 'cancel'; variant: 'danger' }
-  | { key: 'view'; label: string; group: 'view'; variant: 'icon' };
-type PopupMessage = { type: 'success' | 'error'; text: string } | null;
-type BookImagePreview = { name: string; url: string; size: number };
-type PromotionModalMode = 'create' | 'edit' | null;
-type ConfirmDialog = {
-  title: string;
-  message: string;
-  confirmLabel: string;
-  variant?: 'danger' | 'warning';
-  onConfirm: () => Promise<void>;
-} | null;
-type CancelDecisionDialog = {
-  action: 'approve' | 'reject';
-  order: AdminOrder | AdminOrderDetail;
-} | null;
-
-const COLORS = ['#F97316', '#3B82F6', '#8B5CF6', '#10B981', '#EF4444', '#14B8A6'];
-const LOW_STOCK_THRESHOLD = 5;
-const MAX_BOOK_IMAGES = 5;
-const MAX_BOOK_IMAGE_SIZE = 2 * 1024 * 1024;
-const ACCEPTED_BOOK_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const ORDER_STATUS_OPTIONS: AdminOrderStatus[] = ['PENDING', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
-const ORDER_PAYMENT_METHOD_OPTIONS: AdminPaymentMethod[] = ['COD', 'MOMO'];
-const ORDER_PAYMENT_STATUS_OPTIONS: AdminPaymentStatus[] = ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'];
-const ADMIN_BOOKS_PAGE_SIZE = 10;
-const ADMIN_ORDERS_PAGE_SIZE = 10;
-const EMPTY_ORDER_STATUS_TOTALS: Record<AdminOrderStatus, number> = {
-  PENDING: 0,
-  PROCESSING: 0,
-  SHIPPED: 0,
-  COMPLETED: 0,
-  CANCELLED: 0,
-};
-const emptyUserForm: AdminUserPayload = {
-  userName: '',
-  fullName: '',
-  email: '',
-  phone: '',
-  password: '',
-  role: 'CUSTOMER',
-  isVerified: true,
-};
-
-const formatCurrency = (value: number | string | null | undefined) =>
-  `${Number(value || 0).toLocaleString('vi-VN')}đ`;
-
-const formatDate = (value?: string | Date | null) => {
-  if (!value) return 'Đang cập nhật';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'Đang cập nhật' : date.toLocaleDateString('vi-VN');
-};
-
-const getOrderStatusText = (status: AdminOrderStatus) => {
-  const labels: Record<AdminOrderStatus, string> = {
-    PENDING: 'Chờ xử lý',
-    PROCESSING: 'Đang xử lý',
-    SHIPPED: 'Đang giao',
-    COMPLETED: 'Hoàn thành',
-    CANCELLED: 'Đã hủy',
-  };
-  return labels[status] || status;
-};
-
-const getOrderStatusColor = (status: AdminOrderStatus) => {
-  const colors: Record<AdminOrderStatus, string> = {
-    PENDING: 'bg-yellow-100 text-yellow-700',
-    PROCESSING: 'bg-blue-100 text-blue-700',
-    SHIPPED: 'bg-indigo-100 text-indigo-700',
-    COMPLETED: 'bg-green-100 text-green-700',
-    CANCELLED: 'bg-red-100 text-red-700',
-  };
-  return colors[status] || 'bg-gray-100 text-gray-700';
-};
-
-const getOrderStatusPillClass = (status: AdminOrderStatus) => {
-  const colors: Record<AdminOrderStatus, string> = {
-    PENDING: 'bg-amber-50 text-amber-700 ring-amber-100',
-    PROCESSING: 'bg-blue-50 text-blue-700 ring-blue-100',
-    SHIPPED: 'bg-indigo-50 text-indigo-700 ring-indigo-100',
-    COMPLETED: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-    CANCELLED: 'bg-rose-50 text-rose-700 ring-rose-100',
-  };
-  return colors[status] || 'bg-gray-50 text-gray-700 ring-gray-100';
-};
-
-const getPaymentStatusPillClass = (status?: string | null) => {
-  if (status === 'COMPLETED') return 'bg-emerald-50 text-emerald-700 ring-emerald-100';
-  if (status === 'FAILED') return 'bg-rose-50 text-rose-700 ring-rose-100';
-  if (status === 'REFUNDED') return 'bg-sky-50 text-sky-700 ring-sky-100';
-  return 'bg-amber-50 text-amber-700 ring-amber-100';
-};
-
-const getOrderTaskPillClass = (order: AdminOrder | AdminOrderDetail) => {
-  if (hasPendingCustomerCancelRequest(order)) return 'bg-rose-50 text-rose-700 ring-rose-100';
-  const colors: Record<AdminOrderStatus, string> = {
-    PENDING: 'bg-orange-50 text-orange-700 ring-orange-100',
-    PROCESSING: 'bg-blue-50 text-blue-700 ring-blue-100',
-    SHIPPED: 'bg-indigo-50 text-indigo-700 ring-indigo-100',
-    COMPLETED: 'bg-gray-50 text-gray-600 ring-gray-100',
-    CANCELLED: 'bg-gray-50 text-gray-600 ring-gray-100',
-  };
-  return colors[order.status] || 'bg-gray-50 text-gray-600 ring-gray-100';
-};
-
-const getNextStatuses = (status: AdminOrderStatus): AdminOrderStatus[] => {
-  const transitions: Record<AdminOrderStatus, AdminOrderStatus[]> = {
-    PENDING: ['PROCESSING', 'CANCELLED'],
-    PROCESSING: ['SHIPPED', 'CANCELLED'],
-    SHIPPED: ['COMPLETED'],
-    COMPLETED: [],
-    CANCELLED: [],
-  };
-  return transitions[status] || [];
-};
-
-const getOrderOperationNote = (status: AdminOrderStatus) => {
-  const notes: Partial<Record<AdminOrderStatus, string>> = {
-    PROCESSING: 'Nhân viên xác nhận đơn hàng',
-    SHIPPED: 'Nhân viên đã đóng gói và bàn giao vận chuyển',
-    COMPLETED: 'Nhân viên xác nhận giao hàng thành công',
-  };
-  return notes[status];
-};
-
-const getOrderTaskText = (order: AdminOrder | AdminOrderDetail) => {
-  if (hasPendingCustomerCancelRequest(order)) return 'Chờ xử lý hủy';
-  const labels: Record<AdminOrderStatus, string> = {
-    PENDING: 'Cần xác nhận',
-    PROCESSING: 'Cần đóng gói',
-    SHIPPED: 'Đang giao khách',
-    COMPLETED: 'Không cần thao tác',
-    CANCELLED: 'Đã hủy',
-  };
-  return labels[order.status] || 'Không cần thao tác';
-};
-
-const getPaymentMethodText = (method?: string) => {
-  const labels: Record<string, string> = {
-    COD: 'Thanh toán khi nhận hàng',
-    CREDIT_CARD: 'Thẻ tín dụng',
-    DEBIT_CARD: 'Thẻ ghi nợ',
-    BANK_TRANSFER: 'Chuyển khoản',
-    WALLET: 'Ví điện tử',
-    MOMO: 'MoMo',
-  };
-  return labels[method || ''] || method || 'Đang cập nhật';
-};
-
-const getPaymentStatusText = (status?: string) => {
-  const labels: Record<string, string> = {
-    PENDING: 'Chờ thanh toán',
-    COMPLETED: 'Đã thanh toán',
-    FAILED: 'Thanh toán thất bại',
-    REFUNDED: 'Đã hoàn tiền',
-  };
-  return labels[status || ''] || status || 'Đang cập nhật';
-};
-
-const escapeHtml = (value: unknown) =>
-  String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-
-const getOrderShippingAddress = (order: AdminOrderDetail) =>
-  [
-    order.address?.addressLine,
-    order.address?.wardName || order.address?.ward,
-    order.address?.districtName || order.address?.district,
-    order.address?.provinceName || order.address?.city,
-    order.address?.country,
-  ]
-    .filter(Boolean)
-    .join(', ');
-
-const buildOrderPrintHtml = (order: AdminOrderDetail) => {
-  const orderCode = order.orderCode || order.id.slice(0, 8);
-  const receiverName =
-    order.address?.receiverName ||
-    order.address?.fullName ||
-    order.user?.fullName ||
-    order.user?.userName ||
-    order.customerName ||
-    'Khách hàng';
-  const phone = order.address?.phone || order.customerPhone || 'Đang cập nhật';
-  const address = getOrderShippingAddress(order) || 'Đang cập nhật';
-  const itemRows = (order.items || [])
-    .map(
-      (item, index) => `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${escapeHtml(item.book?.title || 'Sách')}</td>
-          <td class="number">${item.quantity}</td>
-          <td class="number">${escapeHtml(formatCurrency(item.price))}</td>
-          <td class="number">${escapeHtml(formatCurrency(item.subTotal))}</td>
-        </tr>`
-    )
-    .join('');
-
-  return `<!doctype html>
-    <html lang="vi">
-      <head>
-        <meta charset="utf-8" />
-        <title>Phiếu đóng gói ${escapeHtml(orderCode)}</title>
-        <style>
-          * { box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; color: #111827; margin: 32px; }
-          h1 { font-size: 24px; margin: 0 0 4px; }
-          h2 { font-size: 16px; margin: 24px 0 8px; }
-          .muted { color: #6b7280; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
-          .box { border: 1px solid #d1d5db; border-radius: 8px; padding: 14px; }
-          .row { margin: 6px 0; }
-          table { border-collapse: collapse; width: 100%; margin-top: 12px; }
-          th, td { border: 1px solid #d1d5db; padding: 10px; text-align: left; vertical-align: top; }
-          th { background: #f3f4f6; }
-          .number { text-align: right; white-space: nowrap; }
-          .total { display: flex; justify-content: flex-end; gap: 16px; margin-top: 16px; font-size: 18px; font-weight: 700; }
-          .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 48px; text-align: center; }
-          @media print { body { margin: 20mm; } }
-        </style>
-      </head>
-      <body>
-        <h1>Phiếu đóng gói / giao hàng</h1>
-        <div class="muted">Mã đơn: ${escapeHtml(orderCode)} - Ngày đặt: ${escapeHtml(formatDate(order.createdAt))}</div>
-
-        <div class="grid">
-          <div class="box">
-            <h2>Thông tin khách hàng</h2>
-            <div class="row"><strong>Người nhận:</strong> ${escapeHtml(receiverName)}</div>
-            <div class="row"><strong>Số điện thoại:</strong> ${escapeHtml(phone)}</div>
-            <div class="row"><strong>Địa chỉ:</strong> ${escapeHtml(address)}</div>
-          </div>
-          <div class="box">
-            <h2>Thông tin xử lý</h2>
-            <div class="row"><strong>Trạng thái:</strong> ${escapeHtml(getOrderStatusText(order.status))}</div>
-            <div class="row"><strong>Thanh toán:</strong> ${escapeHtml(getPaymentMethodText(order.payments?.[0]?.method))}</div>
-            <div class="row"><strong>Tình trạng thanh toán:</strong> ${escapeHtml(getPaymentStatusText(order.payments?.[0]?.status))}</div>
-          </div>
-        </div>
-
-        <h2>Sản phẩm</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>STT</th>
-              <th>Tên sách</th>
-              <th class="number">SL</th>
-              <th class="number">Đơn giá</th>
-              <th class="number">Thành tiền</th>
-            </tr>
-          </thead>
-          <tbody>${itemRows || '<tr><td colspan="5">Không có sản phẩm</td></tr>'}</tbody>
-        </table>
-        <div class="total"><span>Tổng cộng</span><span>${escapeHtml(formatCurrency(order.totalAmount))}</span></div>
-
-        <div class="signatures">
-          <div><strong>Nhân viên đóng gói</strong><br /><span class="muted">(Ký, ghi rõ họ tên)</span></div>
-          <div><strong>Đơn vị giao hàng / khách nhận</strong><br /><span class="muted">(Ký, ghi rõ họ tên)</span></div>
-        </div>
-      </body>
-    </html>`;
-};
-
-const getLatestCancelNote = (order?: AdminOrderDetail | null) =>
-  [...(order?.statusLogs || [])]
-    .reverse()
-    .find(
-      (log) =>
-        (log.toStatus === 'CANCELLED' && log.note) ||
-        (log.fromStatus === log.toStatus && log.note?.includes('yêu cầu hủy'))
-    )?.note || '';
-
-const hasCustomerCancelRequest = (order?: Pick<AdminOrderDetail, 'status' | 'statusLogs'> | AdminOrder | null) =>
-  Boolean(
-    (order as AdminOrder)?.cancelRequested ||
-      ((order?.status === 'PENDING' || order?.status === 'PROCESSING') &&
-        (order as AdminOrderDetail)?.statusLogs?.some(
-          (log) => log.fromStatus === log.toStatus && Boolean(log.note?.includes('yêu cầu hủy'))
-        ))
-  );
-
-const isCustomerCancelRequestLog = (log: NonNullable<AdminOrderDetail['statusLogs']>[number]) =>
-  log.fromStatus === log.toStatus &&
-  !log.changedByUser &&
-  Boolean(
-    log.note?.includes('yêu cầu hủy') ||
-      log.note?.includes('yêu cầu hủy') ||
-      log.note?.startsWith('Khách yêu cầu hủy:') ||
-      log.note?.startsWith('Khách yêu cầu hủy:')
-  );
-
-const isCancelRequestResolutionLog = (log: NonNullable<AdminOrderDetail['statusLogs']>[number]) =>
-  Boolean(
-    log.changedByUser &&
-      (log.toStatus === 'CANCELLED' ||
-        (log.fromStatus === log.toStatus &&
-          (log.note?.startsWith('Admin từ chối yêu cầu hủy:') ||
-            log.note?.startsWith('Admin tu choi yeu cau huy:'))))
-  );
-
-const hasPendingCustomerCancelRequest = (
-  order?: Pick<AdminOrderDetail, 'status' | 'statusLogs'> | AdminOrder | null
-) => {
-  if (!order || !['PENDING', 'PROCESSING'].includes(order.status)) return false;
-
-  const statusLogs = (order as AdminOrderDetail).statusLogs;
-  if (!statusLogs) return Boolean((order as AdminOrder).cancelRequested);
-
-  const sortedLogs = [...statusLogs].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-  const latestRequest = sortedLogs.find(isCustomerCancelRequestLog);
-  const latestResolution = sortedLogs.find(isCancelRequestResolutionLog);
-
-  return Boolean(
-    latestRequest &&
-      (!latestResolution ||
-        new Date(latestRequest.createdAt).getTime() > new Date(latestResolution.createdAt).getTime())
-  );
-};
-
-const getBookStatusMeta = (book: ApiBook) => {
-  const stock = Number(book.stock || 0);
-
-  if (book.deletedAt || book.status === 'deleted') {
-    return {
-      label: 'Đã xóa mềm',
-      dot: 'bg-gray-400',
-      className: 'bg-gray-100 text-gray-700 ring-gray-200',
-    };
-  }
-
-  if (stock <= 0) {
-    return {
-      label: 'Hết hàng',
-      dot: 'bg-red-500',
-      className: 'bg-red-50 text-red-700 ring-red-100',
-    };
-  }
-
-  if (stock <= LOW_STOCK_THRESHOLD) {
-    return {
-      label: 'Sắp hết hàng',
-      dot: 'bg-amber-500',
-      className: 'bg-amber-50 text-amber-700 ring-amber-100',
-    };
-  }
-
-  return {
-    label: 'Còn hàng',
-    dot: 'bg-emerald-500',
-    className: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-  };
-};
+import {
+  ADMIN_BOOKS_PAGE_SIZE,
+  ADMIN_ORDERS_PAGE_SIZE,
+  ACCEPTED_BOOK_IMAGE_TYPES,
+  COLORS,
+  EMPTY_ORDER_STATUS_TOTALS,
+  LOW_STOCK_THRESHOLD,
+  MAX_BOOK_IMAGES,
+  MAX_BOOK_IMAGE_SIZE,
+  ORDER_PAYMENT_METHOD_OPTIONS,
+  ORDER_PAYMENT_STATUS_OPTIONS,
+  ORDER_STATUS_OPTIONS,
+  emptyUserForm,
+} from './admin/constants';
+import {
+  BookImageGallery,
+  BookInput,
+  EmptyState,
+  InfoBlock,
+  SearchBox,
+  TableCell,
+  TableHead,
+  UserInput,
+} from './admin/components';
+import {
+  buildOrderPrintHtml,
+  formatCurrency,
+  formatDate,
+  getBookStatusMeta,
+  getLatestCancelNote,
+  getNextStatuses,
+  getOrderOperationNote,
+  getOrderShippingAddress,
+  getOrderStatusPillClass,
+  getOrderStatusText,
+  getOrderTaskPillClass,
+  getOrderTaskText,
+  getPaymentMethodText,
+  getPaymentStatusPillClass,
+  getPaymentStatusText,
+  hasCustomerCancelRequest,
+  hasPendingCustomerCancelRequest,
+} from './admin/utils';
+import type {
+  AdminView,
+  BookCategoryFilter,
+  BookImagePreview,
+  BookStockFilter,
+  BookVisibilityFilter,
+  CancelDecisionDialog,
+  CategoryBookFilter,
+  CategoryVisibilityFilter,
+  ConfirmDialog,
+  ExistingBookImage,
+  OrderAction,
+  OrderWorkflowTab,
+  PopupMessage,
+  PromotionBookStockFilter,
+  PromotionDraft,
+  PromotionModalMode,
+  UserLockFilter,
+  UserRoleFilter,
+  UserVerifiedFilter,
+} from './admin/types';
 
 export function AdminPage() {
   const navigate = useNavigate();
@@ -4993,204 +4675,4 @@ export function AdminPage() {
     </div>
   );
 }
-
-function SearchBox({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <div className="relative w-full max-w-md">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-      />
-    </div>
-  );
-}
-
-function BookInput({
-  label,
-  value,
-  onChange,
-  type = 'text',
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  required?: boolean;
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-      />
-    </div>
-  );
-}
-
-function UserInput({
-  label,
-  value,
-  onChange,
-  type = 'text',
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  required?: boolean;
-}) {
-  return (
-    <div>
-      <label className="mb-2 block text-sm font-medium text-gray-700">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      <input
-        type={type}
-        value={value}
-        required={required}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-      />
-    </div>
-  );
-}
-
-function BookImageGallery({
-  images,
-  compact = false,
-  deletedImageIds = [],
-  onToggleDelete,
-}: {
-  images: ExistingBookImage[];
-  compact?: boolean;
-  deletedImageIds?: string[];
-  onToggleDelete?: (imageId?: string) => void;
-}) {
-  if (images.length === 0) {
-    return <p className="text-sm text-gray-500">Chưa có ảnh sách.</p>;
-  }
-
-  return (
-    <div className={`grid gap-3 ${compact ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4 md:grid-cols-5'}`}>
-      {images.map((image, index) => {
-        const isDeleted = Boolean(image.id && deletedImageIds.includes(image.id));
-
-        return (
-        <div
-          key={`${image.url}-${index}`}
-          className={`relative overflow-hidden rounded-lg border bg-white ${
-            isDeleted ? 'border-red-300 opacity-60' : 'border-gray-200'
-          }`}
-        >
-          <img
-            src={image.url}
-            alt={`Ảnh sách ${index + 1}`}
-            className={`${compact ? 'h-24' : 'h-32'} w-full object-cover`}
-          />
-          {onToggleDelete && image.id && (
-            <button
-              type="button"
-              onClick={() => onToggleDelete(image.id)}
-              className={`absolute right-2 top-2 rounded-md px-2 py-1 text-xs font-medium shadow-sm ${
-                isDeleted
-                  ? 'bg-white text-red-600 hover:bg-red-50'
-                  : 'bg-red-600 text-white hover:bg-red-700'
-              }`}
-            >
-              {isDeleted ? 'Hoàn tác' : 'Xóa'}
-            </button>
-          )}
-          {image.isPrimary && !isDeleted && (
-            <div className="absolute left-2 top-2 rounded-md bg-orange-500 px-2 py-1 text-xs font-medium text-white">
-              Chính
-            </div>
-          )}
-          {isDeleted && (
-            <div className="absolute inset-x-0 bottom-0 bg-red-600/90 px-2 py-1 text-center text-xs font-medium text-white">
-              Sẽ xóa khi lưu
-            </div>
-          )}
-          {!compact && (
-            <div className="px-2 py-1 text-center text-xs text-gray-500">
-              Ảnh {index + 1}
-            </div>
-          )}
-        </div>
-      );
-      })}
-    </div>
-  );
-}
-
-function TableHead({
-  children,
-  align = 'left',
-  className = '',
-}: {
-  children: React.ReactNode;
-  align?: 'left' | 'right';
-  className?: string;
-}) {
-  return (
-    <th className={`px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 ${align === 'right' ? 'text-right' : 'text-left'} ${className}`}>
-      {children}
-    </th>
-  );
-}
-
-function TableCell({
-  children,
-  align = 'left',
-  className = '',
-}: {
-  children: React.ReactNode;
-  align?: 'left' | 'right';
-  className?: string;
-}) {
-  return <td className={`px-5 py-4 align-top text-sm text-gray-700 ${align === 'right' ? 'text-right' : 'text-left'} ${className}`}>{children}</td>;
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="flex items-center justify-center gap-2 px-6 py-10 text-gray-500">
-      <BarChart3 className="w-5 h-5" />
-      {text}
-    </div>
-  );
-}
-
-function InfoBlock({ title, rows }: { title: string; rows: Array<[string, string]> }) {
-  return (
-    <div>
-      <h4 className="text-sm font-medium text-gray-500 mb-3">{title}</h4>
-      <div className="space-y-2">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex justify-between gap-4">
-            <span className="text-gray-600">{label}</span>
-            <span className="font-medium text-gray-800 text-right">{value}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 
