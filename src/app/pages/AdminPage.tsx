@@ -106,7 +106,17 @@ type CategoryBookFilter = 'all' | 'with_books' | 'empty';
 type UserRoleFilter = 'all' | 'CUSTOMER' | 'STAFF' | 'ADMIN' | 'GUEST';
 type UserLockFilter = 'all' | 'active' | 'locked';
 type UserVerifiedFilter = 'all' | 'verified' | 'unverified';
-type OrderWorkflowTab = 'all' | 'pending' | 'processing' | 'shipped' | 'cancel_requests';
+type OrderWorkflowTab = 'all' | 'pending' | 'processing' | 'shipped' | 'completed' | 'cancelled' | 'cancel_requests';
+type OrderAction =
+  | { key: 'confirm'; label: string; group: 'operation'; nextStatus: AdminOrderStatus; variant: 'primary' }
+  | { key: 'handover'; label: string; group: 'operation'; nextStatus: AdminOrderStatus; variant: 'primary' }
+  | { key: 'complete'; label: string; group: 'operation'; nextStatus: AdminOrderStatus; variant: 'success' }
+  | { key: 'print'; label: string; group: 'operation'; variant: 'secondary' }
+  | { key: 'approve_cancel'; label: string; group: 'cancel'; variant: 'danger' }
+  | { key: 'reject_cancel'; label: string; group: 'cancel'; variant: 'secondary' }
+  | { key: 'manual_cancel'; label: string; group: 'cancel'; variant: 'danger' }
+  | { key: 'view_cancel'; label: string; group: 'cancel'; variant: 'danger' }
+  | { key: 'view'; label: string; group: 'view'; variant: 'icon' };
 type PopupMessage = { type: 'success' | 'error'; text: string } | null;
 type BookImagePreview = { name: string; url: string; size: number };
 type PromotionModalMode = 'create' | 'edit' | null;
@@ -119,7 +129,7 @@ type ConfirmDialog = {
 } | null;
 type CancelDecisionDialog = {
   action: 'approve' | 'reject';
-  order: AdminOrderDetail;
+  order: AdminOrder | AdminOrderDetail;
 } | null;
 
 const COLORS = ['#F97316', '#3B82F6', '#8B5CF6', '#10B981', '#EF4444', '#14B8A6'];
@@ -189,6 +199,27 @@ const getNextStatuses = (status: AdminOrderStatus): AdminOrderStatus[] => {
     CANCELLED: [],
   };
   return transitions[status] || [];
+};
+
+const getOrderOperationNote = (status: AdminOrderStatus) => {
+  const notes: Partial<Record<AdminOrderStatus, string>> = {
+    PROCESSING: 'Nhân viên xác nhận đơn hàng',
+    SHIPPED: 'Nhân viên đã đóng gói và bàn giao vận chuyển',
+    COMPLETED: 'Nhân viên xác nhận giao hàng thành công',
+  };
+  return notes[status];
+};
+
+const getOrderTaskText = (order: AdminOrder | AdminOrderDetail) => {
+  if (hasPendingCustomerCancelRequest(order)) return 'Chờ xử lý hủy';
+  const labels: Record<AdminOrderStatus, string> = {
+    PENDING: 'Cần xác nhận',
+    PROCESSING: 'Cần đóng gói',
+    SHIPPED: 'Đang giao khách',
+    COMPLETED: 'Không cần thao tác',
+    CANCELLED: 'Đã hủy',
+  };
+  return labels[order.status] || 'Không cần thao tác';
 };
 
 const getPaymentMethodText = (method?: string) => {
@@ -861,12 +892,6 @@ export function AdminPage() {
   });
   const cancelRequestOrders = orders.filter((order) => hasPendingCustomerCancelRequest(order));
   const cancelRequestCount = showCancelRequestsOnly ? orderTotal : cancelRequestOrders.length;
-  const orderStatusSummary = ORDER_STATUS_OPTIONS.map((status) => ({
-    status,
-    label: getOrderStatusText(status),
-    count: orderStatusTotals[status] || 0,
-    className: getOrderStatusColor(status),
-  }));
   const orderWorkflowTabs: Array<{
     id: OrderWorkflowTab;
     label: string;
@@ -879,8 +904,10 @@ export function AdminPage() {
       count: ORDER_STATUS_OPTIONS.reduce((sum, status) => sum + (orderStatusTotals[status] || 0), 0),
     },
     { id: 'pending', label: 'Chờ xác nhận', count: orderStatusTotals.PENDING || 0, status: 'PENDING' },
-    { id: 'processing', label: 'Đang chuẩn bị', count: orderStatusTotals.PROCESSING || 0, status: 'PROCESSING' },
+    { id: 'processing', label: 'Cần đóng gói', count: orderStatusTotals.PROCESSING || 0, status: 'PROCESSING' },
     { id: 'shipped', label: 'Đang giao', count: orderStatusTotals.SHIPPED || 0, status: 'SHIPPED' },
+    { id: 'completed', label: 'Hoàn tất', count: orderStatusTotals.COMPLETED || 0, status: 'COMPLETED' },
+    { id: 'cancelled', label: 'Đã hủy', count: orderStatusTotals.CANCELLED || 0, status: 'CANCELLED' },
     { id: 'cancel_requests', label: 'Yêu cầu hủy', count: cancelRequestCount },
   ];
   const activeUsers = customers.filter((customer) => !customer.isLocked);
@@ -907,7 +934,11 @@ export function AdminPage() {
           ? 'processing'
           : status === 'SHIPPED'
             ? 'shipped'
-            : 'all'
+            : status === 'COMPLETED'
+              ? 'completed'
+              : status === 'CANCELLED'
+                ? 'cancelled'
+                : 'all'
     );
     setShowCancelRequestsOnly(false);
     setSearchQuery('');
@@ -1161,7 +1192,71 @@ export function AdminPage() {
     }
   };
 
-  const confirmOrderStatusUpdate = (order: AdminOrder, status: AdminOrderStatus) => {
+  const getOrderActions = (order: AdminOrder | AdminOrderDetail, placement: 'table' | 'modal'): OrderAction[] => {
+    const actions: OrderAction[] = [];
+    const hasCancelRequest = hasPendingCustomerCancelRequest(order);
+
+    if (hasCancelRequest) {
+      if (placement === 'table') {
+        actions.push({ key: 'view_cancel', label: 'Xử lý hủy', group: 'cancel', variant: 'danger' });
+      } else {
+        actions.push({ key: 'approve_cancel', label: 'Duyệt hủy đơn', group: 'cancel', variant: 'danger' });
+        actions.push({ key: 'reject_cancel', label: 'Từ chối yêu cầu', group: 'cancel', variant: 'secondary' });
+      }
+    } else if (isAdmin && ['PENDING', 'PROCESSING'].includes(order.status)) {
+      actions.push({ key: 'manual_cancel', label: 'Hủy đơn thủ công', group: 'cancel', variant: 'danger' });
+    }
+
+    const showOperationalActions = placement === 'modal' || !hasCancelRequest;
+
+    if (showOperationalActions && order.status === 'PENDING') {
+      actions.push({ key: 'confirm', label: 'Xác nhận đơn', group: 'operation', nextStatus: 'PROCESSING', variant: 'primary' });
+    }
+
+    if (showOperationalActions && order.status === 'PROCESSING') {
+      actions.push({ key: 'print', label: 'In phiếu', group: 'operation', variant: 'secondary' });
+      actions.push({ key: 'handover', label: 'Chuyển sang đang giao', group: 'operation', nextStatus: 'SHIPPED', variant: 'primary' });
+    }
+
+    if (showOperationalActions && order.status === 'SHIPPED') {
+      actions.push({ key: 'complete', label: 'Xác nhận hoàn thành', group: 'operation', nextStatus: 'COMPLETED', variant: 'success' });
+    }
+
+    if (placement === 'table') {
+      actions.push({ key: 'view', label: 'Xem chi tiết', group: 'view', variant: 'icon' });
+    }
+
+    return actions;
+  };
+
+  const handleOperationalStatusChange = async (
+    order: AdminOrder | AdminOrderDetail,
+    status: AdminOrderStatus,
+    note?: string
+  ) => {
+    try {
+      setUpdatingStatus(true);
+      const updatedOrder = await updateAdminOrderStatus(order.id, status, note || getOrderOperationNote(status));
+      if (selectedOrder?.id === updatedOrder.id) {
+        setSelectedOrder(updatedOrder);
+        setOrderInternalNote('');
+      }
+      await loadData();
+      showPopup({ type: 'success', text: 'Đã cập nhật trạng thái đơn hàng.' });
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Không thể cập nhật trạng thái đơn hàng';
+      setError(message);
+      showPopup({ type: 'error', text: message });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const confirmOperationalStatusChange = (
+    order: AdminOrder | AdminOrderDetail,
+    status: AdminOrderStatus,
+    note?: string
+  ) => {
     const orderCode = order.orderCode || order.id.slice(0, 8);
     const messages: Record<AdminOrderStatus, string> = {
       PENDING: '',
@@ -1175,21 +1270,68 @@ export function AdminPage() {
       title: getOrderStatusText(status),
       message: messages[status] || `Chuyển đơn ${orderCode} sang trạng thái ${getOrderStatusText(status)}?`,
       confirmLabel: 'Xác nhận',
-      variant: status === 'CANCELLED' ? 'danger' : 'warning',
-      onConfirm: async () => {
-        const note =
-          status === 'PROCESSING'
-            ? 'Staff xác nhận đơn hàng'
-            : status === 'SHIPPED'
-              ? 'Staff đã đóng gói và bàn giao vận chuyển'
-              : status === 'COMPLETED'
-                ? 'Staff xác nhận giao hàng thành công'
-                : undefined;
-        await updateAdminOrderStatus(order.id, status, note);
-        await loadData();
-      },
+      variant: 'warning',
+      onConfirm: async () => handleOperationalStatusChange(order, status, note),
     });
   };
+
+  const handleOrderAction = (order: AdminOrder | AdminOrderDetail, action: OrderAction) => {
+    if (action.key === 'view' || action.key === 'view_cancel') {
+      openOrderDetail(order);
+      return;
+    }
+
+    if (action.key === 'print') {
+      if ('items' in order) {
+        handlePrintOrder(order);
+      } else {
+        handlePrintOrderFromList(order);
+      }
+      return;
+    }
+
+    if (action.key === 'approve_cancel' || action.key === 'manual_cancel') {
+      openCancelDecisionDialog('approve', order);
+      return;
+    }
+
+    if (action.key === 'reject_cancel') {
+      openCancelDecisionDialog('reject', order);
+      return;
+    }
+
+    if ('nextStatus' in action) {
+      const note = 'items' in order ? orderInternalNote.trim() || undefined : undefined;
+      confirmOperationalStatusChange(order, action.nextStatus, note);
+    }
+  };
+
+  const getOrderActionClassName = (action: OrderAction) => {
+    if (action.variant === 'icon') return 'p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors';
+    if (action.variant === 'danger') {
+      return 'rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50';
+    }
+    if (action.variant === 'success') {
+      return 'rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50';
+    }
+    if (action.variant === 'primary') {
+      return 'rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50';
+    }
+    return 'rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50';
+  };
+
+  const renderOrderActionButton = (order: AdminOrder | AdminOrderDetail, action: OrderAction) => (
+    <button
+      key={action.key}
+      type="button"
+      disabled={updatingStatus}
+      onClick={() => handleOrderAction(order, action)}
+      className={getOrderActionClassName(action)}
+      title={action.label}
+    >
+      {action.variant === 'icon' ? <Eye className="w-4 h-4" /> : action.label}
+    </button>
+  );
 
   const formatFileSize = (size: number) => `${(size / 1024 / 1024).toFixed(1)}MB`;
 
@@ -1979,52 +2121,17 @@ export function AdminPage() {
     );
   };
 
-  const executeSelectedOrderStatusUpdate = async (status: AdminOrderStatus) => {
-    if (!selectedOrder) return;
-
-    try {
-      setUpdatingStatus(true);
-      const note = orderInternalNote.trim();
-      const updatedOrder = await updateAdminOrderStatus(selectedOrder.id, status, note || undefined);
-      setSelectedOrder(updatedOrder);
-      setOrderInternalNote('');
-      await loadData();
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Không thể cập nhật trạng thái đơn hàng');
-    } finally {
-      setUpdatingStatus(false);
-    }
-  };
-
-  const handleUpdateStatus = async (status: AdminOrderStatus) => {
-    if (!selectedOrder) return;
-    if (status === 'CANCELLED') {
-      openCancelDecisionDialog('approve');
-      return;
-    }
-
-    const orderCode = selectedOrder.orderCode || selectedOrder.id.slice(0, 8);
-    const messages: Record<AdminOrderStatus, string> = {
-      PENDING: '',
-      PROCESSING: `Xác nhận đơn ${orderCode} và chuyển sang đang chuẩn bị?`,
-      SHIPPED: `Đơn ${orderCode} đã được đóng gói và bàn giao vận chuyển?`,
-      COMPLETED: `Xác nhận đơn ${orderCode} đã giao thành công?`,
-      CANCELLED: `Hủy đơn ${orderCode}?`,
-    };
-
-    setConfirmDialog({
-      title: getOrderStatusText(status),
-      message: messages[status] || `Chuyển đơn ${orderCode} sang trạng thái ${getOrderStatusText(status)}?`,
-      confirmLabel: 'Xác nhận',
-      variant: 'warning',
-      onConfirm: async () => executeSelectedOrderStatusUpdate(status),
-    });
-  };
-
-  const openCancelDecisionDialog = (action: 'approve' | 'reject') => {
-    if (!selectedOrder) return;
-    setCancelDecisionDialog({ action, order: selectedOrder });
-    setCancelDecisionNote(action === 'approve' ? 'Admin duyệt yêu cầu hủy đơn' : '');
+  const openCancelDecisionDialog = (action: 'approve' | 'reject', order?: AdminOrder | AdminOrderDetail) => {
+    const targetOrder = order || selectedOrder;
+    if (!targetOrder) return;
+    setCancelDecisionDialog({ action, order: targetOrder });
+    setCancelDecisionNote(
+      action === 'approve'
+        ? hasPendingCustomerCancelRequest(targetOrder)
+          ? 'Duyệt yêu cầu hủy đơn'
+          : 'Hủy đơn thủ công'
+        : ''
+    );
   };
 
   const closeCancelDecisionDialog = () => {
@@ -2060,11 +2167,14 @@ export function AdminPage() {
       setCancelDecisionDialog(null);
       setCancelDecisionNote('');
       await loadData();
+      const hadCancelRequest = hasPendingCustomerCancelRequest(cancelDecisionDialog.order);
       showPopup({
         type: 'success',
         text:
           cancelDecisionDialog.action === 'approve'
-            ? 'Đã duyệt yêu cầu hủy đơn hàng.'
+            ? hadCancelRequest
+              ? 'Đã duyệt yêu cầu hủy đơn hàng.'
+              : 'Đã hủy đơn hàng.'
             : 'Đã từ chối yêu cầu hủy, đơn hàng tiếp tục được xử lý.',
       });
     } catch (err: any) {
@@ -2351,7 +2461,9 @@ export function AdminPage() {
                     <div>
                       <h3 className="text-xl font-bold">
                         {cancelDecisionDialog.action === 'approve'
-                          ? 'Duyệt hủy đơn hàng'
+                          ? hasPendingCustomerCancelRequest(cancelDecisionDialog.order)
+                            ? 'Duyệt hủy đơn hàng'
+                            : 'Hủy đơn thủ công'
                           : 'Từ chối yêu cầu hủy'}
                       </h3>
                       <p className="mt-1 text-sm text-white/90">
@@ -2412,7 +2524,9 @@ export function AdminPage() {
                       {updatingStatus
                         ? 'Đang xử lý...'
                         : cancelDecisionDialog.action === 'approve'
-                          ? 'Duyệt hủy'
+                          ? hasPendingCustomerCancelRequest(cancelDecisionDialog.order)
+                            ? 'Duyệt hủy'
+                            : 'Hủy đơn'
                           : 'Từ chối yêu cầu'}
                     </button>
                   </div>
@@ -3342,76 +3456,6 @@ export function AdminPage() {
 
           {currentView === 'orders' && (
             <div className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                {orderStatusSummary.map((item) => (
-                  <button
-                    key={item.status}
-                    type="button"
-                    onClick={() => {
-                      if (item.status === 'PENDING') return goToOrderWorkflowTab('pending');
-                      if (item.status === 'PROCESSING') return goToOrderWorkflowTab('processing');
-                      if (item.status === 'SHIPPED') return goToOrderWorkflowTab('shipped');
-                      setOrderWorkflowTab('all');
-                      setShowCancelRequestsOnly(false);
-                      setStatusFilter(item.status);
-                      setOrderCurrentPage(1);
-                    }}
-                    className={`rounded-2xl border p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                      statusFilter === item.status ? 'border-orange-300 bg-orange-50' : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.className}`}>
-                        {item.label}
-                      </span>
-                      <ShoppingCart className="h-5 w-5 text-gray-300" />
-                    </div>
-                    <div className="mt-4 text-3xl font-bold text-gray-900">
-                      {item.count.toLocaleString('vi-VN')}
-                    </div>
-                    <div className="mt-1 text-xs text-gray-500">Đơn hàng</div>
-                  </button>
-                ))}
-              </div>
-
-              {cancelRequestOrders.length > 0 && (
-              <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="mt-1 h-6 w-6 text-yellow-700" />
-                    <div>
-                      <h3 className="text-lg font-bold text-yellow-900">Yêu cầu hủy từ khách hàng</h3>
-                      <p className="mt-1 text-sm text-yellow-800">
-                        Có {cancelRequestOrders.length.toLocaleString('vi-VN')} đơn đang chờ admin xử lý yêu cầu hủy.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => (showCancelRequestsOnly ? goToOrderWorkflowTab('all') : goToOrderWorkflowTab('cancel_requests'))}
-                      className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                        showCancelRequestsOnly
-                          ? 'bg-yellow-700 text-white hover:bg-yellow-800'
-                          : 'border border-yellow-300 bg-white text-yellow-800 hover:bg-yellow-100'
-                      }`}
-                    >
-                      {showCancelRequestsOnly ? 'Hiển thị tất cả đơn' : 'Chỉ xem yêu cầu hủy'}
-                    </button>
-                    {cancelRequestOrders[0] && (
-                      <button
-                        type="button"
-                        onClick={() => openOrderDetail(cancelRequestOrders[0])}
-                        className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
-                      >
-                        Xử lý yêu cầu mới nhất
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              )}
-
               <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap gap-2">
                   {orderWorkflowTabs.map((tab) => (
@@ -3434,25 +3478,8 @@ export function AdminPage() {
                     </button>
                   ))}
                 </div>
-                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1.4fr_0.9fr_0.9fr_0.8fr_0.8fr_auto]">
+                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1.4fr_0.9fr_0.9fr_0.8fr_auto]">
                   <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm mã đơn, SĐT, tên khách..." />
-                  <select
-                    value={statusFilter}
-                    onChange={(event) => {
-                      const value = event.target.value as 'all' | AdminOrderStatus;
-                      setStatusFilter(value);
-                      setOrderWorkflowTab('all');
-                      setShowCancelRequestsOnly(false);
-                    }}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  >
-                    <option value="all">Tất cả trạng thái</option>
-                    <option value="PENDING">Chờ xử lý</option>
-                    <option value="PROCESSING">Đang chuẩn bị</option>
-                    <option value="SHIPPED">Đang giao</option>
-                    <option value="COMPLETED">Hoàn thành</option>
-                    <option value="CANCELLED">Đã hủy</option>
-                  </select>
                   <select
                     value={orderPaymentMethodFilter}
                     onChange={(event) => setOrderPaymentMethodFilter(event.target.value as 'all' | AdminPaymentMethod)}
@@ -3509,6 +3536,7 @@ export function AdminPage() {
                       <TableHead>Tổng tiền</TableHead>
                       <TableHead>Thanh toán</TableHead>
                       <TableHead>Trạng thái</TableHead>
+                      <TableHead>Việc cần làm</TableHead>
                       <TableHead align="right">Thao tác</TableHead>
                     </tr>
                   </thead>
@@ -3553,59 +3581,12 @@ export function AdminPage() {
                             </span>
                           )}
                         </TableCell>
+                        <TableCell>
+                          <span className="text-sm font-medium text-gray-700">{getOrderTaskText(order)}</span>
+                        </TableCell>
                         <TableCell align="right">
                           <div className="flex flex-wrap justify-end gap-2">
-                            {hasPendingCustomerCancelRequest(order) && (
-                              <button
-                                onClick={() => openOrderDetail(order)}
-                                className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
-                              >
-                                Xử lý hủy
-                              </button>
-                            )}
-                            {order.status === 'PENDING' && (
-                              <button
-                                type="button"
-                                onClick={() => confirmOrderStatusUpdate(order, 'PROCESSING')}
-                                className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
-                              >
-                                Xác nhận
-                              </button>
-                            )}
-                            {order.status === 'PROCESSING' && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handlePrintOrderFromList(order)}
-                                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                                >
-                                  In phiếu
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => confirmOrderStatusUpdate(order, 'SHIPPED')}
-                                  className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
-                                >
-                                  Chuyển giao
-                                </button>
-                              </>
-                            )}
-                            {order.status === 'SHIPPED' && (
-                              <button
-                                type="button"
-                                onClick={() => confirmOrderStatusUpdate(order, 'COMPLETED')}
-                                className="rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700"
-                              >
-                                Hoàn thành
-                              </button>
-                            )}
-                            <button
-                              onClick={() => openOrderDetail(order)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Xem chi tiết"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                            {getOrderActions(order, 'table').map((action) => renderOrderActionButton(order, action))}
                           </div>
                         </TableCell>
                       </tr>
@@ -4585,70 +4566,6 @@ export function AdminPage() {
                 </button>
               </div>
 
-              {hasPendingCustomerCancelRequest(selectedOrder) && (
-                <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-700" />
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-yellow-900">Khách hàng yêu cầu hủy đơn</h4>
-                      <p className="mt-1 text-sm leading-6 text-yellow-800">
-                        {getLatestCancelNote(selectedOrder) || 'Khách đã gửi yêu cầu hủy đơn hàng này.'}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={updatingStatus}
-                          onClick={() => handleUpdateStatus('CANCELLED')}
-                          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
-                        >
-                          Duyệt hủy đơn
-                        </button>
-                        <button
-                          type="button"
-                          disabled={updatingStatus}
-                          onClick={() => openCancelDecisionDialog('reject')}
-                          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          Từ chối yêu cầu
-                        </button>
-                        {selectedOrder.status === 'PENDING' && (
-                          <button
-                            type="button"
-                            disabled={updatingStatus}
-                            onClick={() => handleUpdateStatus('PROCESSING')}
-                            className="rounded-lg border border-yellow-300 bg-white px-4 py-2 text-sm font-semibold text-yellow-800 transition-colors hover:bg-yellow-100 disabled:opacity-50"
-                          >
-                            Tiếp tục xử lý
-                          </button>
-                        )}
-                        {selectedOrder.status === 'PROCESSING' && (
-                          <button
-                            type="button"
-                            disabled={updatingStatus}
-                            onClick={() => handleUpdateStatus('SHIPPED')}
-                            className="rounded-lg border border-yellow-300 bg-white px-4 py-2 text-sm font-semibold text-yellow-800 transition-colors hover:bg-yellow-100 disabled:opacity-50"
-                          >
-                            Chuyển sang đang giao
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selectedOrder.status === 'CANCELLED' && getLatestCancelNote(selectedOrder) && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-                    <div>
-                      <h4 className="font-semibold text-red-800">Lý do hủy đơn</h4>
-                      <p className="mt-1 text-sm leading-6 text-red-700">{getLatestCancelNote(selectedOrder)}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div>
                 <h4 className="text-sm font-medium text-gray-500 mb-2">Địa chỉ giao hàng</h4>
                 <p className="text-gray-800">
@@ -4741,6 +4658,67 @@ export function AdminPage() {
                 <span className="text-2xl font-bold text-orange-500">{formatCurrency(selectedOrder.totalAmount)}</span>
               </div>
 
+              {getOrderActions(selectedOrder, 'modal').some((action) => action.group === 'operation') && (
+                <div className="rounded-xl border border-orange-100 bg-orange-50 p-4">
+                  <div className="mb-3">
+                    <h4 className="font-semibold text-gray-900">Xử lý vận hành</h4>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Trạng thái hiện tại: {getOrderStatusText(selectedOrder.status)}. Bước tiếp theo:{' '}
+                      {getNextStatuses(selectedOrder.status)
+                        .filter((status) => status !== 'CANCELLED')
+                        .map(getOrderStatusText)
+                        .join(', ') || 'Không còn thao tác'}
+                    </p>
+                  </div>
+                  <label className="mb-3 block">
+                    <span className="mb-1 block text-sm font-medium text-gray-600">Ghi chú nội bộ</span>
+                    <textarea
+                      value={orderInternalNote}
+                      onChange={(event) => setOrderInternalNote(event.target.value)}
+                      rows={3}
+                      maxLength={500}
+                      placeholder="Ví dụ: Đã gọi xác nhận, khách hẹn giao buổi chiều..."
+                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {getOrderActions(selectedOrder, 'modal')
+                      .filter((action) => action.group === 'operation')
+                      .map((action) => renderOrderActionButton(selectedOrder, action))}
+                  </div>
+                </div>
+              )}
+
+              {getOrderActions(selectedOrder, 'modal').some((action) => action.group === 'cancel') && (
+                <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+                  <div className="mb-3">
+                    <h4 className="font-semibold text-red-900">Xử lý hủy</h4>
+                    <p className="mt-1 text-sm leading-6 text-red-700">
+                      {hasPendingCustomerCancelRequest(selectedOrder)
+                        ? getLatestCancelNote(selectedOrder) || 'Khách đã gửi yêu cầu hủy đơn hàng này.'
+                        : 'Admin có thể hủy thủ công đơn chưa chuyển sang giao hàng.'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {getOrderActions(selectedOrder, 'modal')
+                      .filter((action) => action.group === 'cancel')
+                      .map((action) => renderOrderActionButton(selectedOrder, action))}
+                  </div>
+                </div>
+              )}
+
+              {selectedOrder.status === 'CANCELLED' && getLatestCancelNote(selectedOrder) && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                    <div>
+                      <h4 className="font-semibold text-red-800">Lý do hủy đơn</h4>
+                      <p className="mt-1 text-sm leading-6 text-red-700">{getLatestCancelNote(selectedOrder)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {(selectedOrder.statusLogs || []).length > 0 && (
                 <div className="rounded-xl border border-gray-200 bg-white p-4">
                   <h4 className="font-medium text-gray-800 mb-4">Lịch sử xử lý</h4>
@@ -4766,35 +4744,6 @@ export function AdminPage() {
                 </div>
               )}
 
-              {getNextStatuses(selectedOrder.status).length > 0 && (
-                <div className="rounded-xl bg-gray-50 p-4">
-                  <h4 className="font-medium text-gray-800 mb-3">Cập nhật trạng thái</h4>
-                  <label className="mb-3 block">
-                    <span className="mb-1 block text-sm font-medium text-gray-600">Ghi chú nội bộ</span>
-                    <textarea
-                      value={orderInternalNote}
-                      onChange={(event) => setOrderInternalNote(event.target.value)}
-                      rows={3}
-                      maxLength={500}
-                      placeholder="Ví dụ: Đã gọi xác nhận, khách hẹn giao buổi chiều..."
-                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {getNextStatuses(selectedOrder.status).map((status) => (
-                      <button
-                        key={status}
-                        disabled={updatingStatus}
-                        onClick={() => handleUpdateStatus(status)}
-                        className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors flex items-center gap-2"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        {getOrderStatusText(status)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
