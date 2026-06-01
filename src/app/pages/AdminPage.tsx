@@ -1010,47 +1010,68 @@ export function AdminPage() {
   const stockAlertBooks = [...outOfStockBooks, ...lowStockBooks].sort(
     (a, b) => Number(a.stock || 0) - Number(b.stock || 0)
   );
-  const staffPriorityOrders = orders
-    .filter((order) => order.status === 'PENDING' || hasPendingCustomerCancelRequest(order))
-    .sort((a, b) => {
-      const cancelDiff = Number(hasPendingCustomerCancelRequest(b)) - Number(hasPendingCustomerCancelRequest(a));
-      if (cancelDiff !== 0) return cancelDiff;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-  const staffTodoItems = [
+  const staffWorkCards = [
     {
-      id: 'pending-orders',
-      label: `${orderStatusTotals.PENDING || 0} đơn mới cần xác nhận`,
-      helper: 'Kiểm tra thông tin giao hàng và chuyển sang đang xử lý.',
-      actionLabel: 'Xem đơn',
-      hidden: (orderStatusTotals.PENDING || 0) === 0,
+      id: 'pending',
+      title: 'Cần xác nhận',
+      value: orderStatusTotals.PENDING || 0,
+      helper: 'Đơn mới cần kiểm tra thông tin',
+      className: 'border-orange-100 bg-orange-50 text-orange-700',
+      iconClassName: 'bg-orange-100 text-orange-700',
+      icon: ShoppingCart,
       onClick: () => goToOrders('PENDING'),
     },
     {
-      id: 'processing-orders',
-      label: `${orderStatusTotals.PROCESSING || 0} đơn đang xử lý`,
-      helper: 'Chuẩn bị hàng, đóng gói và cập nhật trạng thái giao hàng.',
-      actionLabel: 'Chuẩn bị đơn',
-      hidden: (orderStatusTotals.PROCESSING || 0) === 0,
+      id: 'processing',
+      title: 'Cần đóng gói',
+      value: orderStatusTotals.PROCESSING || 0,
+      helper: 'Đơn đã xác nhận chờ chuẩn bị',
+      className: 'border-blue-100 bg-blue-50 text-blue-700',
+      iconClassName: 'bg-blue-100 text-blue-700',
+      icon: Package,
       onClick: () => goToOrders('PROCESSING'),
     },
     {
-      id: 'cancel-requests',
-      label: `${cancelRequestOrders.length} yêu cầu hủy cần xử lý`,
-      helper: 'Xem lý do khách gửi và phản hồi yêu cầu hủy.',
-      actionLabel: 'Xử lý',
-      hidden: cancelRequestOrders.length === 0,
-      onClick: () => goToCancelRequests(),
+      id: 'shipped',
+      title: 'Đang giao',
+      value: orderStatusTotals.SHIPPED || 0,
+      helper: 'Theo dõi đơn đang vận chuyển',
+      className: 'border-indigo-100 bg-indigo-50 text-indigo-700',
+      iconClassName: 'bg-indigo-100 text-indigo-700',
+      icon: ShoppingCart,
+      onClick: () => goToOrders('SHIPPED'),
     },
     {
-      id: 'stock-alerts',
-      label: `${stockAlertBooks.length} sách cần kiểm tra tồn kho`,
-      helper: 'Ưu tiên sách hết hàng hoặc sắp hết để tránh bán thiếu.',
-      actionLabel: 'Cập nhật tồn',
-      hidden: stockAlertBooks.length === 0,
-      onClick: () => goToStockAlerts(stockAlertBooks.some((book) => Number(book.stock || 0) <= 0) ? 'out_of_stock' : 'low_stock'),
+      id: 'cancel',
+      title: 'Yêu cầu hủy',
+      value: cancelRequestCount,
+      helper: 'Cần phản hồi khách hàng',
+      className: 'border-rose-100 bg-rose-50 text-rose-700',
+      iconClassName: 'bg-rose-100 text-rose-700',
+      icon: AlertCircle,
+      onClick: () => goToCancelRequests(),
     },
-  ].filter((item) => !item.hidden);
+  ];
+  const staffPriorityOrders = orders
+    .filter(
+      (order) =>
+        hasPendingCustomerCancelRequest(order) ||
+        order.status === 'PENDING' ||
+        order.status === 'PROCESSING' ||
+        order.status === 'SHIPPED'
+    )
+    .sort((a, b) => {
+      const priority = (order: AdminOrder) => {
+        if (hasPendingCustomerCancelRequest(order)) return 0;
+        if (order.status === 'PENDING') return 1;
+        if (order.status === 'PROCESSING') return 2;
+        if (order.status === 'SHIPPED') return 3;
+        return 4;
+      };
+      const cancelDiff = priority(a) - priority(b);
+      if (cancelDiff !== 0) return cancelDiff;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
 
   const getPromotionStatusLabel = (promotion?: AdminPromotion) => {
     if (!promotion) return '';
@@ -1065,6 +1086,24 @@ export function AdminPage() {
   };
 
   const isPromotionCurrentlyActive = (promotion?: AdminPromotion) => getPromotionStatusLabel(promotion) === 'Đang áp dụng';
+  const staffActivePromotions = activePromotions
+    .filter(isPromotionCurrentlyActive)
+    .sort((a, b) => {
+      const left = a.endsAt ? new Date(a.endsAt).getTime() : Number.MAX_SAFE_INTEGER;
+      const right = b.endsAt ? new Date(b.endsAt).getTime() : Number.MAX_SAFE_INTEGER;
+      return left - right;
+    });
+  const getPromotionRemainingText = (promotion: AdminPromotion) => {
+    if (!promotion.endsAt) return 'Chưa có ngày kết thúc';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endsAt = new Date(promotion.endsAt);
+    endsAt.setHours(0, 0, 0, 0);
+    const days = Math.ceil((endsAt.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (days < 0) return 'Đã hết hạn';
+    if (days === 0) return 'Kết thúc hôm nay';
+    return `Còn ${days} ngày`;
+  };
   const filteredPromotionModalBooks = useMemo(() => {
     const keyword = promotionBookSearch.trim().toLowerCase();
 
@@ -2581,6 +2620,172 @@ export function AdminPage() {
 
           {currentView === 'dashboard' && (
             <div className="space-y-6">
+              {!isAdmin && (
+                <div className="space-y-6">
+                  <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-950">Bảng làm việc hôm nay</h2>
+                        <p className="mt-1 text-sm text-gray-500">Tập trung vào đơn cần xử lý, tồn kho và khuyến mãi đang chạy.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => goToOrders()}
+                        className="w-fit rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+                      >
+                        Mở đơn hàng
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {staffWorkCards.map((card) => {
+                      const Icon = card.icon;
+                      return (
+                        <button
+                          key={card.id}
+                          type="button"
+                          onClick={card.onClick}
+                          className={`rounded-2xl border p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${card.className}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold">{card.title}</p>
+                              <p className="mt-2 text-3xl font-bold">{card.value.toLocaleString('vi-VN')}</p>
+                            </div>
+                            <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${card.iconClassName}`}>
+                              <Icon className="h-5 w-5" />
+                            </span>
+                          </div>
+                          <p className="mt-3 text-sm opacity-80">{card.helper}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.35fr_0.9fr]">
+                    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">Hàng đợi xử lý đơn</h3>
+                          <p className="text-sm text-gray-500">Ưu tiên yêu cầu hủy, đơn mới, đóng gói và đang giao lâu nhất.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => goToOrders()}
+                          className="text-sm font-semibold text-orange-600 hover:text-orange-700"
+                        >
+                          Xem tất cả
+                        </button>
+                      </div>
+                      <div className="divide-y divide-gray-100">
+                        {staffPriorityOrders.slice(0, 8).map((order) => {
+                          const actions = getOrderActions(order, 'table').filter((action) => action.key !== 'view').slice(0, 2);
+                          return (
+                            <div key={order.id} className="grid gap-4 px-6 py-4 lg:grid-cols-[1fr_auto] lg:items-center">
+                              <button type="button" onClick={() => openOrderDetail(order)} className="min-w-0 text-left">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-semibold text-gray-950">{order.orderCode || order.id.slice(0, 8)}</span>
+                                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getOrderTaskPillClass(order)}`}>
+                                    {getOrderTaskText(order)}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-sm text-gray-600">
+                                  {order.customerName || 'Khách hàng'}{order.customerPhone ? ` - ${order.customerPhone}` : ''}
+                                </p>
+                                <p className="mt-1 text-sm text-gray-500">{formatDate(order.createdAt)} · {formatCurrency(order.totalAmount)}</p>
+                              </button>
+                              <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
+                                {actions.map((action) => renderOrderActionButton(order, action))}
+                                {renderOrderActionButton(order, { key: 'view', label: 'Xem chi tiết', group: 'view', variant: 'icon' })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {staffPriorityOrders.length === 0 && <EmptyState text="Không có đơn ưu tiên cần xử lý." />}
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-900">Cảnh báo tồn kho</h3>
+                            <p className="text-sm text-gray-500">Sách hết hàng và sắp hết cần cập nhật trước.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => goToStockAlerts('all')}
+                            className="text-sm font-semibold text-orange-600 hover:text-orange-700"
+                          >
+                            Tất cả sách
+                          </button>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {stockAlertBooks.slice(0, 5).map((book) => {
+                            const stock = Number(book.stock || 0);
+                            return (
+                              <div key={book.id} className="flex items-center justify-between gap-4 px-6 py-4">
+                                <div className="min-w-0">
+                                  <p className="line-clamp-1 font-semibold text-gray-950">{book.title}</p>
+                                  <p className="mt-1 text-sm text-gray-500">{book.category?.name || 'Chưa phân loại'}</p>
+                                  <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${stock <= 0 ? 'bg-rose-50 text-rose-700 ring-rose-100' : 'bg-amber-50 text-amber-700 ring-amber-100'}`}>
+                                    Tồn {stock.toLocaleString('vi-VN')}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => openBookDetail(book, 'edit')}
+                                  className="shrink-0 rounded-lg bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-100 transition-colors hover:bg-orange-100"
+                                >
+                                  Cập nhật
+                                </button>
+                              </div>
+                            );
+                          })}
+                          {stockAlertBooks.length === 0 && <EmptyState text="Không có cảnh báo tồn kho." />}
+                        </div>
+                      </div>
+
+                      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-900">Khuyến mãi đang chạy</h3>
+                            <p className="text-sm text-gray-500">Thông tin nhanh để tư vấn khách.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setCurrentView('promotions')}
+                            className="text-sm font-semibold text-orange-600 hover:text-orange-700"
+                          >
+                            Xem thêm
+                          </button>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {staffActivePromotions.slice(0, 4).map((promotion) => (
+                            <div key={promotion.id} className="px-6 py-4">
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                  <p className="line-clamp-1 font-semibold text-gray-950">{promotion.name}</p>
+                                  <p className="mt-1 text-sm text-gray-500">{promotion.bookCount || promotion.books?.length || 0} sách áp dụng</p>
+                                </div>
+                                <span className="shrink-0 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 ring-1 ring-orange-100">
+                                  -{promotion.discountPercent}%
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm font-medium text-gray-700">{getPromotionRemainingText(promotion)}</p>
+                            </div>
+                          ))}
+                          {staffActivePromotions.length === 0 && <EmptyState text="Không có chương trình đang chạy." />}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isAdmin && (
+              <>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
                 {stats.map((stat) => {
                   const Icon = stat.icon;
@@ -2596,192 +2801,6 @@ export function AdminPage() {
                 })}
               </div>
 
-              {!isAdmin && (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <button
-                      type="button"
-                      onClick={() => goToOrders('PENDING')}
-                      className="rounded-xl border border-yellow-100 bg-yellow-50 px-4 py-3 text-left text-sm font-semibold text-yellow-800 transition-colors hover:bg-yellow-100"
-                    >
-                      Đơn mới
-                    </button>
-                    <button
-                      type="button"
-                      onClick={goToCancelRequests}
-                      className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-left text-sm font-semibold text-red-700 transition-colors hover:bg-red-100"
-                    >
-                      Yêu cầu hủy
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => goToStockAlerts('out_of_stock')}
-                      className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-left text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100"
-                    >
-                      Sách hết hàng
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => goToStockAlerts('low_stock')}
-                      className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-left text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100"
-                    >
-                      Sách sắp hết
-                    </button>
-                  </div>
-
-                  <div className="rounded-xl bg-white p-6 shadow-sm">
-                    <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h3 className="text-lg font-bold text-gray-800">Việc cần làm hôm nay</h3>
-                        <p className="text-sm text-gray-500">Ưu tiên các tác vụ ảnh hưởng trực tiếp đến xử lý đơn và tồn kho.</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                      {staffTodoItems.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
-                          <div>
-                            <p className="font-semibold text-gray-900">{item.label}</p>
-                            <p className="mt-1 text-sm text-gray-500">{item.helper}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={item.onClick}
-                            className="shrink-0 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
-                          >
-                            {item.actionLabel}
-                          </button>
-                        </div>
-                      ))}
-                      {staffTodoItems.length === 0 && (
-                        <div className="rounded-xl border border-green-100 bg-green-50 p-4 text-sm font-medium text-green-700 xl:col-span-2">
-                          Chưa có tác vụ khẩn cấp. Tiếp tục theo dõi đơn mới và tồn kho trong ca làm việc.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                    <div className="overflow-hidden rounded-xl bg-white shadow-sm">
-                      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-800">Đơn cần xử lý ngay</h3>
-                          <p className="text-sm text-gray-500">Đơn mới và yêu cầu hủy được đưa lên đầu.</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => goToOrders()}
-                          className="text-sm font-semibold text-orange-600 hover:text-orange-700"
-                        >
-                          Tất cả đơn
-                        </button>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[620px]">
-                          <thead className="bg-slate-50">
-                            <tr>
-                              <TableHead>Mã đơn</TableHead>
-                              <TableHead>Khách</TableHead>
-                              <TableHead>Tổng tiền</TableHead>
-                              <TableHead>Trạng thái</TableHead>
-                              <TableHead>Ngày đặt</TableHead>
-                              <TableHead align="right">Hành động</TableHead>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {staffPriorityOrders.slice(0, 6).map((order) => (
-                              <tr key={order.id} className="bg-white">
-                                <TableCell className="font-semibold text-gray-900">{order.orderCode || order.id.slice(0, 8)}</TableCell>
-                                <TableCell>{order.customerName || 'Khách hàng'}</TableCell>
-                                <TableCell>{formatCurrency(order.totalAmount)}</TableCell>
-                                <TableCell>
-                                  <span className={`text-xs px-2 py-1 rounded-full ${getOrderStatusColor(order.status)}`}>
-                                    {hasPendingCustomerCancelRequest(order) ? 'Yêu cầu hủy' : getOrderStatusText(order.status)}
-                                  </span>
-                                </TableCell>
-                                <TableCell>{formatDate(order.createdAt)}</TableCell>
-                                <TableCell align="right">
-                                  <button
-                                    type="button"
-                                    onClick={() => openOrderDetail(order)}
-                                    className="rounded-lg bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 transition-colors hover:bg-orange-100"
-                                  >
-                                    Xử lý
-                                  </button>
-                                </TableCell>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {staffPriorityOrders.length === 0 && <EmptyState text="Không có đơn ưu tiên cần xử lý." />}
-                      </div>
-                    </div>
-
-                    <div className="overflow-hidden rounded-xl bg-white shadow-sm">
-                      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-800">Cảnh báo tồn kho</h3>
-                          <p className="text-sm text-gray-500">Sách hết hàng và sắp hết cần cập nhật trước.</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => goToStockAlerts('all')}
-                          className="text-sm font-semibold text-orange-600 hover:text-orange-700"
-                        >
-                          Tất cả sách
-                        </button>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[620px]">
-                          <thead className="bg-slate-50">
-                            <tr>
-                              <TableHead>Sách</TableHead>
-                              <TableHead>Tồn kho</TableHead>
-                              <TableHead>Đã bán</TableHead>
-                              <TableHead>Trạng thái</TableHead>
-                              <TableHead align="right">Hành động</TableHead>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {stockAlertBooks.slice(0, 6).map((book) => {
-                              const stock = Number(book.stock || 0);
-                              return (
-                                <tr key={book.id} className="bg-white">
-                                  <TableCell>
-                                    <div className="min-w-0">
-                                      <p className="line-clamp-1 font-semibold text-gray-900">{book.title}</p>
-                                      <p className="text-sm text-gray-500">{book.author}</p>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>{stock.toLocaleString('vi-VN')}</TableCell>
-                                  <TableCell>{Number(book.soldCount || 0).toLocaleString('vi-VN')}</TableCell>
-                                  <TableCell>
-                                    <span className={`text-xs px-2 py-1 rounded-full ${stock <= 0 ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                      {stock <= 0 ? 'Hết hàng' : 'Sắp hết'}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    <button
-                                      type="button"
-                                      onClick={() => openBookDetail(book, 'edit')}
-                                      className="rounded-lg bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 transition-colors hover:bg-orange-100"
-                                    >
-                                      Cập nhật
-                                    </button>
-                                  </TableCell>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                        {stockAlertBooks.length === 0 && <EmptyState text="Không có cảnh báo tồn kho." />}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isAdmin && (
-              <>
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 <div className="bg-white rounded-xl p-6 shadow-sm">
                   <h3 className="text-lg font-bold text-gray-800 mb-6">Doanh thu theo tháng</h3>
