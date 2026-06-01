@@ -1108,6 +1108,131 @@ export function AdminPage() {
       const right = b.endsAt ? new Date(b.endsAt).getTime() : Number.MAX_SAFE_INTEGER;
       return left - right;
     });
+  const latestRevenuePoint = dashboard?.revenueData?.[(dashboard?.revenueData?.length || 1) - 1];
+  const currentMonthRevenue = Number(latestRevenuePoint?.revenue || 0) * 1_000_000;
+  const completedOrderTotal = orderStatusTotals.COMPLETED || 0;
+  const cancelledOrderTotal = orderStatusTotals.CANCELLED || 0;
+  const allOrderTotal = ORDER_STATUS_OPTIONS.reduce((sum, status) => sum + (orderStatusTotals[status] || 0), 0);
+  const averageOrderValue = completedOrderTotal > 0 ? Number(dashboard?.stats.totalRevenue || 0) / completedOrderTotal : 0;
+  const completionRate = allOrderTotal > 0 ? Math.round((completedOrderTotal / allOrderTotal) * 100) : 0;
+  const cancelRate = allOrderTotal > 0 ? Math.round((cancelledOrderTotal / allOrderTotal) * 100) : 0;
+  const adminKpiCards = [
+    {
+      id: 'month-revenue',
+      title: 'Doanh thu tháng này',
+      value: formatCurrency(currentMonthRevenue),
+      helper: 'Theo đơn đã hoàn thành',
+      icon: DollarSign,
+      className: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      iconClassName: 'bg-emerald-100 text-emerald-700',
+      onClick: undefined,
+    },
+    {
+      id: 'orders',
+      title: 'Tổng đơn hàng',
+      value: (dashboard?.stats.totalOrders || 0).toLocaleString('vi-VN'),
+      helper: 'Tất cả trạng thái',
+      icon: ShoppingCart,
+      className: 'border-blue-100 bg-blue-50 text-blue-700',
+      iconClassName: 'bg-blue-100 text-blue-700',
+      onClick: () => goToOrders(),
+    },
+    {
+      id: 'pending',
+      title: 'Đơn chờ xử lý',
+      value: (orderStatusTotals.PENDING || 0).toLocaleString('vi-VN'),
+      helper: 'Cần xác nhận',
+      icon: AlertCircle,
+      className: 'border-orange-100 bg-orange-50 text-orange-700',
+      iconClassName: 'bg-orange-100 text-orange-700',
+      onClick: () => goToOrders('PENDING'),
+    },
+    {
+      id: 'cancel',
+      title: 'Yêu cầu hủy',
+      value: cancelRequestCount.toLocaleString('vi-VN'),
+      helper: 'Cần phản hồi',
+      icon: ArchiveX,
+      className: 'border-rose-100 bg-rose-50 text-rose-700',
+      iconClassName: 'bg-rose-100 text-rose-700',
+      onClick: () => goToCancelRequests(),
+    },
+    {
+      id: 'books',
+      title: 'Sách đang bán',
+      value: books.filter((book) => !isBookDeleted(book)).length.toLocaleString('vi-VN'),
+      helper: `${stockAlertBooks.length.toLocaleString('vi-VN')} sách cần chú ý`,
+      icon: BookOpen,
+      className: 'border-indigo-100 bg-indigo-50 text-indigo-700',
+      iconClassName: 'bg-indigo-100 text-indigo-700',
+      onClick: () => {
+        setBookVisibilityFilter('active');
+        setCurrentView('books');
+      },
+    },
+    {
+      id: 'customers',
+      title: 'Khách hàng',
+      value: (dashboard?.stats.totalCustomers || 0).toLocaleString('vi-VN'),
+      helper: 'Tài khoản khách',
+      icon: Users,
+      className: 'border-sky-100 bg-sky-50 text-sky-700',
+      iconClassName: 'bg-sky-100 text-sky-700',
+      onClick: () => setCurrentView('customers'),
+    },
+  ];
+  const adminActionItems = [
+    {
+      id: 'pending-orders',
+      label: `${(orderStatusTotals.PENDING || 0).toLocaleString('vi-VN')} đơn chờ xác nhận`,
+      helper: 'Kiểm tra thông tin khách và chuyển sang đóng gói.',
+      actionLabel: 'Xem đơn',
+      hidden: (orderStatusTotals.PENDING || 0) === 0,
+      onClick: () => goToOrders('PENDING'),
+    },
+    {
+      id: 'packing-orders',
+      label: `${(orderStatusTotals.PROCESSING || 0).toLocaleString('vi-VN')} đơn cần đóng gói`,
+      helper: 'Theo dõi tiến độ chuẩn bị hàng.',
+      actionLabel: 'Đóng gói',
+      hidden: (orderStatusTotals.PROCESSING || 0) === 0,
+      onClick: () => goToOrders('PROCESSING'),
+    },
+    {
+      id: 'cancel-requests',
+      label: `${cancelRequestCount.toLocaleString('vi-VN')} yêu cầu hủy`,
+      helper: 'Duyệt hoặc từ chối yêu cầu hủy từ khách.',
+      actionLabel: 'Xử lý',
+      hidden: cancelRequestCount === 0,
+      onClick: () => goToCancelRequests(),
+    },
+    {
+      id: 'stock-alerts',
+      label: `${stockAlertBooks.length.toLocaleString('vi-VN')} sách tồn kho thấp`,
+      helper: 'Ưu tiên sách hết hàng và sắp hết.',
+      actionLabel: 'Xem sách',
+      hidden: stockAlertBooks.length === 0,
+      onClick: () => goToStockAlerts(stockAlertBooks.some((book) => Number(book.stock || 0) <= 0) ? 'out_of_stock' : 'low_stock'),
+    },
+    {
+      id: 'ending-promotions',
+      label: `${staffActivePromotions.filter((promotion) => promotion.endsAt && new Date(promotion.endsAt).getTime() - Date.now() <= 3 * 24 * 60 * 60 * 1000).length.toLocaleString('vi-VN')} khuyến mãi sắp hết`,
+      helper: 'Kiểm tra chương trình cần gia hạn hoặc thay banner.',
+      actionLabel: 'Xem KM',
+      hidden: staffActivePromotions.filter((promotion) => promotion.endsAt && new Date(promotion.endsAt).getTime() - Date.now() <= 3 * 24 * 60 * 60 * 1000).length === 0,
+      onClick: () => setCurrentView('promotions'),
+    },
+  ].filter((item) => !item.hidden);
+  const adminOrderStatusChartData = ORDER_STATUS_OPTIONS.map((status) => ({
+    status,
+    label: getOrderStatusText(status),
+    count: orderStatusTotals[status] || 0,
+  }));
+  const adminHealthMetrics = [
+    { label: 'Giá trị TB / đơn hoàn thành', value: formatCurrency(averageOrderValue) },
+    { label: 'Tỷ lệ hoàn thành', value: `${completionRate}%` },
+    { label: 'Tỷ lệ hủy', value: `${cancelRate}%` },
+  ];
   const getPromotionRemainingText = (promotion: AdminPromotion) => {
     if (!promotion.endsAt) return 'Chưa có ngày kết thúc';
     const today = new Date();
@@ -1164,68 +1289,6 @@ export function AdminPage() {
       setIsConfirmingDialog(false);
     }
   };
-
-  const stats = isAdmin
-    ? [
-        {
-          title: 'Tổng doanh thu',
-          value: formatCurrency(dashboard?.stats.totalRevenue || 0),
-          icon: DollarSign,
-          textColor: 'text-green-600',
-          bgLight: 'bg-green-50',
-        },
-        {
-          title: 'Đơn hàng',
-          value: (dashboard?.stats.totalOrders || 0).toLocaleString('vi-VN'),
-          icon: ShoppingCart,
-          textColor: 'text-blue-600',
-          bgLight: 'bg-blue-50',
-        },
-        {
-          title: 'Khách hàng',
-          value: (dashboard?.stats.totalCustomers || 0).toLocaleString('vi-VN'),
-          icon: Users,
-          textColor: 'text-purple-600',
-          bgLight: 'bg-purple-50',
-        },
-        {
-          title: 'Sản phẩm',
-          value: (dashboard?.stats.totalBooks || 0).toLocaleString('vi-VN'),
-          icon: Package,
-          textColor: 'text-orange-600',
-          bgLight: 'bg-orange-50',
-        },
-      ]
-    : [
-        {
-          title: 'Đơn chờ xử lý',
-          value: (orderStatusTotals.PENDING || 0).toLocaleString('vi-VN'),
-          icon: ShoppingCart,
-          textColor: 'text-yellow-600',
-          bgLight: 'bg-yellow-50',
-        },
-        {
-          title: 'Đơn đang xử lý',
-          value: (orderStatusTotals.PROCESSING || 0).toLocaleString('vi-VN'),
-          icon: Package,
-          textColor: 'text-blue-600',
-          bgLight: 'bg-blue-50',
-        },
-        {
-          title: 'Yêu cầu hủy',
-          value: cancelRequestOrders.length.toLocaleString('vi-VN'),
-          icon: AlertCircle,
-          textColor: 'text-red-600',
-          bgLight: 'bg-red-50',
-        },
-        {
-          title: 'Sách sắp hết',
-          value: lowStockBooks.length.toLocaleString('vi-VN'),
-          icon: ArchiveX,
-          textColor: 'text-orange-600',
-          bgLight: 'bg-orange-50',
-        },
-      ];
 
   const openOrderDetail = async (order: AdminOrder) => {
     try {
@@ -2793,62 +2856,142 @@ export function AdminPage() {
 
               {isAdmin && (
               <>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-                {stats.map((stat) => {
-                  const Icon = stat.icon;
-                  return (
-                    <div key={stat.title} className="bg-white rounded-xl p-6 shadow-sm">
-                      <div className={`w-12 h-12 ${stat.bgLight} rounded-lg flex items-center justify-center mb-4`}>
-                        <Icon className={`w-6 h-6 ${stat.textColor}`} />
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-950">Tổng quan điều hành</h2>
+                    <p className="mt-1 text-sm text-gray-500">Theo dõi doanh thu, tồn kho, đơn hàng và các việc cần xử lý trong ngày.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => goToOrders()}
+                    className="w-fit rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+                  >
+                    Mở quản lý đơn
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+                {adminKpiCards.map((card) => {
+                  const Icon = card.icon;
+                  const content = (
+                    <>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold">{card.title}</p>
+                          <p className="mt-2 text-2xl font-bold">{card.value}</p>
+                        </div>
+                        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.iconClassName}`}>
+                          <Icon className="h-5 w-5" />
+                        </span>
                       </div>
-                      <h3 className="text-gray-600 text-sm mb-1">{stat.title}</h3>
-                      <p className="text-3xl font-bold text-gray-800">{stat.value}</p>
+                      <p className="mt-3 text-xs font-medium opacity-80">{card.helper}</p>
+                    </>
+                  );
+
+                  return card.onClick ? (
+                    <button
+                      key={card.id}
+                      type="button"
+                      onClick={card.onClick}
+                      className={`rounded-2xl border p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${card.className}`}
+                    >
+                      {content}
+                    </button>
+                  ) : (
+                    <div key={card.id} className={`rounded-2xl border p-5 shadow-sm ${card.className}`}>
+                      {content}
                     </div>
                   );
                 })}
               </div>
 
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-800 mb-6">Doanh thu theo tháng</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={dashboard?.revenueData || []}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="month" stroke="#9CA3AF" />
-                      <YAxis stroke="#9CA3AF" />
-                      <Tooltip formatter={(value) => [`${value} triệu`, 'Doanh thu']} />
-                      <Legend />
-                      <Line type="monotone" dataKey="revenue" stroke="#F97316" strokeWidth={3} name="Doanh thu" />
-                    </LineChart>
-                  </ResponsiveContainer>
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.95fr_1.4fr]">
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-100 px-6 py-4">
+                    <h3 className="text-lg font-bold text-gray-900">Việc cần xử lý</h3>
+                    <p className="text-sm text-gray-500">Các việc ảnh hưởng trực tiếp đến vận hành cửa hàng.</p>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {adminActionItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between gap-4 px-6 py-4">
+                        <div>
+                          <p className="font-semibold text-gray-950">{item.label}</p>
+                          <p className="mt-1 text-sm text-gray-500">{item.helper}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={item.onClick}
+                          className="shrink-0 rounded-lg bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-100 transition-colors hover:bg-orange-100"
+                        >
+                          {item.actionLabel}
+                        </button>
+                      </div>
+                    ))}
+                    {adminActionItems.length === 0 && <EmptyState text="Không có việc cần xử lý ngay." />}
+                  </div>
                 </div>
 
-                <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-800 mb-6">Đơn hàng theo tháng</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={dashboard?.revenueData || []}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="month" stroke="#9CA3AF" />
-                      <YAxis stroke="#9CA3AF" />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="orders" fill="#3B82F6" name="Đơn hàng" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[1fr_0.55fr]">
+                  <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <h3 className="text-lg font-bold text-gray-900">Doanh thu theo tháng</h3>
+                    <p className="mt-1 text-sm text-gray-500">Đơn vị: triệu đồng, chỉ tính đơn hoàn thành.</p>
+                    <div className="mt-6">
+                      <ResponsiveContainer width="100%" height={290}>
+                        <LineChart data={dashboard?.revenueData || []}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="month" stroke="#9CA3AF" />
+                          <YAxis stroke="#9CA3AF" />
+                          <Tooltip formatter={(value) => [`${value} triệu đồng`, 'Doanh thu']} />
+                          <Legend />
+                          <Line type="monotone" dataKey="revenue" stroke="#F97316" strokeWidth={3} name="Doanh thu" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <h3 className="text-lg font-bold text-gray-900">Chỉ số vận hành</h3>
+                    <div className="mt-5 space-y-3">
+                      {adminHealthMetrics.map((metric) => (
+                        <div key={metric.label} className="rounded-xl bg-gray-50 px-4 py-3">
+                          <p className="text-xs font-medium text-gray-500">{metric.label}</p>
+                          <p className="mt-1 text-xl font-bold text-gray-950">{metric.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-800 mb-6">Phân bổ danh mục</h3>
-                  <ResponsiveContainer width="100%" height={240}>
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_0.8fr]">
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <h3 className="text-lg font-bold text-gray-900">Đơn theo trạng thái</h3>
+                  <p className="mt-1 text-sm text-gray-500">Backlog vận hành theo từng bước xử lý.</p>
+                  <div className="mt-6">
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={adminOrderStatusChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="label" stroke="#9CA3AF" />
+                        <YAxis allowDecimals={false} stroke="#9CA3AF" />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#F97316" name="Số đơn" radius={[8, 8, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <h3 className="text-lg font-bold text-gray-900">Phân bổ danh mục</h3>
+                  <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
                       <Pie
                         data={dashboard?.categoryData || []}
                         cx="50%"
                         cy="50%"
-                        innerRadius={55}
-                        outerRadius={90}
+                        innerRadius={50}
+                        outerRadius={85}
                         paddingAngle={4}
                         dataKey="value"
                       >
@@ -2859,11 +3002,11 @@ export function AdminPage() {
                       <Tooltip />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="space-y-2 mt-4">
-                    {(dashboard?.categoryData || []).map((item, index) => (
+                  <div className="mt-4 space-y-2">
+                    {(dashboard?.categoryData || []).slice(0, 5).map((item, index) => (
                       <div key={item.name} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                           <span className="text-sm text-gray-600">{item.name}</span>
                         </div>
                         <span className="text-sm font-medium text-gray-800">{item.value}%</span>
@@ -2871,33 +3014,101 @@ export function AdminPage() {
                     ))}
                   </div>
                 </div>
+              </div>
 
-                <div className="bg-white rounded-xl p-6 shadow-sm xl:col-span-2">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Đơn hàng gần đây</h3>
-                  <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                    <h3 className="text-lg font-bold text-gray-900">Đơn gần đây</h3>
+                    <button type="button" onClick={() => goToOrders()} className="text-sm font-semibold text-orange-600 hover:text-orange-700">
+                      Xem tất cả
+                    </button>
+                  </div>
+                  <div className="divide-y divide-gray-100">
                     {(dashboard?.recentOrders || []).map((order) => (
                       <button
                         key={order.id}
                         onClick={() => openOrderDetail(order)}
-                        className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-orange-50 transition-colors text-left"
+                        className="w-full px-6 py-4 text-left transition-colors hover:bg-orange-50/60"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                            <ShoppingCart className="w-5 h-5 text-orange-600" />
-                          </div>
+                        <div className="flex items-center justify-between gap-4">
                           <div>
-                            <p className="font-medium text-gray-800">{order.orderCode || order.id.slice(0, 8)}</p>
-                            <p className="text-sm text-gray-500">{order.customerName}</p>
+                            <p className="font-semibold text-gray-950">{order.orderCode || order.id.slice(0, 8)}</p>
+                            <p className="mt-1 text-sm text-gray-500">{order.customerName}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-gray-900">{formatCurrency(order.totalAmount)}</p>
+                            <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getOrderStatusPillClass(order.status)}`}>
+                              {getOrderStatusText(order.status)}
+                            </span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-medium text-gray-800">{formatCurrency(order.totalAmount)}</p>
-                          <span className={`text-xs px-2 py-1 rounded-full ${getOrderStatusColor(order.status)}`}>
-                            {getOrderStatusText(order.status)}
+                      </button>
+                    ))}
+                    {(dashboard?.recentOrders || []).length === 0 && <EmptyState text="Chưa có đơn gần đây." />}
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                    <h3 className="text-lg font-bold text-gray-900">Sách tồn thấp</h3>
+                    <button type="button" onClick={() => goToStockAlerts('low_stock')} className="text-sm font-semibold text-orange-600 hover:text-orange-700">
+                      Xem sách
+                    </button>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {stockAlertBooks.slice(0, 5).map((book) => {
+                      const stock = Number(book.stock || 0);
+                      return (
+                        <button
+                          key={book.id}
+                          type="button"
+                          onClick={() => openBookDetail(book, 'detail')}
+                          className="w-full px-6 py-4 text-left transition-colors hover:bg-orange-50/60"
+                        >
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                              <p className="line-clamp-1 font-semibold text-gray-950">{book.title}</p>
+                              <p className="mt-1 text-sm text-gray-500">Đã bán {Number(book.soldCount || 0).toLocaleString('vi-VN')}</p>
+                            </div>
+                            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${stock <= 0 ? 'bg-rose-50 text-rose-700 ring-rose-100' : 'bg-amber-50 text-amber-700 ring-amber-100'}`}>
+                              Tồn {stock.toLocaleString('vi-VN')}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {stockAlertBooks.length === 0 && <EmptyState text="Không có sách tồn thấp." />}
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                    <h3 className="text-lg font-bold text-gray-900">Khuyến mãi đang chạy</h3>
+                    <button type="button" onClick={() => setCurrentView('promotions')} className="text-sm font-semibold text-orange-600 hover:text-orange-700">
+                      Xem KM
+                    </button>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {staffActivePromotions.slice(0, 5).map((promotion) => (
+                      <button
+                        key={promotion.id}
+                        type="button"
+                        onClick={() => setCurrentView('promotions')}
+                        className="w-full px-6 py-4 text-left transition-colors hover:bg-orange-50/60"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <p className="line-clamp-1 font-semibold text-gray-950">{promotion.name}</p>
+                            <p className="mt-1 text-sm text-gray-500">{promotion.bookCount || promotion.books?.length || 0} sách · {getPromotionRemainingText(promotion)}</p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 ring-1 ring-orange-100">
+                            -{promotion.discountPercent}%
                           </span>
                         </div>
                       </button>
                     ))}
+                    {staffActivePromotions.length === 0 && <EmptyState text="Không có khuyến mãi đang chạy." />}
                   </div>
                 </div>
               </div>
