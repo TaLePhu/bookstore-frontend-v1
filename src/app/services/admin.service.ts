@@ -196,8 +196,40 @@ export const getAdminBooks = async (params?: {
   };
 };
 
+export const getManagementBooks = async (params?: {
+  page?: number;
+  limit?: number;
+  q?: string;
+  status?: 'in_stock' | 'out_of_stock';
+}): Promise<{ data: ApiBook[]; total: number }> => {
+  const endpoint = params?.q ? '/management/books/search' : '/management/books';
+  const res = await api.get(endpoint, {
+    params: {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 20,
+      q: params?.q || undefined,
+      status: params?.status,
+    },
+  });
+
+  return {
+    data: res.data.data,
+    total: res.data.pagination?.total ?? res.data.data.length,
+  };
+};
+
 export const getAdminBookDetail = async (id: string): Promise<ApiBook> => {
   const res = await api.get(`/admin/books/${id}`);
+  return res.data.data;
+};
+
+export const getManagementBookDetail = async (id: string): Promise<ApiBook> => {
+  const res = await api.get(`/management/books/${id}`);
+  return res.data.data;
+};
+
+export const updateManagementBookStock = async (id: string, stock: number): Promise<ApiBook> => {
+  const res = await api.patch(`/management/books/${id}/stock`, { stock });
   return res.data.data;
 };
 
