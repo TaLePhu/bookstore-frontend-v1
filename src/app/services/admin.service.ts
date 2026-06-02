@@ -185,6 +185,7 @@ export interface AdminBookImportPayload {
   language?: string;
   releaseDate?: string;
   imageUrl?: string;
+  imageUrls?: string[];
 }
 
 export interface AdminBookImportResult {

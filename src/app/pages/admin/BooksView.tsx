@@ -89,7 +89,12 @@ const IMPORT_COLUMNS = [
   'pages',
   'language',
   'releaseDate',
-  'imageUrl',
+  'imageUrls',
+  'imageUrl1',
+  'imageUrl2',
+  'imageUrl3',
+  'imageUrl4',
+  'imageUrl5',
 ];
 
 const parseCsvLine = (line: string) => {
@@ -213,6 +218,11 @@ export function BooksView({
         'Tác giả mẫu',
         '9786040000001',
         sampleCategory,
+        'https://example.com/book-cover-1.jpg|https://example.com/book-cover-2.jpg',
+        '',
+        '',
+        '',
+        '',
         '',
         '120000',
         '20',
@@ -256,6 +266,21 @@ export function BooksView({
         return acc;
       }, {});
       const categoryId = row.categoryId || categoryByName.get((row.categoryName || '').trim().toLowerCase()) || '';
+      const imageUrls = [
+        ...(row.imageUrls || '')
+          .split('|')
+          .map((value) => value.trim())
+          .filter(Boolean),
+        row.imageUrl,
+        row.imageUrl1,
+        row.imageUrl2,
+        row.imageUrl3,
+        row.imageUrl4,
+        row.imageUrl5,
+      ]
+        .map((value) => (value || '').trim())
+        .filter(Boolean)
+        .slice(0, 5);
 
       return {
         title: row.title,
@@ -270,7 +295,8 @@ export function BooksView({
         pages: row.pages,
         language: row.language || 'Tiếng Việt',
         releaseDate: row.releaseDate,
-        imageUrl: row.imageUrl,
+        imageUrl: imageUrls[0],
+        imageUrls,
       };
     });
   };
