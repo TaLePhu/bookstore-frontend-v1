@@ -383,7 +383,7 @@ const buildPromotionFormData = (payload: AdminPromotionPayload) => {
   const formData = new FormData();
   formData.append('name', payload.name);
   formData.append('description', payload.description || '');
-  if (payload.bannerImageUrl) formData.append('bannerImageUrl', payload.bannerImageUrl);
+  if (payload.bannerImageUrl !== undefined) formData.append('bannerImageUrl', payload.bannerImageUrl);
   formData.append('discountPercent', String(payload.discountPercent));
   if (payload.startsAt) formData.append('startsAt', payload.startsAt);
   if (payload.endsAt) formData.append('endsAt', payload.endsAt);

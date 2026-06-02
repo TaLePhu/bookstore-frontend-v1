@@ -1,6 +1,7 @@
-import type { AdminOrder, AdminOrderDetail, AdminOrderStatus } from '../../services/admin.service';
+import type { AdminOrder, AdminOrderDetail, AdminOrderStatus, AdminPromotion } from '../../services/admin.service';
 import type { ApiBook } from '../../services/book.service';
 import { LOW_STOCK_THRESHOLD } from './constants';
+import type { PromotionEffectiveStatus } from './types';
 
 export const formatCurrency = (value: number | string | null | undefined) =>
   `${Number(value || 0).toLocaleString('vi-VN')}đ`;
@@ -315,4 +316,32 @@ export const getBookStatusMeta = (book: ApiBook) => {
     dot: 'bg-emerald-500',
     className: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
   };
+};
+
+export const getPromotionEffectiveStatus = (promotion: AdminPromotion): PromotionEffectiveStatus => {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const startsAt = promotion.startsAt ? new Date(promotion.startsAt) : null;
+  const endsAt = promotion.endsAt ? new Date(promotion.endsAt) : null;
+  if (startsAt) startsAt.setHours(0, 0, 0, 0);
+  if (endsAt) endsAt.setHours(0, 0, 0, 0);
+
+  if (promotion.status !== 'ACTIVE') return 'inactive';
+  if (startsAt && startsAt > now) return 'upcoming';
+  if (endsAt && endsAt < now) return 'expired';
+  if (endsAt && endsAt.getTime() - now.getTime() <= 3 * 24 * 60 * 60 * 1000) return 'ending_soon';
+  return 'running';
+};
+
+export const getPromotionEffectiveMeta = (promotion: AdminPromotion) => {
+  const status = getPromotionEffectiveStatus(promotion);
+  const meta: Record<PromotionEffectiveStatus, { label: string; className: string }> = {
+    all: { label: 'Tất cả', className: 'bg-gray-50 text-gray-700 ring-gray-100' },
+    running: { label: 'Đang chạy', className: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
+    upcoming: { label: 'Sắp diễn ra', className: 'bg-blue-50 text-blue-700 ring-blue-100' },
+    ending_soon: { label: 'Sắp hết hạn', className: 'bg-amber-50 text-amber-700 ring-amber-100' },
+    expired: { label: 'Đã hết hạn', className: 'bg-rose-50 text-rose-700 ring-rose-100' },
+    inactive: { label: 'Tạm tắt', className: 'bg-gray-50 text-gray-600 ring-gray-100' },
+  };
+  return { status, ...meta[status] };
 };

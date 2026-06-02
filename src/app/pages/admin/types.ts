@@ -14,6 +14,7 @@ export type BookPromotionFilter = 'all' | 'discounted' | 'not_discounted';
 export type BookPriceFilter = 'all' | 'under_100' | '100_200' | 'over_200';
 export type BookSortOption = 'latest' | 'bestseller' | 'stock_low' | 'price_asc' | 'price_desc';
 export type PromotionBookStockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
+export type PromotionEffectiveStatus = 'all' | 'running' | 'upcoming' | 'ending_soon' | 'expired' | 'inactive';
 export type CategoryVisibilityFilter = 'active' | 'deleted' | 'all';
 export type CategoryBookFilter = 'all' | 'with_books' | 'empty';
 export type UserRoleFilter = 'all' | 'CUSTOMER' | 'STAFF' | 'ADMIN' | 'GUEST';

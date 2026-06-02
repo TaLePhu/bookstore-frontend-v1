@@ -1,9 +1,6 @@
 import type React from 'react';
 import { AlertCircle, CheckCircle2, X } from 'lucide-react';
-import type {
-  AdminCategory,
-  AdminPromotionPayload,
-} from '../../services/admin.service';
+import type { AdminCategory, AdminPromotionPayload } from '../../services/admin.service';
 import type { ApiBook } from '../../services/book.service';
 import { getBookImage } from '../../utils/book-display';
 import type { PromotionBookStockFilter, PromotionModalMode } from './types';
@@ -63,6 +60,8 @@ export function PromotionModal({
   togglePromotionBook,
   handleSavePromotionProgram,
 }: PromotionModalProps) {
+  const bannerPreviewSource = promotionBannerPreview || promotionForm.bannerImageUrl || '';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white shadow-2xl">
@@ -71,9 +70,10 @@ export function PromotionModal({
             <h3 className="text-xl font-bold text-gray-900">
               {promotionModalMode === 'edit' ? 'Sửa chương trình khuyến mãi' : 'Tạo chương trình khuyến mãi'}
             </h3>
-            <p className="text-sm text-gray-500">Chọn sách để áp dụng giá khuyến mãi tự động.</p>
+            <p className="text-sm text-gray-500">Chọn sách, banner và thời gian áp dụng cho chương trình.</p>
           </div>
           <button
+            type="button"
             className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
             onClick={closePromotionModal}
           >
@@ -88,45 +88,32 @@ export function PromotionModal({
               <span>{promotionFormError}</span>
             </div>
           )}
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Tên chương trình</label>
-              <input
-                value={promotionForm.name}
-                onChange={(event) => handlePromotionFormInput('name', event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="Ví dụ: Sale hè 2026"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Phần trăm giảm</label>
-              <input
-                type="number"
-                min="1"
-                max="100"
-                value={promotionForm.discountPercent}
-                onChange={(event) => handlePromotionFormInput('discountPercent', event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Ngày bắt đầu</label>
-              <input
-                type="date"
-                value={promotionForm.startsAt || ''}
-                onChange={(event) => handlePromotionFormInput('startsAt', event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Ngày kết thúc</label>
-              <input
-                type="date"
-                value={promotionForm.endsAt || ''}
-                onChange={(event) => handlePromotionFormInput('endsAt', event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
+            <PromotionInput
+              label="Tên chương trình"
+              value={promotionForm.name}
+              onChange={(value) => handlePromotionFormInput('name', value)}
+              placeholder="Ví dụ: Sale hè 2026"
+            />
+            <PromotionInput
+              label="Phần trăm giảm"
+              type="number"
+              value={String(promotionForm.discountPercent)}
+              onChange={(value) => handlePromotionFormInput('discountPercent', value)}
+            />
+            <PromotionInput
+              label="Ngày bắt đầu"
+              type="date"
+              value={promotionForm.startsAt || ''}
+              onChange={(value) => handlePromotionFormInput('startsAt', value)}
+            />
+            <PromotionInput
+              label="Ngày kết thúc"
+              type="date"
+              value={promotionForm.endsAt || ''}
+              onChange={(value) => handlePromotionFormInput('endsAt', value)}
+            />
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">Trạng thái</label>
               <select
@@ -134,12 +121,12 @@ export function PromotionModal({
                 onChange={(event) => handlePromotionFormInput('status', event.target.value as AdminPromotionPayload['status'])}
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
               >
-                <option value="ACTIVE">Đang áp dụng</option>
+                <option value="ACTIVE">Bật</option>
                 <option value="INACTIVE">Tạm tắt</option>
               </select>
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Số sách đã chọn</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Sách đã chọn</label>
               <div className="rounded-lg border border-orange-100 bg-orange-50 px-4 py-3 font-semibold text-orange-700">
                 {promotionForm.bookIds.length} / {promotionBooks.length} sách
               </div>
@@ -160,9 +147,9 @@ export function PromotionModal({
           <div className="rounded-xl border border-gray-200 p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <label className="block text-sm font-medium text-gray-700">
-                Ảnh banner slider {promotionModalMode === 'create' && <span className="text-red-500">*</span>}
+                Banner slider {promotionModalMode === 'create' && <span className="text-red-500">*</span>}
               </label>
-              {(promotionBannerPreview || promotionForm.bannerImageUrl) && (
+              {bannerPreviewSource && (
                 <button
                   type="button"
                   onClick={clearPromotionBanner}
@@ -182,14 +169,21 @@ export function PromotionModal({
               }}
               className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
-            <p className="mt-2 text-xs text-gray-500">Hỗ trợ jpg, png, webp. Tối đa 2MB. Ảnh này sẽ hiển thị trên slider trang chủ khi chương trình đang áp dụng.</p>
-            {(promotionBannerPreview || promotionForm.bannerImageUrl) && (
+            <div className="mt-3">
+              <label className="mb-2 block text-sm font-medium text-gray-700">Hoặc nhập URL banner</label>
+              <input
+                value={promotionForm.bannerImageUrl || ''}
+                onChange={(event) => handlePromotionFormInput('bannerImageUrl', event.target.value)}
+                placeholder="https://res.cloudinary.com/.../banner.jpg"
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Nên dùng banner 1200x420 hoặc 1440x480. Banner sẽ được ưu tiên trên slider trang chủ khi chương trình đang hiệu lực.
+            </p>
+            {bannerPreviewSource && (
               <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
-                <img
-                  src={promotionBannerPreview || promotionForm.bannerImageUrl || ''}
-                  alt="Ảnh banner khuyến mãi"
-                  className="h-48 w-full object-cover"
-                />
+                <img src={bannerPreviewSource} alt="Banner khuyến mãi" className="h-48 w-full object-cover" />
               </div>
             )}
           </div>
@@ -246,7 +240,12 @@ export function PromotionModal({
               {filteredPromotionModalBooks.map((book) => {
                 const checked = promotionForm.bookIds.includes(book.id);
                 return (
-                  <label key={book.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${checked ? 'border-orange-300 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                  <label
+                    key={book.id}
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                      checked ? 'border-orange-300 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
                     <input
                       type="checkbox"
                       checked={checked}
@@ -273,12 +272,14 @@ export function PromotionModal({
 
         <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
           <button
+            type="button"
             className="rounded-lg border border-gray-300 px-6 py-3 text-gray-700 transition-colors hover:bg-gray-100"
             onClick={closePromotionModal}
           >
             Hủy
           </button>
           <button
+            type="button"
             onClick={handleSavePromotionProgram}
             disabled={savingPromotion}
             className="flex items-center gap-2 rounded-lg bg-orange-500 px-6 py-3 text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
@@ -288,6 +289,33 @@ export function PromotionModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PromotionInput({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-medium text-gray-700">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+      />
     </div>
   );
 }

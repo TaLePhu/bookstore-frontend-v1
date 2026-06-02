@@ -111,6 +111,7 @@ import {
   getOrderOperationNote,
   getOrderStatusText,
   getPaymentMethodText,
+  getPromotionEffectiveStatus,
   hasCustomerCancelRequest,
   hasPendingCustomerCancelRequest,
 } from './admin/utils';
@@ -132,6 +133,7 @@ import type {
   OrderWorkflowTab,
   PopupMessage,
   PromotionBookStockFilter,
+  PromotionEffectiveStatus,
   PromotionDraft,
   PromotionModalMode,
   UserLockFilter,
@@ -232,6 +234,7 @@ export function AdminPage() {
   const [promotionBookSearch, setPromotionBookSearch] = useState('');
   const [promotionCategoryFilter, setPromotionCategoryFilter] = useState('all');
   const [promotionStockFilter, setPromotionStockFilter] = useState<PromotionBookStockFilter>('all');
+  const [promotionEffectiveStatusFilter, setPromotionEffectiveStatusFilter] = useState<PromotionEffectiveStatus>('all');
   const [showSelectedPromotionBooksOnly, setShowSelectedPromotionBooksOnly] = useState(false);
   const [promotionForm, setPromotionForm] = useState<AdminPromotionPayload>({
     name: '',
@@ -520,21 +523,29 @@ export function AdminPage() {
 
   const filteredPromotions = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
-    if (currentView !== 'promotions' || !keyword) return promotions;
+    let result = promotions;
 
-    return promotions.filter((promotion) =>
-      [
-        promotion.name,
-        promotion.description,
-        promotion.status,
-        ...(promotion.books || []).map((book) => book.title),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(keyword)
-    );
-  }, [currentView, promotions, searchQuery]);
+    if (promotionEffectiveStatusFilter !== 'all') {
+      result = result.filter((promotion) => getPromotionEffectiveStatus(promotion) === promotionEffectiveStatusFilter);
+    }
+
+    if (currentView === 'promotions' && keyword) {
+      result = result.filter((promotion) =>
+        [
+          promotion.name,
+          promotion.description,
+          promotion.status,
+          ...(promotion.books || []).map((book) => book.title),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(keyword)
+      );
+    }
+
+    return result;
+  }, [currentView, promotionEffectiveStatusFilter, promotions, searchQuery]);
 
   const filteredOrders = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -1567,6 +1578,24 @@ export function AdminPage() {
     setPromotionModalMode('edit');
   };
 
+  const openClonePromotion = (promotion: AdminPromotion) => {
+    resetPromotionForm();
+    setSelectedPromotion(null);
+    setPromotionForm({
+      name: `${promotion.name || 'Khuyến mãi'} (copy)`,
+      description: promotion.description || '',
+      bannerImageUrl: promotion.bannerImageUrl || undefined,
+      discountPercent: String(promotion.discountPercent ?? 10),
+      startsAt: '',
+      endsAt: '',
+      status: 'INACTIVE',
+      bookIds: (promotion.books || []).map((book) => book.id),
+      bannerImage: null,
+    });
+    setPromotionBannerPreview('');
+    setPromotionModalMode('create');
+  };
+
   const handlePromotionFormInput = (
     field: keyof AdminPromotionPayload,
     value: AdminPromotionPayload[keyof AdminPromotionPayload]
@@ -1722,7 +1751,7 @@ export function AdminPage() {
       return;
     }
 
-    if (promotionModalMode === 'create' && !promotionForm.bannerImage) {
+    if (promotionModalMode === 'create' && !promotionForm.bannerImage && !promotionForm.bannerImageUrl?.trim()) {
       const message = 'Vui lòng chọn ảnh banner để hiển thị trên slider trang chủ.';
       showPromotionFormError(message);
       return;
@@ -2396,8 +2425,11 @@ export function AdminPage() {
               activePromotions={activePromotions}
               promotionBookTotal={promotionBookTotal}
               filteredPromotions={filteredPromotions}
+              promotionEffectiveStatusFilter={promotionEffectiveStatusFilter}
+              setPromotionEffectiveStatusFilter={setPromotionEffectiveStatusFilter}
               openCreatePromotion={openCreatePromotion}
               openEditPromotion={openEditPromotion}
+              openClonePromotion={openClonePromotion}
               handleDeletePromotionProgram={handleDeletePromotionProgram}
               deletingPromotionId={deletingPromotionId}
               onViewPromotionsPage={() => navigate('/promotions')}
