@@ -1,12 +1,32 @@
 import type React from 'react';
-import { AlertCircle, ArchiveX, Edit, Eye, Plus, RefreshCcw, Trash2 } from 'lucide-react';
+import {
+  AlertCircle,
+  ArchiveX,
+  Download,
+  Edit,
+  Eye,
+  Filter,
+  Package,
+  Plus,
+  RefreshCcw,
+  RotateCcw,
+  Tags,
+  Trash2,
+} from 'lucide-react';
 import type { AdminCategory, AdminPromotion } from '../../services/admin.service';
 import type { ApiBook } from '../../services/book.service';
 import { getBookImage } from '../../utils/book-display';
 import { LOW_STOCK_THRESHOLD } from './constants';
 import { EmptyState, SearchBox, TableCell, TableHead } from './components';
-import type { BookCategoryFilter, BookStockFilter, BookVisibilityFilter } from './types';
-import { formatCurrency, getBookStatusMeta } from './utils';
+import type {
+  BookCategoryFilter,
+  BookPriceFilter,
+  BookPromotionFilter,
+  BookSortOption,
+  BookStockFilter,
+  BookVisibilityFilter,
+} from './types';
+import { formatCurrency, formatDate, getBookStatusMeta } from './utils';
 
 type BooksViewProps = {
   isAdmin: boolean;
@@ -24,6 +44,12 @@ type BooksViewProps = {
   setBookStockFilter: (value: BookStockFilter) => void;
   bookCategoryFilter: BookCategoryFilter;
   setBookCategoryFilter: (value: BookCategoryFilter) => void;
+  bookPromotionFilter: BookPromotionFilter;
+  setBookPromotionFilter: (value: BookPromotionFilter) => void;
+  bookPriceFilter: BookPriceFilter;
+  setBookPriceFilter: (value: BookPriceFilter) => void;
+  bookSortOption: BookSortOption;
+  setBookSortOption: (value: BookSortOption) => void;
   openCreateBook: () => void;
   openBookDetail: (book: ApiBook, mode: 'detail' | 'edit') => Promise<void>;
   handleSoftDeleteBook: (book: ApiBook) => Promise<void>;
@@ -38,6 +64,8 @@ type BooksViewProps = {
   totalBookPages: number;
   setBookCurrentPage: React.Dispatch<React.SetStateAction<number>>;
 };
+
+const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 export function BooksView({
   isAdmin,
@@ -55,6 +83,12 @@ export function BooksView({
   setBookStockFilter,
   bookCategoryFilter,
   setBookCategoryFilter,
+  bookPromotionFilter,
+  setBookPromotionFilter,
+  bookPriceFilter,
+  setBookPriceFilter,
+  bookSortOption,
+  setBookSortOption,
   openCreateBook,
   openBookDetail,
   handleSoftDeleteBook,
@@ -69,108 +103,196 @@ export function BooksView({
   totalBookPages,
   setBookCurrentPage,
 }: BooksViewProps) {
+  const activeBookCount = books.filter((book) => !isBookDeleted(book)).length;
+  const discountedBookCount = books.filter((book) => !isBookDeleted(book) && Number(book.discount || 0) > 0).length;
+  const deletedBookCount = books.filter(isBookDeleted).length;
+
+  const resetFilters = () => {
+    setSearchQuery('');
+    setBookStockFilter('all');
+    setBookCategoryFilter('all');
+    setBookPromotionFilter('all');
+    setBookPriceFilter('all');
+    setBookSortOption('latest');
+    if (isAdmin) setBookVisibilityFilter('active');
+  };
+
+  const exportBooks = () => {
+    const rows = [
+      ['Ten sach', 'Tac gia', 'ISBN', 'Danh muc', 'Gia ban', 'Ton kho', 'Da ban', 'Trang thai'],
+      ...filteredBooks.map((book) => [
+        book.title,
+        book.author,
+        book.isbn || '',
+        book.category?.name || 'Chua phan loai',
+        Number(book.price || 0),
+        Number(book.stock || 0),
+        Number(book.soldCount || 0),
+        getBookStatusMeta(book).label,
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'danh-sach-sach.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
-      {outOfStockBooks.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h4 className="font-medium text-red-800">Có {outOfStockBooks.length} sách hết hàng</h4>
-            <p className="text-sm text-red-700">{outOfStockBooks.map((book) => book.title).join(', ')}</p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <BookMetricCard icon={Package} label="Sách đang bán" value={activeBookCount} tone="emerald" />
+        <BookMetricCard icon={AlertCircle} label="Sắp hết hàng" value={lowStockBooks.length} tone="amber" />
+        <BookMetricCard icon={ArchiveX} label="Hết hàng" value={outOfStockBooks.length} tone="rose" />
+        <BookMetricCard icon={Tags} label="Đang khuyến mãi" value={discountedBookCount} tone="orange" />
+      </div>
+
+      {(outOfStockBooks.length > 0 || lowStockBooks.length > 0) && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+            <div>
+              <h4 className="font-semibold text-amber-900">Cảnh báo tồn kho</h4>
+              <p className="mt-1 text-sm text-amber-800">
+                Có {outOfStockBooks.length} sách hết hàng và {lowStockBooks.length} sách sắp hết hàng. Staff chỉ xem chi tiết, admin xử lý cập nhật trong form sửa sách.
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-      {lowStockBooks.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h4 className="font-medium text-yellow-800">
-              Có {lowStockBooks.length} sách sắp hết hàng
-            </h4>
-            <p className="text-sm text-yellow-700">
-              {lowStockBooks.map((book) => `${book.title} (${Number(book.stock || 0)} cuốn)`).join(', ')}
-            </p>
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-gray-950">Quản lý sách</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {filteredBooks.length.toLocaleString('vi-VN')} sách phù hợp. {isAdmin ? `${deletedBookCount} sách đã xóa mềm.` : 'Staff chỉ có quyền xem thông tin sách.'}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={exportBooks}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <Download className="h-4 w-4" />
+                Xuất CSV
+              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={openCreateBook}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+                >
+                  <Plus className="h-4 w-4" />
+                  Thêm sách
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.4fr_repeat(5,minmax(0,1fr))_auto]">
+            <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm theo tên, tác giả, ISBN, NXB..." />
+            {isAdmin && (
+              <select
+                value={bookVisibilityFilter}
+                onChange={(event) => setBookVisibilityFilter(event.target.value as BookVisibilityFilter)}
+                className="rounded-lg border border-gray-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="active">Đang bán</option>
+                <option value="deleted">Đã xóa mềm</option>
+                <option value="all">Tất cả</option>
+              </select>
+            )}
+            <select
+              value={bookStockFilter}
+              onChange={(event) => setBookStockFilter(event.target.value as BookStockFilter)}
+              className="rounded-lg border border-gray-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="all">Tất cả tồn kho</option>
+              <option value="in_stock">Còn hàng</option>
+              <option value="low_stock">Sắp hết</option>
+              <option value="out_of_stock">Hết hàng</option>
+            </select>
+            <select
+              value={bookCategoryFilter}
+              onChange={(event) => setBookCategoryFilter(event.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="all">Tất cả danh mục</option>
+              {activeCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+              <option value="uncategorized">Chưa phân loại</option>
+            </select>
+            <select
+              value={bookPromotionFilter}
+              onChange={(event) => setBookPromotionFilter(event.target.value as BookPromotionFilter)}
+              className="rounded-lg border border-gray-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="all">Tất cả khuyến mãi</option>
+              <option value="discounted">Đang giảm giá</option>
+              <option value="not_discounted">Không giảm giá</option>
+            </select>
+            <select
+              value={bookPriceFilter}
+              onChange={(event) => setBookPriceFilter(event.target.value as BookPriceFilter)}
+              className="rounded-lg border border-gray-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="all">Tất cả giá</option>
+              <option value="under_100">Dưới 100k</option>
+              <option value="100_200">100k - 200k</option>
+              <option value="over_200">Trên 200k</option>
+            </select>
+            <select
+              value={bookSortOption}
+              onChange={(event) => setBookSortOption(event.target.value as BookSortOption)}
+              className="rounded-lg border border-gray-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="latest">Mới nhất</option>
+              <option value="bestseller">Bán chạy</option>
+              <option value="stock_low">Tồn thấp</option>
+              <option value="price_asc">Giá tăng</option>
+              <option value="price_desc">Giá giảm</option>
+            </select>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Xóa lọc
+            </button>
           </div>
         </div>
-      )}
-
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm sách theo tên, tác giả, danh mục..." />
-        {isAdmin && (
-          <select
-            value={bookVisibilityFilter}
-            onChange={(event) => setBookVisibilityFilter(event.target.value as BookVisibilityFilter)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-          >
-            <option value="active">Sách đang bán</option>
-            <option value="deleted">Sách đã xóa mềm</option>
-            <option value="all">Tất cả sách</option>
-          </select>
-        )}
-        <select
-          value={bookStockFilter}
-          onChange={(event) => setBookStockFilter(event.target.value as BookStockFilter)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-        >
-          <option value="all">Tất cả tồn kho</option>
-          <option value="in_stock">Còn hàng</option>
-          <option value="low_stock">Sắp hết hàng</option>
-          <option value="out_of_stock">Hết hàng</option>
-        </select>
-        <select
-          value={bookCategoryFilter}
-          onChange={(event) => setBookCategoryFilter(event.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-        >
-          <option value="all">Tất cả danh mục</option>
-          {activeCategories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-          <option value="uncategorized">Chưa phân loại</option>
-        </select>
-        {isAdmin && (
-          <button
-            onClick={openCreateBook}
-            className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 md:w-auto"
-          >
-            <Plus className="w-5 h-5" />
-            Thêm sách mới
-          </button>
-        )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-gray-100 bg-white px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-orange-500" />
             <h3 className="text-lg font-semibold text-gray-900">Danh sách sách</h3>
-            <p className="text-sm text-gray-500">
-              {filteredBooks.length.toLocaleString('vi-VN')} mục phù hợp với bộ lọc hiện tại
-            </p>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs font-medium">
-            <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">
-              Còn hàng: {books.filter((book) => !isBookDeleted(book) && Number(book.stock || 0) > LOW_STOCK_THRESHOLD).length}
-            </span>
-            <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700">
-              Sắp hết: {lowStockBooks.length}
-            </span>
-            <span className="rounded-full bg-red-50 px-3 py-1.5 text-red-700">
-              Hết hàng: {outOfStockBooks.length}
-            </span>
-          </div>
+          <p className="text-sm text-gray-500">
+            Trang {bookCurrentPage}/{totalBookPages}
+          </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px]">
+          <table className="w-full min-w-[1120px]">
             <thead className="bg-slate-50/80">
               <tr>
                 <TableHead>Sách</TableHead>
                 <TableHead>Danh mục</TableHead>
-                <TableHead>Giá</TableHead>
+                <TableHead>Giá bán</TableHead>
                 <TableHead>Tồn kho</TableHead>
-                <TableHead>Đã bán</TableHead>
+                <TableHead>Bán</TableHead>
+                <TableHead>Khuyến mãi</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead align="right">Thao tác</TableHead>
               </tr>
@@ -184,37 +306,17 @@ export function BooksView({
                 const hasDiscount = Number(book.discount || 0) > 0;
 
                 return (
-                  <tr key={book.id} title={statusMeta.label} className={`transition-colors hover:bg-orange-50/30 ${isBookDeleted(book) ? 'bg-gray-50/80' : 'bg-white'}`}>
+                  <tr key={book.id} className={`transition-colors hover:bg-orange-50/30 ${isBookDeleted(book) ? 'bg-gray-50/80' : 'bg-white'}`}>
                     <TableCell>
                       <div className="flex min-w-0 items-center gap-4">
-                        <div className="h-20 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100 shadow-sm ring-1 ring-gray-200">
-                          <img
-                            src={getBookImage(book)}
-                            alt={book.title}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
+                        <img src={getBookImage(book)} alt={book.title} className="h-20 w-14 shrink-0 rounded-lg object-cover shadow-sm ring-1 ring-gray-200" />
                         <div className="min-w-0">
-                          <p className="line-clamp-2 text-sm font-semibold leading-6 text-gray-950">{book.title}</p>
+                          <p className="line-clamp-2 font-semibold leading-6 text-gray-950">{book.title}</p>
                           <p className="mt-1 text-sm text-gray-500">{book.author}</p>
                           <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
-                            {book.isbn && (
-                              <span className="rounded-full bg-gray-100 px-2 py-1">ISBN {book.isbn}</span>
-                            )}
-                            {book.publisher && (
-                              <span className="rounded-full bg-gray-100 px-2 py-1">{book.publisher}</span>
-                            )}
-                            {bookPromotion && (
-                              <span
-                                className={`rounded-full px-2 py-1 font-semibold ${
-                                  promotionActive
-                                    ? 'bg-orange-100 text-orange-700'
-                                    : 'bg-gray-100 text-gray-600'
-                                }`}
-                              >
-                                KM {bookPromotion.discountPercent}% - {getPromotionStatusLabel(bookPromotion)}
-                              </span>
-                            )}
+                            {book.isbn && <span className="rounded-full bg-gray-100 px-2 py-1">ISBN {book.isbn}</span>}
+                            {book.publisher && <span className="rounded-full bg-gray-100 px-2 py-1">{book.publisher}</span>}
+                            {book.releaseDate && <span className="rounded-full bg-gray-100 px-2 py-1">{formatDate(book.releaseDate)}</span>}
                           </div>
                         </div>
                       </div>
@@ -222,18 +324,14 @@ export function BooksView({
                     <TableCell>{book.category?.name || 'Chưa phân loại'}</TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        <span className={`font-semibold ${hasDiscount ? 'text-red-600' : 'text-gray-900'}`}>
-                          {formatCurrency(book.price)}
-                        </span>
+                        <p className={`font-semibold ${hasDiscount ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(book.price)}</p>
                         {hasDiscount && (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs text-gray-400 line-through">
-                              {formatCurrency(book.originalPrice)}
-                            </span>
-                            <span className="w-fit rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
+                          <>
+                            <p className="text-xs text-gray-400 line-through">{formatCurrency(book.originalPrice)}</p>
+                            <span className="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
                               -{Number(book.discount || 0)}%
                             </span>
-                          </div>
+                          </>
                         )}
                       </div>
                     </TableCell>
@@ -243,65 +341,47 @@ export function BooksView({
                       </span>
                     </TableCell>
                     <TableCell>{Number(book.soldCount || 0).toLocaleString('vi-VN')}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {isBookDeleted(book) ? (
-                        <span className="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700">Đã xóa mềm</span>
-                      ) : Number(book.stock || 0) > 0 && Number(book.stock || 0) <= LOW_STOCK_THRESHOLD ? (
-                        <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">Sắp hết hàng</span>
-                      ) : (
-                        <span className={`text-xs px-2 py-1 rounded-full ${Number(book.stock || 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {Number(book.stock || 0) > 0 ? 'Còn hàng' : 'Hết hàng'}
+                    <TableCell>
+                      {bookPromotion ? (
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${promotionActive ? 'bg-orange-50 text-orange-700 ring-orange-100' : 'bg-gray-50 text-gray-600 ring-gray-100'}`}>
+                          {bookPromotion.discountPercent}% - {getPromotionStatusLabel(bookPromotion)}
                         </span>
+                      ) : hasDiscount ? (
+                        <span className="inline-flex rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 ring-1 ring-red-100">Giảm trực tiếp</span>
+                      ) : (
+                        <span className="text-sm text-gray-400">Không</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.className}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${statusMeta.dot}`} />
+                        {statusMeta.label}
+                      </span>
                     </TableCell>
                     <TableCell align="right">
                       <div className="flex flex-wrap justify-end gap-2">
-                        <button
-                          onClick={() => openBookDetail(book, 'detail')}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-100 transition-colors hover:bg-blue-100"
-                          title="Xem chi tiết"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                        <IconButton title="Xem chi tiết" onClick={() => openBookDetail(book, 'detail')} tone="blue">
+                          <Eye className="h-4 w-4" />
+                        </IconButton>
                         {isAdmin && (
-                          <button
-                            onClick={() => openBookDetail(book, 'edit')}
-                            disabled={isBookDeleted(book)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-orange-600 ring-1 ring-orange-100 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            title="Chỉnh sửa"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
+                          <IconButton title="Chỉnh sửa" onClick={() => openBookDetail(book, 'edit')} disabled={isBookDeleted(book)} tone="orange">
+                            <Edit className="h-4 w-4" />
+                          </IconButton>
                         )}
-                        {isAdmin && (
-                          <button
-                            onClick={() => handleSoftDeleteBook(book)}
-                            disabled={deletingBookId === book.id || isBookDeleted(book)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600 ring-1 ring-red-100 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            title="Xóa mềm: ẩn sách khỏi trang bán hàng"
-                          >
-                            <ArchiveX className="w-4 h-4" />
-                          </button>
+                        {isAdmin && !isBookDeleted(book) && (
+                          <IconButton title="Xóa mềm: ẩn khỏi trang bán hàng" onClick={() => handleSoftDeleteBook(book)} disabled={deletingBookId === book.id} tone="red">
+                            <ArchiveX className="h-4 w-4" />
+                          </IconButton>
                         )}
                         {isAdmin && isBookDeleted(book) && (
-                          <button
-                            onClick={() => handleRestoreDeletedBook(book)}
-                            disabled={deletingBookId === book.id}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600 ring-1 ring-green-100 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            title="Khôi phục sách đã xóa mềm"
-                          >
-                            <RefreshCcw className="w-4 h-4" />
-                          </button>
+                          <IconButton title="Khôi phục sách" onClick={() => handleRestoreDeletedBook(book)} disabled={deletingBookId === book.id} tone="green">
+                            <RefreshCcw className="h-4 w-4" />
+                          </IconButton>
                         )}
                         {isAdmin && (
-                          <button
-                            onClick={() => handlePermanentDeleteBook(book)}
-                            disabled={deletingBookId === book.id}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-700 ring-1 ring-rose-100 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            title="Xóa cứng vĩnh viễn"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <IconButton title="Xóa vĩnh viễn" onClick={() => handlePermanentDeleteBook(book)} disabled={deletingBookId === book.id} tone="rose">
+                            <Trash2 className="h-4 w-4" />
+                          </IconButton>
                         )}
                       </div>
                     </TableCell>
@@ -315,7 +395,7 @@ export function BooksView({
         {filteredBooks.length > 0 && (
           <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
             <p className="text-sm text-gray-500">
-              Trang {bookCurrentPage}/{totalBookPages} • Hiển thị {paginatedBooks.length} / {filteredBooks.length} sách
+              Hiển thị {paginatedBooks.length} / {filteredBooks.length} sách
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -334,9 +414,7 @@ export function BooksView({
                     type="button"
                     onClick={() => setBookCurrentPage(page)}
                     className={`h-9 min-w-9 rounded-lg px-3 text-sm font-medium transition-colors ${
-                      page === bookCurrentPage
-                        ? 'bg-orange-500 text-white'
-                        : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                      page === bookCurrentPage ? 'bg-orange-500 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     {page}
@@ -355,5 +433,72 @@ export function BooksView({
         )}
       </div>
     </div>
+  );
+}
+
+function BookMetricCard({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number;
+  tone: 'emerald' | 'amber' | 'rose' | 'orange';
+}) {
+  const tones = {
+    emerald: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+    amber: 'border-amber-100 bg-amber-50 text-amber-700',
+    rose: 'border-rose-100 bg-rose-50 text-rose-700',
+    orange: 'border-orange-100 bg-orange-50 text-orange-700',
+  };
+
+  return (
+    <div className={`rounded-2xl border p-5 shadow-sm ${tones[tone]}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{label}</p>
+          <p className="mt-2 text-3xl font-bold">{value.toLocaleString('vi-VN')}</p>
+        </div>
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/70">
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function IconButton({
+  children,
+  title,
+  onClick,
+  disabled,
+  tone,
+}: {
+  children: React.ReactNode;
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  tone: 'blue' | 'orange' | 'red' | 'green' | 'rose';
+}) {
+  const tones = {
+    blue: 'bg-blue-50 text-blue-600 ring-blue-100 hover:bg-blue-100',
+    orange: 'bg-orange-50 text-orange-600 ring-orange-100 hover:bg-orange-100',
+    red: 'bg-red-50 text-red-600 ring-red-100 hover:bg-red-100',
+    green: 'bg-green-50 text-green-600 ring-green-100 hover:bg-green-100',
+    rose: 'bg-rose-50 text-rose-700 ring-rose-100 hover:bg-rose-100',
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ring-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tones[tone]}`}
+    >
+      {children}
+    </button>
   );
 }

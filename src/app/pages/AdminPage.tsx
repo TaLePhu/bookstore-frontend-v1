@@ -13,7 +13,6 @@ import {
   LogOut,
   Package,
   Percent,
-  Plus,
   RefreshCcw,
   Settings,
   ShoppingCart,
@@ -116,6 +115,9 @@ import type {
   AdminView,
   BookCategoryFilter,
   BookImagePreview,
+  BookPriceFilter,
+  BookPromotionFilter,
+  BookSortOption,
   BookStockFilter,
   BookVisibilityFilter,
   CancelDecisionDialog,
@@ -153,6 +155,9 @@ export function AdminPage() {
   const [bookVisibilityFilter, setBookVisibilityFilter] = useState<BookVisibilityFilter>('active');
   const [bookStockFilter, setBookStockFilter] = useState<BookStockFilter>('all');
   const [bookCategoryFilter, setBookCategoryFilter] = useState<BookCategoryFilter>('all');
+  const [bookPromotionFilter, setBookPromotionFilter] = useState<BookPromotionFilter>('all');
+  const [bookPriceFilter, setBookPriceFilter] = useState<BookPriceFilter>('all');
+  const [bookSortOption, setBookSortOption] = useState<BookSortOption>('latest');
   const [bookCurrentPage, setBookCurrentPage] = useState(1);
   const [categoryVisibilityFilter, setCategoryVisibilityFilter] = useState<CategoryVisibilityFilter>('active');
   const [categoryBookFilter, setCategoryBookFilter] = useState<CategoryBookFilter>('all');
@@ -420,11 +425,51 @@ export function AdminPage() {
       });
     }
 
-    if (currentView !== 'books' || !keyword) return result;
-    return result.filter((book) =>
-      [book.title, book.author, book.category?.name].filter(Boolean).join(' ').toLowerCase().includes(keyword)
-    );
-  }, [books, bookCategoryFilter, bookStockFilter, currentView, searchQuery]);
+    if (bookPromotionFilter !== 'all') {
+      result = result.filter((book) => {
+        const hasDiscount = Number(book.discount || 0) > 0;
+        return bookPromotionFilter === 'discounted' ? hasDiscount : !hasDiscount;
+      });
+    }
+
+    if (bookPriceFilter !== 'all') {
+      result = result.filter((book) => {
+        const price = Number(book.price || 0);
+        if (bookPriceFilter === 'under_100') return price < 100000;
+        if (bookPriceFilter === '100_200') return price >= 100000 && price <= 200000;
+        return price > 200000;
+      });
+    }
+
+    if (currentView === 'books' && keyword) {
+      result = result.filter((book) =>
+        [book.title, book.author, book.isbn, book.publisher, book.category?.name]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(keyword)
+      );
+    }
+
+    return result.sort((left, right) => {
+      if (bookSortOption === 'bestseller') return Number(right.soldCount || 0) - Number(left.soldCount || 0);
+      if (bookSortOption === 'stock_low') return Number(left.stock || 0) - Number(right.stock || 0);
+      if (bookSortOption === 'price_asc') return Number(left.price || 0) - Number(right.price || 0);
+      if (bookSortOption === 'price_desc') return Number(right.price || 0) - Number(left.price || 0);
+      const leftDate = left.releaseDate ? new Date(left.releaseDate).getTime() : 0;
+      const rightDate = right.releaseDate ? new Date(right.releaseDate).getTime() : 0;
+      return rightDate - leftDate;
+    });
+  }, [
+    books,
+    bookCategoryFilter,
+    bookPriceFilter,
+    bookPromotionFilter,
+    bookSortOption,
+    bookStockFilter,
+    currentView,
+    searchQuery,
+  ]);
 
   const totalBookPages = useMemo(
     () => Math.max(1, Math.ceil(filteredBooks.length / ADMIN_BOOKS_PAGE_SIZE)),
@@ -445,7 +490,16 @@ export function AdminPage() {
 
   useEffect(() => {
     setBookCurrentPage(1);
-  }, [searchQuery, bookVisibilityFilter, bookStockFilter, bookCategoryFilter, currentView]);
+  }, [
+    searchQuery,
+    bookVisibilityFilter,
+    bookStockFilter,
+    bookCategoryFilter,
+    bookPromotionFilter,
+    bookPriceFilter,
+    bookSortOption,
+    currentView,
+  ]);
 
   const filteredPromotionBooks = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -1205,6 +1259,16 @@ export function AdminPage() {
       if (!Number.isInteger(pages) || pages <= 0) {
         return 'Số trang phải là số nguyên lớn hơn 0.';
       }
+    }
+
+    const normalizedIsbn = String(bookForm.isbn || '').trim().toLowerCase();
+    const duplicateBook = books.find(
+      (book) =>
+        String(book.isbn || '').trim().toLowerCase() === normalizedIsbn &&
+        (!selectedBook || book.id !== selectedBook.id)
+    );
+    if (duplicateBook) {
+      return `ISBN này đã tồn tại ở sách "${duplicateBook.title}".`;
     }
 
     const selectedFiles = getSelectedBookImageFiles();
@@ -2285,6 +2349,12 @@ export function AdminPage() {
               setBookStockFilter={setBookStockFilter}
               bookCategoryFilter={bookCategoryFilter}
               setBookCategoryFilter={setBookCategoryFilter}
+              bookPromotionFilter={bookPromotionFilter}
+              setBookPromotionFilter={setBookPromotionFilter}
+              bookPriceFilter={bookPriceFilter}
+              setBookPriceFilter={setBookPriceFilter}
+              bookSortOption={bookSortOption}
+              setBookSortOption={setBookSortOption}
               openCreateBook={openCreateBook}
               openBookDetail={openBookDetail}
               handleSoftDeleteBook={handleSoftDeleteBook}
