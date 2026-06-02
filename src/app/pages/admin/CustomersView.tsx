@@ -78,6 +78,9 @@ const vi = {
   lock: 'Kh\u00f3a',
   noOrders: 'Ch\u01b0a c\u00f3 \u0111\u01a1n',
   orderUnit: '\u0111\u01a1n',
+  separator: '\u00b7',
+  loyal: 'Th\u00e2n thi\u1ebft',
+  newCustomer: 'M\u1edbi',
 };
 
 export function CustomersView({
@@ -243,7 +246,7 @@ export function CustomersView({
                       <TableCell>{formatDate(account.createdAt)}</TableCell>
                       <TableCell>
                         <span className={`rounded-full px-2 py-1 text-xs ${account.isLocked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                          {account.isLocked ? vi.locked : 'Ho\u1ea1t \u0111\u1ed9ng'}
+                          {account.isLocked ? vi.locked : vi.active}
                         </span>
                       </TableCell>
                     </>
@@ -258,7 +261,7 @@ export function CustomersView({
                       </TableCell>
                       <TableCell>
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${account.isLocked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                          {account.isLocked ? vi.locked : 'Ho\u1ea1t \u0111\u1ed9ng'}
+                          {account.isLocked ? vi.locked : vi.active}
                         </span>
                       </TableCell>
                     </>
@@ -344,12 +347,12 @@ function CustomerTierBadge({ totalSpent }: { totalSpent: number }) {
   if (totalSpent >= 1000000) {
     return (
       <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
-        Th\u00e2n thi\u1ebft
+        {vi.loyal}
       </span>
     );
   }
 
-  return <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">M\u1edbi</span>;
+  return <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">{vi.newCustomer}</span>;
 }
 
 function CustomerPurchaseSummary({
@@ -371,7 +374,7 @@ function CustomerPurchaseSummary({
       <p className="font-semibold text-gray-900">{formatCurrency(totalSpent)}</p>
       <p className="text-xs text-gray-500">
         {totalOrders.toLocaleString('vi-VN')} {vi.orderUnit}
-        {customer.lastOrderAt ? ` \u00b7 ${formatDate(customer.lastOrderAt)}` : ''}
+        {customer.lastOrderAt ? ` ${vi.separator} ${formatDate(customer.lastOrderAt)}` : ''}
       </p>
     </div>
   );

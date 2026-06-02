@@ -1028,21 +1028,32 @@ export function AdminPage() {
     showSelectedPromotionBooksOnly,
   ]);
 
+  const decodeMojibakeText = (text: string) => {
+    let normalized = text;
+    for (let index = 0; index < 2; index += 1) {
+      if (!/[\u00c3\u00c4\u00c6\u00c2\u00e2]|\u00e1[\u00ba\u00bb]/.test(normalized)) break;
+      try {
+        const decoded = decodeURIComponent(escape(normalized));
+        if (decoded === normalized) break;
+        normalized = decoded;
+      } catch {
+        break;
+      }
+    }
+    return normalized;
+  };
+
   const normalizeAdminMessage = (text: string) => {
     if (!text) return text;
-    const promotionMessageBySignal: Array<[string, string]> = [
-      ['Kh', 'Kh\u00f4ng th\u1ec3 l\u01b0u ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i.'],
-      ['Vui l', 'Vui l\u00f2ng ki\u1ec3m tra th\u00f4ng tin ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i.'],
-    ];
-    if (text.includes('chÆ°Æ¡ng trÃ¬nh khuyáº¿n mÃ£i') || text.includes('khuyáº¿n mÃ£i')) {
-      if (text.includes('báº­t')) return '\u0110\u00e3 b\u1eadt ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i. Ch\u01b0\u01a1ng tr\u00ecnh s\u1ebd t\u1ef1 \u00e1p d\u1ee5ng theo ng\u00e0y.';
-      if (text.includes('táº¯t')) return '\u0110\u00e3 t\u1eaft ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i v\u00e0 tr\u1ea3 s\u00e1ch v\u1ec1 gi\u00e1 hi\u1ec7n h\u00e0nh.';
-      if (text.includes('cáº­p nháº­t')) return '\u0110\u00e3 c\u1eadp nh\u1eadt ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i.';
-      if (text.includes('táº¡o')) return '\u0110\u00e3 t\u1ea1o ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i.';
-      if (text.includes('thuá»™c')) return 'M\u1ed9t s\u1ed1 s\u00e1ch \u0111\u00e3 thu\u1ed9c ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i kh\u00e1c. Vui l\u00f2ng b\u1ecf c\u00e1c s\u00e1ch n\u00e0y ho\u1eb7c ch\u1ec9nh ch\u01b0\u01a1ng tr\u00ecnh hi\u1ec7n c\u00f3.';
-      return promotionMessageBySignal.find(([signal]) => text.includes(signal))?.[1] || text;
+    const normalizedText = decodeMojibakeText(text);
+    if (
+      normalizedText.includes('Kh\u00f4ng th\u1ec3') ||
+      normalizedText.includes('Vui l\u00f2ng') ||
+      normalizedText.includes('M\u1eadt kh\u1ea9u')
+    ) {
+      return normalizedText;
     }
-    return text;
+    return normalizedText;
   };
 
   const showPopup = (message: Exclude<PopupMessage, null>) => {
