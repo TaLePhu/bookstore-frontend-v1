@@ -132,6 +132,38 @@ export interface AdminCustomerSummary extends AdminUser {
   }>;
 }
 
+export interface AdminStaffSummary extends AdminUser {
+  totals: {
+    confirmed: number;
+    packed: number;
+    completed: number;
+    totalActions: number;
+    handledOrders: number;
+  };
+  dailyStats: Array<{
+    date: string;
+    confirmed: number;
+    packed: number;
+    completed: number;
+  }>;
+  recentOrders: Array<{
+    id: string;
+    orderCode?: string | null;
+    status: AdminOrderStatus;
+    totalAmount: number;
+    updatedAt: string;
+  }>;
+  activityLogs: Array<{
+    id: string;
+    orderId: string;
+    orderCode?: string | null;
+    fromStatus: AdminOrderStatus;
+    toStatus: AdminOrderStatus;
+    note?: string | null;
+    createdAt: string;
+  }>;
+}
+
 export interface AdminUserPayload {
   userName: string;
   fullName?: string;
@@ -545,6 +577,11 @@ export const updateAdminCustomerNote = async (
   note: string
 ): Promise<AdminCustomerSummary> => {
   const res = await api.patch(`/admin/customers/${id}/note`, { note });
+  return res.data.data;
+};
+
+export const getAdminStaffSummary = async (id: string): Promise<AdminStaffSummary> => {
+  const res = await api.get(`/admin/staff/${id}/summary`);
   return res.data.data;
 };
 

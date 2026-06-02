@@ -37,6 +37,7 @@ import {
   getAdminBookDetail,
   getAdminCategories,
   getAdminCustomerSummary,
+  getAdminStaffSummary,
   getAdminCustomers,
   getAdminDashboard,
   getAdminOrderDetail,
@@ -65,6 +66,7 @@ import {
   type AdminCategory,
   type AdminCategoryPayload,
   type AdminCustomerSummary,
+  type AdminStaffSummary,
   type AdminDashboardResponse,
   type AdminOrder,
   type AdminOrderDetail,
@@ -110,6 +112,7 @@ import { CategoryModal } from './admin/CategoryModal';
 import { CancelDecisionModal, ConfirmDialogModal } from './admin/AdminDialogs';
 import { DashboardView } from './admin/DashboardView';
 import { CustomerDetailModal } from './admin/CustomerDetailModal';
+import { StaffDetailModal } from './admin/StaffDetailModal';
 import {
   buildOrderPrintHtml,
   formatCurrency,
@@ -190,8 +193,10 @@ export function AdminPage() {
   const [orderStatusTotals, setOrderStatusTotals] = useState<Record<AdminOrderStatus, number>>(EMPTY_ORDER_STATUS_TOTALS);
   const [customers, setCustomers] = useState<AdminUser[]>([]);
   const [selectedCustomerSummary, setSelectedCustomerSummary] = useState<AdminCustomerSummary | null>(null);
+  const [selectedStaffSummary, setSelectedStaffSummary] = useState<AdminStaffSummary | null>(null);
   const [customerNoteDraft, setCustomerNoteDraft] = useState('');
   const [loadingCustomerSummaryId, setLoadingCustomerSummaryId] = useState<string | null>(null);
+  const [loadingStaffSummaryId, setLoadingStaffSummaryId] = useState<string | null>(null);
   const [savingCustomerNote, setSavingCustomerNote] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [userForm, setUserForm] = useState<AdminUserPayload>(emptyUserForm);
@@ -2293,6 +2298,20 @@ export function AdminPage() {
     }
   };
 
+  const openStaffDetail = async (staff: AdminUser) => {
+    try {
+      setLoadingStaffSummaryId(staff.id);
+      const summary = await getAdminStaffSummary(staff.id);
+      setSelectedStaffSummary(summary);
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Kh\u00f4ng th\u1ec3 t\u1ea3i chi ti\u1ebft nh\u00e2n vi\u00ean.';
+      setError(message);
+      showPopup({ type: 'error', text: message });
+    } finally {
+      setLoadingStaffSummaryId(null);
+    }
+  };
+
   const handleSaveCustomerNote = async () => {
     if (!selectedCustomerSummary) return;
     try {
@@ -2709,6 +2728,8 @@ export function AdminPage() {
               userVerifiedFilter={userVerifiedFilter}
               setUserVerifiedFilter={setUserVerifiedFilter}
               openCreateUserModal={openCreateUserModal}
+              openStaffDetail={openStaffDetail}
+              loadingStaffSummaryId={loadingStaffSummaryId}
               handleToggleUserLock={handleToggleUserLock}
               handleChangeUserRole={handleChangeUserRole}
               handleResetUserPassword={handleResetUserPassword}
@@ -2831,6 +2852,13 @@ export function AdminPage() {
             setSelectedCustomerSummary(null);
             setCustomerNoteDraft('');
           }}
+        />
+      )}
+
+      {selectedStaffSummary && (
+        <StaffDetailModal
+          staff={selectedStaffSummary}
+          onClose={() => setSelectedStaffSummary(null)}
         />
       )}
     </div>

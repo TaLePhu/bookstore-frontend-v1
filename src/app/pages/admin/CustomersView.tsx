@@ -28,7 +28,9 @@ type CustomersViewProps = {
   setUserVerifiedFilter: (value: UserVerifiedFilter) => void;
   openCreateUserModal: (role?: 'CUSTOMER' | 'STAFF') => void;
   openCustomerDetail?: (customer: AdminUser) => void;
+  openStaffDetail?: (staff: AdminUser) => void;
   loadingCustomerSummaryId?: string | null;
+  loadingStaffSummaryId?: string | null;
   handleToggleUserLock: (customer: AdminUser) => Promise<void>;
   handleChangeUserRole: (customer: AdminUser, role: string) => Promise<void>;
   handleResetUserPassword: (customer: AdminUser) => Promise<void>;
@@ -98,7 +100,9 @@ export function CustomersView({
   setUserVerifiedFilter,
   openCreateUserModal,
   openCustomerDetail,
+  openStaffDetail,
   loadingCustomerSummaryId,
+  loadingStaffSummaryId,
   handleToggleUserLock,
   handleChangeUserRole,
   handleResetUserPassword,
@@ -268,6 +272,16 @@ export function CustomersView({
                   )}
                   <TableCell align="right">
                     <div className="flex flex-wrap justify-end gap-2">
+                      {isStaffView && openStaffDetail && (
+                        <button
+                          type="button"
+                          disabled={loadingStaffSummaryId === account.id}
+                          onClick={() => openStaffDetail(account)}
+                          className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50"
+                        >
+                          {loadingStaffSummaryId === account.id ? vi.loading : vi.detail}
+                        </button>
+                      )}
                       {!isStaffView && openCustomerDetail && (
                         <button
                           type="button"
