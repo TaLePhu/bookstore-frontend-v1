@@ -5,6 +5,13 @@ import type { UserLockFilter, UserVerifiedFilter } from './types';
 import { formatCurrency, formatDate } from './utils';
 
 type AccountViewMode = 'customers' | 'staff';
+type MetricTone = 'gray' | 'emerald' | 'red' | 'amber' | 'blue' | 'orange';
+
+type Metric = {
+  label: string;
+  value: number | string;
+  tone: MetricTone;
+};
 
 type CustomersViewProps = {
   mode: AccountViewMode;
@@ -100,15 +107,15 @@ export function CustomersView({
   const vipCustomerCount = accounts.filter((account) => Number(account.totalSpent || 0) >= 5000000).length;
   const customersWithOrders = accounts.filter((account) => Number(account.totalOrders || 0) > 0).length;
   const customerTotalSpent = accounts.reduce((sum, account) => sum + Number(account.totalSpent || 0), 0);
-  const metricCards = isStaffView
+  const metricCards: Metric[] = isStaffView
     ? [
-        { label: vi.totalStaff, value: accounts.length },
+        { label: vi.totalStaff, value: accounts.length, tone: 'gray' },
         { label: vi.active, value: activeUsers.length, tone: 'emerald' as const },
         { label: vi.locked, value: lockedUsers.length, tone: 'red' as const },
         { label: vi.unverified, value: unverifiedUsers.length, tone: 'amber' as const },
       ]
     : [
-        { label: vi.totalCustomers, value: accounts.length },
+        { label: vi.totalCustomers, value: accounts.length, tone: 'gray' },
         { label: vi.vipCustomers, value: vipCustomerCount, tone: 'emerald' as const },
         { label: vi.customersWithOrders, value: customersWithOrders, tone: 'blue' as const },
         { label: vi.totalSpent, value: formatCurrency(customerTotalSpent), tone: 'orange' as const },
@@ -307,7 +314,7 @@ function MetricCard({
 }: {
   label: string;
   value: number | string;
-  tone?: 'gray' | 'emerald' | 'red' | 'amber' | 'blue' | 'orange';
+  tone?: MetricTone;
 }) {
   const tones = {
     gray: 'text-gray-900',
