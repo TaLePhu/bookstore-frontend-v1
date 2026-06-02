@@ -4,7 +4,7 @@ import type {
   AdminOrderStatus,
 } from '../../services/admin.service';
 
-export type AdminView = 'dashboard' | 'books' | 'promotions' | 'categories' | 'orders' | 'customers' | 'settings';
+export type AdminView = 'dashboard' | 'books' | 'promotions' | 'categories' | 'orders' | 'customers' | 'staff' | 'settings';
 export type ExistingBookImage = { id?: string; url: string; isPrimary?: boolean };
 export type PromotionDraft = { price: string; originalPrice: string; discount: string };
 export type BookVisibilityFilter = 'active' | 'deleted' | 'all';
@@ -17,7 +17,6 @@ export type PromotionBookStockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_o
 export type PromotionEffectiveStatus = 'all' | 'running' | 'upcoming' | 'ending_soon' | 'expired' | 'inactive';
 export type CategoryVisibilityFilter = 'active' | 'deleted' | 'all';
 export type CategoryBookFilter = 'all' | 'with_books' | 'empty';
-export type UserRoleFilter = 'all' | 'CUSTOMER' | 'STAFF' | 'ADMIN' | 'GUEST';
 export type UserLockFilter = 'all' | 'active' | 'locked';
 export type UserVerifiedFilter = 'all' | 'verified' | 'unverified';
 export type OrderWorkflowTab = 'all' | 'pending' | 'processing' | 'shipped' | 'completed' | 'cancelled' | 'cancel_requests';

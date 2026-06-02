@@ -19,6 +19,7 @@ import {
   Store,
   Trash2,
   Users,
+  UserCog,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -138,7 +139,6 @@ import type {
   PromotionDraft,
   PromotionModalMode,
   UserLockFilter,
-  UserRoleFilter,
   UserVerifiedFilter,
 } from './admin/types';
 
@@ -167,7 +167,6 @@ export function AdminPage() {
   const [bookCurrentPage, setBookCurrentPage] = useState(1);
   const [categoryVisibilityFilter, setCategoryVisibilityFilter] = useState<CategoryVisibilityFilter>('active');
   const [categoryBookFilter, setCategoryBookFilter] = useState<CategoryBookFilter>('all');
-  const [userRoleFilter, setUserRoleFilter] = useState<UserRoleFilter>('CUSTOMER');
   const [userLockFilter, setUserLockFilter] = useState<UserLockFilter>('all');
   const [userVerifiedFilter, setUserVerifiedFilter] = useState<UserVerifiedFilter>('all');
   const [isLoading, setIsLoading] = useState(true);
@@ -256,11 +255,24 @@ export function AdminPage() {
     { id: 'orders' as const, label: 'Đơn hàng', icon: ShoppingCart },
     { id: 'customers' as const, label: 'Khách hàng', icon: Users },
     { id: 'settings' as const, label: 'Cài đặt', icon: Settings },
+    { id: 'staff' as const, label: 'Nh\u00e2n vi\u00ean', icon: UserCog },
   ];
 
   const visibleMenuItems = useMemo(() => {
-    if (isAdmin) return menuItems;
-    return menuItems.filter((item) => ['dashboard', 'books', 'orders', 'promotions'].includes(item.id));
+    const items = isAdmin
+      ? menuItems
+      : menuItems.filter((item) => ['dashboard', 'books', 'orders', 'promotions'].includes(item.id));
+    const order: Record<AdminView, number> = {
+      dashboard: 0,
+      promotions: 1,
+      categories: 2,
+      books: 3,
+      orders: 4,
+      customers: 5,
+      staff: 6,
+      settings: 7,
+    };
+    return [...items].sort((left, right) => order[left.id] - order[right.id]);
   }, [isAdmin]);
 
   useEffect(() => {
@@ -333,10 +345,7 @@ export function AdminPage() {
         getAdminCategories({ includeDeleted: true }),
         getAdminOrders(orderRequestParams),
         getAdminCustomers({
-          limit: 50,
-          role: userRoleFilter === 'all' ? undefined : userRoleFilter,
-          isLocked: userLockFilter === 'all' ? undefined : userLockFilter === 'locked',
-          isVerified: userVerifiedFilter === 'all' ? undefined : userVerifiedFilter === 'verified',
+          limit: 500,
         }),
       ]);
       const orderStatusResults = await Promise.all(
@@ -381,9 +390,6 @@ export function AdminPage() {
     orderDateFrom,
     orderDateTo,
     bookVisibilityFilter,
-    userRoleFilter,
-    userLockFilter,
-    userVerifiedFilter,
   ]);
 
   useEffect(() => {
@@ -595,8 +601,12 @@ export function AdminPage() {
     const keyword = searchQuery.trim().toLowerCase();
     let result = [...customers];
 
-    if (userRoleFilter !== 'all') {
-      result = result.filter((customer) => customer.role === userRoleFilter);
+    if (currentView === 'customers') {
+      result = result.filter((customer) => customer.role === 'CUSTOMER');
+    }
+
+    if (currentView === 'staff') {
+      result = result.filter((customer) => customer.role === 'STAFF');
     }
 
     if (userLockFilter !== 'all') {
@@ -607,11 +617,11 @@ export function AdminPage() {
       result = result.filter((customer) => customer.isVerified === (userVerifiedFilter === 'verified'));
     }
 
-    if (currentView !== 'customers' || !keyword) return result;
+    if (!['customers', 'staff'].includes(currentView) || !keyword) return result;
     return result.filter((customer) =>
       [customer.fullName, customer.userName, customer.email].filter(Boolean).join(' ').toLowerCase().includes(keyword)
     );
-  }, [customers, currentView, searchQuery, userLockFilter, userRoleFilter, userVerifiedFilter]);
+  }, [customers, currentView, searchQuery, userLockFilter, userVerifiedFilter]);
 
   const filteredCategories = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -686,10 +696,15 @@ export function AdminPage() {
     { id: 'cancelled', label: 'Đã hủy', count: orderStatusTotals.CANCELLED || 0, status: 'CANCELLED' },
     { id: 'cancel_requests', label: 'Yêu cầu hủy', count: cancelRequestCount },
   ];
-  const activeUsers = customers.filter((customer) => !customer.isLocked);
-  const lockedUsers = customers.filter((customer) => customer.isLocked);
-  const verifiedUsers = customers.filter((customer) => customer.isVerified);
-  const unverifiedUsers = customers.filter((customer) => !customer.isVerified);
+  const currentAccountUsers =
+    currentView === 'staff'
+      ? customers.filter((customer) => customer.role === 'STAFF')
+      : currentView === 'customers'
+        ? customers.filter((customer) => customer.role === 'CUSTOMER')
+        : customers;
+  const activeUsers = currentAccountUsers.filter((customer) => !customer.isLocked);
+  const lockedUsers = currentAccountUsers.filter((customer) => customer.isLocked);
+  const unverifiedUsers = currentAccountUsers.filter((customer) => !customer.isVerified);
   const promotionBooks = books.filter((book) => !isBookDeleted(book));
   const activePromotionBooks = promotionBooks.filter((book) => Number(book.discount || 0) > 0);
   const maxPromotionDiscount = Math.max(...activePromotionBooks.map((book) => Number(book.discount || 0)), 0);
@@ -2605,15 +2620,37 @@ export function AdminPage() {
 
           {currentView === 'customers' && (
             <CustomersView
+              mode="customers"
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
-              customers={customers}
+              accounts={currentAccountUsers}
               activeUsers={activeUsers}
               lockedUsers={lockedUsers}
               unverifiedUsers={unverifiedUsers}
-              filteredCustomers={filteredCustomers}
-              userRoleFilter={userRoleFilter}
-              setUserRoleFilter={setUserRoleFilter}
+              filteredAccounts={filteredCustomers}
+              userLockFilter={userLockFilter}
+              setUserLockFilter={setUserLockFilter}
+              userVerifiedFilter={userVerifiedFilter}
+              setUserVerifiedFilter={setUserVerifiedFilter}
+              openCreateUserModal={openCreateUserModal}
+              handleToggleUserLock={handleToggleUserLock}
+              handleChangeUserRole={handleChangeUserRole}
+              handleResetUserPassword={handleResetUserPassword}
+              updatingUserId={updatingUserId}
+              currentUserId={user?.id}
+            />
+          )}
+
+          {currentView === 'staff' && (
+            <CustomersView
+              mode="staff"
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              accounts={currentAccountUsers}
+              activeUsers={activeUsers}
+              lockedUsers={lockedUsers}
+              unverifiedUsers={unverifiedUsers}
+              filteredAccounts={filteredCustomers}
               userLockFilter={userLockFilter}
               setUserLockFilter={setUserLockFilter}
               userVerifiedFilter={userVerifiedFilter}
