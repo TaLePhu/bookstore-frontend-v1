@@ -171,6 +171,33 @@ export interface AdminBookPayload {
   deleteImageIds?: string[];
 }
 
+export interface AdminBookImportPayload {
+  title: string;
+  author: string;
+  categoryId: string;
+  originalPrice: number | string;
+  stock: number | string;
+  isbn: string;
+  description: string;
+  publisher?: string;
+  publishYear?: number | string;
+  pages?: number | string;
+  language?: string;
+  releaseDate?: string;
+  imageUrl?: string;
+}
+
+export interface AdminBookImportResult {
+  created: number;
+  skipped: number;
+  errors: Array<{
+    row: number;
+    message: string;
+    isbn?: string;
+    title?: string;
+  }>;
+}
+
 export const getAdminDashboard = async (): Promise<AdminDashboardResponse> => {
   const res = await api.get('/admin/dashboard');
   return res.data.data;
@@ -310,6 +337,11 @@ export const createAdminBook = async (payload: AdminBookPayload): Promise<ApiBoo
   const res = await api.post('/admin/books', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+  return res.data.data;
+};
+
+export const importAdminBooks = async (books: AdminBookImportPayload[]): Promise<AdminBookImportResult> => {
+  const res = await api.post('/admin/books/import', { books });
   return res.data.data;
 };
 

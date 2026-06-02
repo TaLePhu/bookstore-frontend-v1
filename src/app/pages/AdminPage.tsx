@@ -44,6 +44,7 @@ import {
   getManagementBooks,
   hardDeleteAdminBook,
   hardDeleteAdminCategory,
+  importAdminBooks,
   restoreAdminBook,
   restoreAdminCategory,
   resetAdminUserPassword,
@@ -55,6 +56,8 @@ import {
   updateAdminUserStatus,
   updateAdminOrderStatus,
   type AdminBookPayload,
+  type AdminBookImportPayload,
+  type AdminBookImportResult,
   type AdminCategory,
   type AdminCategoryPayload,
   type AdminDashboardResponse,
@@ -1418,6 +1421,16 @@ export function AdminPage() {
     }
   };
 
+  const handleImportBooks = async (payload: AdminBookImportPayload[]): Promise<AdminBookImportResult> => {
+    const result = await importAdminBooks(payload);
+    await loadData();
+    showPopup({
+      type: result.created > 0 ? 'success' : 'error',
+      text: `Đã import ${result.created} sách. Bỏ qua ${result.skipped} dòng.`,
+    });
+    return result;
+  };
+
   const getBookPayloadFromBook = (book: ApiBook, draft?: PromotionDraft): AdminBookPayload => ({
     title: book.title || '',
     author: book.author || '',
@@ -2365,6 +2378,7 @@ export function AdminPage() {
               getPromotionForBook={getPromotionForBook}
               isPromotionCurrentlyActive={isPromotionCurrentlyActive}
               getPromotionStatusLabel={getPromotionStatusLabel}
+              handleImportBooks={handleImportBooks}
               bookCurrentPage={bookCurrentPage}
               totalBookPages={totalBookPages}
               setBookCurrentPage={setBookCurrentPage}

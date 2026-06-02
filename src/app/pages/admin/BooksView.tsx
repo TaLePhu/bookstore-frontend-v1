@@ -1,10 +1,12 @@
 import type React from 'react';
+import { useRef, useState } from 'react';
 import {
   AlertCircle,
   ArchiveX,
   Download,
   Edit,
   Eye,
+  FileSpreadsheet,
   Filter,
   Package,
   Plus,
@@ -12,8 +14,14 @@ import {
   RotateCcw,
   Tags,
   Trash2,
+  Upload,
 } from 'lucide-react';
-import type { AdminCategory, AdminPromotion } from '../../services/admin.service';
+import type {
+  AdminBookImportPayload,
+  AdminBookImportResult,
+  AdminCategory,
+  AdminPromotion,
+} from '../../services/admin.service';
 import type { ApiBook } from '../../services/book.service';
 import { getBookImage } from '../../utils/book-display';
 import { LOW_STOCK_THRESHOLD } from './constants';
@@ -60,12 +68,62 @@ type BooksViewProps = {
   getPromotionForBook: (bookId?: string | null) => AdminPromotion | undefined;
   isPromotionCurrentlyActive: (promotion?: AdminPromotion) => boolean;
   getPromotionStatusLabel: (promotion?: AdminPromotion) => string;
+  handleImportBooks: (payload: AdminBookImportPayload[]) => Promise<AdminBookImportResult>;
   bookCurrentPage: number;
   totalBookPages: number;
   setBookCurrentPage: React.Dispatch<React.SetStateAction<number>>;
 };
 
 const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+const IMPORT_COLUMNS = [
+  'title',
+  'author',
+  'isbn',
+  'categoryName',
+  'categoryId',
+  'originalPrice',
+  'stock',
+  'description',
+  'publisher',
+  'publishYear',
+  'pages',
+  'language',
+  'releaseDate',
+  'imageUrl',
+];
+
+const parseCsvLine = (line: string) => {
+  const cells: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      current += '"';
+      index += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      cells.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  cells.push(current.trim());
+  return cells;
+};
 
 export function BooksView({
   isAdmin,
@@ -99,10 +157,15 @@ export function BooksView({
   getPromotionForBook,
   isPromotionCurrentlyActive,
   getPromotionStatusLabel,
+  handleImportBooks,
   bookCurrentPage,
   totalBookPages,
   setBookCurrentPage,
 }: BooksViewProps) {
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [importingBooks, setImportingBooks] = useState(false);
+  const [importResult, setImportResult] = useState<AdminBookImportResult | null>(null);
+  const [importError, setImportError] = useState('');
   const activeBookCount = books.filter((book) => !isBookDeleted(book)).length;
   const discountedBookCount = books.filter((book) => !isBookDeleted(book) && Number(book.discount || 0) > 0).length;
   const deletedBookCount = books.filter(isBookDeleted).length;
@@ -141,6 +204,98 @@ export function BooksView({
     URL.revokeObjectURL(url);
   };
 
+  const downloadImportTemplate = () => {
+    const sampleCategory = activeCategories[0]?.name || 'Tên danh mục đang có';
+    const rows = [
+      IMPORT_COLUMNS,
+      [
+        'Sách mẫu',
+        'Tác giả mẫu',
+        '9786040000001',
+        sampleCategory,
+        '',
+        '120000',
+        '20',
+        'Mô tả sách mẫu',
+        'NXB Trẻ',
+        '2025',
+        '256',
+        'Tiếng Việt',
+        '2026-06-01',
+        '',
+      ],
+    ];
+    const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'mau-import-sach.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const parseImportCsv = (content: string): AdminBookImportPayload[] => {
+    const lines = content
+      .replace(/^\uFEFF/, '')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (lines.length < 2) {
+      throw new Error('File CSV cần có dòng tiêu đề và ít nhất một dòng sách.');
+    }
+
+    const headers = parseCsvLine(lines[0]).map((header) => header.trim());
+    const categoryByName = new Map(activeCategories.map((category) => [category.name.trim().toLowerCase(), category.id]));
+
+    return lines.slice(1).map((line) => {
+      const values = parseCsvLine(line);
+      const row = headers.reduce<Record<string, string>>((acc, header, cellIndex) => {
+        acc[header] = values[cellIndex] || '';
+        return acc;
+      }, {});
+      const categoryId = row.categoryId || categoryByName.get((row.categoryName || '').trim().toLowerCase()) || '';
+
+      return {
+        title: row.title,
+        author: row.author,
+        isbn: row.isbn,
+        categoryId,
+        originalPrice: row.originalPrice,
+        stock: row.stock,
+        description: row.description,
+        publisher: row.publisher,
+        publishYear: row.publishYear,
+        pages: row.pages,
+        language: row.language || 'Tiếng Việt',
+        releaseDate: row.releaseDate,
+        imageUrl: row.imageUrl,
+      };
+    });
+  };
+
+  const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setImportError('');
+    setImportResult(null);
+
+    try {
+      setImportingBooks(true);
+      const content = await file.text();
+      const payload = parseImportCsv(content);
+      const result = await handleImportBooks(payload);
+      setImportResult(result);
+    } catch (error: any) {
+      setImportError(error?.message || 'Không thể import file CSV.');
+    } finally {
+      setImportingBooks(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -176,6 +331,34 @@ export function BooksView({
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 type="button"
+                onClick={downloadImportTemplate}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Tải mẫu
+              </button>
+              {isAdmin && (
+                <>
+                  <input
+                    ref={importInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={handleImportFileChange}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => importInputRef.current?.click()}
+                    disabled={importingBooks}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-700 transition-colors hover:bg-orange-100 disabled:opacity-50"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {importingBooks ? 'Đang import...' : 'Import CSV'}
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
                 onClick={exportBooks}
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
               >
@@ -194,6 +377,29 @@ export function BooksView({
               )}
             </div>
           </div>
+
+          {(importError || importResult) && (
+            <div className={`rounded-xl border px-4 py-3 text-sm ${importError ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+              {importError ? (
+                <p>{importError}</p>
+              ) : importResult ? (
+                <div>
+                  <p className="font-semibold">
+                    Đã import {importResult.created} sách, bỏ qua {importResult.skipped} dòng.
+                  </p>
+                  {importResult.errors.length > 0 && (
+                    <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
+                      {importResult.errors.slice(0, 5).map((item) => (
+                        <li key={`${item.row}-${item.isbn || item.title || item.message}`}>
+                          Dòng {item.row}: {item.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.4fr_repeat(5,minmax(0,1fr))_auto]">
             <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm theo tên, tác giả, ISBN, NXB..." />
