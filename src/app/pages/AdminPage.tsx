@@ -12,6 +12,7 @@ import {
   FolderTree,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Package,
   Percent,
   RefreshCcw,
@@ -113,6 +114,7 @@ import { CategoryModal } from './admin/CategoryModal';
 import { CancelDecisionModal, ConfirmDialogModal } from './admin/AdminDialogs';
 import { DashboardView } from './admin/DashboardView';
 import { ReportsView } from './admin/ReportsView';
+import { MarketingView } from './admin/MarketingView';
 import { CustomerDetailModal } from './admin/CustomerDetailModal';
 import { StaffDetailModal } from './admin/StaffDetailModal';
 import {
@@ -266,6 +268,7 @@ export function AdminPage() {
   const menuItems = [
     { id: 'dashboard' as const, label: isAdmin ? 'Dashboard' : 'Bảng làm việc', icon: LayoutDashboard },
     { id: 'reports' as const, label: 'B\u00e1o c\u00e1o', icon: BarChart3 },
+    { id: 'marketing' as const, label: 'Marketing', icon: Megaphone },
     { id: 'promotions' as const, label: 'Khuyến mãi', icon: Percent },
     { id: 'categories' as const, label: 'Danh mục', icon: FolderTree },
     { id: 'books' as const, label: 'Quản lý sách', icon: BookOpen },
@@ -282,13 +285,14 @@ export function AdminPage() {
     const order: Record<AdminView, number> = {
       dashboard: 0,
       reports: 1,
-      promotions: 2,
-      categories: 3,
-      books: 4,
-      orders: 5,
-      customers: 6,
-      staff: 7,
-      settings: 8,
+      marketing: 2,
+      promotions: 3,
+      categories: 4,
+      books: 5,
+      orders: 6,
+      customers: 7,
+      staff: 8,
+      settings: 9,
     };
     return [...items].sort((left, right) => order[left.id] - order[right.id]);
   }, [isAdmin]);
@@ -786,6 +790,21 @@ export function AdminPage() {
     setBookStockFilter(filter);
     setSearchQuery('');
     setCurrentView('books');
+  };
+
+  const goToBooksView = () => {
+    setSearchQuery('');
+    setCurrentView('books');
+  };
+
+  const goToPromotionsView = () => {
+    setSearchQuery('');
+    setCurrentView('promotions');
+  };
+
+  const goToCustomersView = () => {
+    setSearchQuery('');
+    setCurrentView('customers');
   };
 
   const stockAlertBooks = [...outOfStockBooks, ...lowStockBooks].sort(
@@ -2554,6 +2573,19 @@ export function AdminPage() {
               orders={reportOrders}
               books={books}
               customers={customers}
+            />
+          )}
+
+          {currentView === 'marketing' && (
+            <MarketingView
+              orders={reportOrders}
+              books={books}
+              customers={customers}
+              promotions={promotions}
+              goToBooks={goToBooksView}
+              goToPromotions={goToPromotionsView}
+              goToCustomers={goToCustomersView}
+              goToOrders={() => goToOrders()}
             />
           )}
 

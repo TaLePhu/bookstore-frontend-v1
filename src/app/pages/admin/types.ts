@@ -4,7 +4,7 @@ import type {
   AdminOrderStatus,
 } from '../../services/admin.service';
 
-export type AdminView = 'dashboard' | 'reports' | 'books' | 'promotions' | 'categories' | 'orders' | 'customers' | 'staff' | 'settings';
+export type AdminView = 'dashboard' | 'reports' | 'marketing' | 'books' | 'promotions' | 'categories' | 'orders' | 'customers' | 'staff' | 'settings';
 export type ExistingBookImage = { id?: string; url: string; isPrimary?: boolean };
 export type PromotionDraft = { price: string; originalPrice: string; discount: string };
 export type BookVisibilityFilter = 'active' | 'deleted' | 'all';
