@@ -16,6 +16,7 @@ const vi = {
   packed: '\u0110\u00f3ng g\u00f3i / giao',
   completed: 'Ho\u00e0n th\u00e0nh',
   dailyStats: 'Th\u1ed1ng k\u00ea theo ng\u00e0y',
+  dailyStatsHelp: 'X\u00e1c nh\u1eadn / \u0111\u00f3ng g\u00f3i / ho\u00e0n th\u00e0nh',
   recentOrders: '\u0110\u01a1n \u0111\u00e3 x\u1eed l\u00fd g\u1ea7n \u0111\u00e2y',
   activityLog: 'Nh\u1eadt k\u00fd thao t\u00e1c',
   orderCode: 'M\u00e3 \u0111\u01a1n',
@@ -57,15 +58,10 @@ export function StaffDetailModal({ staff, onClose }: StaffDetailModalProps) {
 
           <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
             <section className="overflow-hidden rounded-xl border border-gray-200">
-              <SectionHeader title={vi.dailyStats} />
-              <div className="divide-y divide-gray-100">
+              <SectionHeader title={vi.dailyStats} subtitle={vi.dailyStatsHelp} />
+              <div className="space-y-3 p-4">
                 {staff.dailyStats.slice(0, 14).map((day) => (
-                  <div key={day.date} className="grid grid-cols-[1fr_auto] gap-3 px-5 py-3 text-sm">
-                    <span className="font-semibold text-gray-800">{formatDate(day.date)}</span>
-                    <span className="text-gray-500">
-                      {day.confirmed}/{day.packed}/{day.completed}
-                    </span>
-                  </div>
+                  <DailyStatsCard key={day.date} day={day} />
                 ))}
                 {staff.dailyStats.length === 0 && <EmptyLine />}
               </div>
@@ -133,10 +129,59 @@ export function StaffDetailModal({ staff, onClose }: StaffDetailModalProps) {
   );
 }
 
-function SectionHeader({ title }: { title: string }) {
+function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="border-b border-gray-100 px-5 py-4">
       <h4 className="font-bold text-gray-900">{title}</h4>
+      {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+    </div>
+  );
+}
+
+function DailyStatsCard({
+  day,
+}: {
+  day: AdminStaffSummary['dailyStats'][number];
+}) {
+  const total = day.confirmed + day.packed + day.completed;
+  const getWidth = (value: number) => (total > 0 ? `${Math.max(8, (value / total) * 100)}%` : '0%');
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-semibold text-gray-900">{formatDate(day.date)}</p>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
+          {total.toLocaleString('vi-VN')} thao t\u00e1c
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-2">
+        <StatsRow label={vi.confirmed} value={day.confirmed} colorClass="bg-orange-500" width={getWidth(day.confirmed)} />
+        <StatsRow label={vi.packed} value={day.packed} colorClass="bg-blue-500" width={getWidth(day.packed)} />
+        <StatsRow label={vi.completed} value={day.completed} colorClass="bg-emerald-500" width={getWidth(day.completed)} />
+      </div>
+    </div>
+  );
+}
+
+function StatsRow({
+  label,
+  value,
+  colorClass,
+  width,
+}: {
+  label: string;
+  value: number;
+  colorClass: string;
+  width: string;
+}) {
+  return (
+    <div className="grid grid-cols-[92px_1fr_32px] items-center gap-2 text-xs">
+      <span className="font-medium text-gray-600">{label}</span>
+      <div className="h-2 overflow-hidden rounded-full bg-white">
+        <div className={`h-full rounded-full ${colorClass}`} style={{ width }} />
+      </div>
+      <span className="text-right font-semibold text-gray-800">{value.toLocaleString('vi-VN')}</span>
     </div>
   );
 }
