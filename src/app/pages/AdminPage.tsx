@@ -1424,10 +1424,12 @@ export function AdminPage() {
   const handleImportBooks = async (payload: AdminBookImportPayload[]): Promise<AdminBookImportResult> => {
     const result = await importAdminBooks(payload);
     await loadData();
-    showPopup({
-      type: result.created > 0 ? 'success' : 'error',
-      text: `Đã import ${result.created} sách. Bỏ qua ${result.skipped} dòng.`,
-    });
+    const message = `Đã import ${result.created} sách. Bỏ qua ${result.skipped} dòng.`;
+    if (result.created > 0) {
+      toast.success(message);
+    } else {
+      toast.error(message);
+    }
     return result;
   };
 

@@ -16,6 +16,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import type {
   AdminBookImportPayload,
   AdminBookImportResult,
@@ -169,8 +170,6 @@ export function BooksView({
 }: BooksViewProps) {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [importingBooks, setImportingBooks] = useState(false);
-  const [importResult, setImportResult] = useState<AdminBookImportResult | null>(null);
-  const [importError, setImportError] = useState('');
   const activeBookCount = books.filter((book) => !isBookDeleted(book)).length;
   const discountedBookCount = books.filter((book) => !isBookDeleted(book) && Number(book.discount || 0) > 0).length;
   const deletedBookCount = books.filter(isBookDeleted).length;
@@ -218,11 +217,6 @@ export function BooksView({
         'Tác giả mẫu',
         '9786040000001',
         sampleCategory,
-        'https://example.com/book-cover-1.jpg|https://example.com/book-cover-2.jpg',
-        '',
-        '',
-        '',
-        '',
         '',
         '120000',
         '20',
@@ -232,6 +226,11 @@ export function BooksView({
         '256',
         'Tiếng Việt',
         '2026-06-01',
+        'https://example.com/book-cover-1.jpg|https://example.com/book-cover-2.jpg',
+        '',
+        '',
+        '',
+        '',
         '',
       ],
     ];
@@ -313,9 +312,9 @@ export function BooksView({
       setImportingBooks(true);
       const content = await file.text();
       const payload = parseImportCsv(content);
-      const result = await handleImportBooks(payload);
-      setImportResult(result);
+      await handleImportBooks(payload);
     } catch (error: any) {
+      toast.error(error?.message || 'Không thể import file CSV.');
       setImportError(error?.message || 'Không thể import file CSV.');
     } finally {
       setImportingBooks(false);
@@ -404,7 +403,7 @@ export function BooksView({
             </div>
           </div>
 
-          {(importError || importResult) && (
+          {false && (importError || importResult) && (
             <div className={`rounded-xl border px-4 py-3 text-sm ${importError ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
               {importError ? (
                 <p>{importError}</p>
