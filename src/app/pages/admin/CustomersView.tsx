@@ -2,7 +2,7 @@ import { Plus } from 'lucide-react';
 import type { AdminUser } from '../../services/admin.service';
 import { EmptyState, SearchBox, TableCell, TableHead } from './components';
 import type { UserLockFilter, UserVerifiedFilter } from './types';
-import { formatDate } from './utils';
+import { formatCurrency, formatDate } from './utils';
 
 type AccountViewMode = 'customers' | 'staff';
 
@@ -45,6 +45,9 @@ const vi = {
   active: '\u0110ang ho\u1ea1t \u0111\u1ed9ng',
   locked: '\u0110\u00e3 kh\u00f3a',
   unverified: 'Ch\u01b0a x\u00e1c th\u1ef1c',
+  vipCustomers: 'Kh\u00e1ch VIP',
+  customersWithOrders: '\u0110\u00e3 mua h\u00e0ng',
+  totalSpent: 'T\u1ed5ng chi ti\u00eau',
   allStatus: 'T\u1ea5t c\u1ea3 tr\u1ea1ng th\u00e1i',
   allVerified: 'T\u1ea5t c\u1ea3 x\u00e1c th\u1ef1c',
   verified: '\u0110\u00e3 x\u00e1c th\u1ef1c',
@@ -52,6 +55,9 @@ const vi = {
   matched: 't\u00e0i kho\u1ea3n ph\u00f9 h\u1ee3p v\u1edbi b\u1ed9 l\u1ecdc hi\u1ec7n t\u1ea1i',
   account: 'T\u00e0i kho\u1ea3n',
   role: 'Vai tr\u00f2',
+  tier: 'H\u1ea1ng kh\u00e1ch',
+  orderCount: 'S\u1ed1 \u0111\u01a1n',
+  lastOrder: '\u0110\u01a1n g\u1ea7n nh\u1ea5t',
   joined: 'Ng\u00e0y tham gia',
   status: 'Tr\u1ea1ng th\u00e1i',
   actions: 'Thao t\u00e1c',
@@ -91,14 +97,29 @@ export function CustomersView({
   const createRole = isStaffView ? 'STAFF' : 'CUSTOMER';
   const listTitle = isStaffView ? vi.staffList : vi.customerList;
   const emptyText = isStaffView ? vi.noStaff : vi.noCustomers;
+  const vipCustomerCount = accounts.filter((account) => Number(account.totalSpent || 0) >= 5000000).length;
+  const customersWithOrders = accounts.filter((account) => Number(account.totalOrders || 0) > 0).length;
+  const customerTotalSpent = accounts.reduce((sum, account) => sum + Number(account.totalSpent || 0), 0);
+  const metricCards = isStaffView
+    ? [
+        { label: vi.totalStaff, value: accounts.length },
+        { label: vi.active, value: activeUsers.length, tone: 'emerald' as const },
+        { label: vi.locked, value: lockedUsers.length, tone: 'red' as const },
+        { label: vi.unverified, value: unverifiedUsers.length, tone: 'amber' as const },
+      ]
+    : [
+        { label: vi.totalCustomers, value: accounts.length },
+        { label: vi.vipCustomers, value: vipCustomerCount, tone: 'emerald' as const },
+        { label: vi.customersWithOrders, value: customersWithOrders, tone: 'blue' as const },
+        { label: vi.totalSpent, value: formatCurrency(customerTotalSpent), tone: 'orange' as const },
+      ];
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-4">
-        <MetricCard label={isStaffView ? vi.totalStaff : vi.totalCustomers} value={accounts.length} />
-        <MetricCard label={vi.active} value={activeUsers.length} tone="emerald" />
-        <MetricCard label={vi.locked} value={lockedUsers.length} tone="red" />
-        <MetricCard label={vi.unverified} value={unverifiedUsers.length} tone="amber" />
+        {metricCards.map((metric) => (
+          <MetricCard key={metric.label} label={metric.label} value={metric.value} tone={metric.tone} />
+        ))}
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -148,12 +169,20 @@ export function CustomersView({
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px]">
+          <table className={`w-full ${isStaffView ? 'min-w-[980px]' : 'min-w-[1260px]'}`}>
             <thead className="bg-gray-50">
               <tr>
                 <TableHead>{vi.account}</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>{vi.role}</TableHead>
+                {!isStaffView && (
+                  <>
+                    <TableHead>{vi.tier}</TableHead>
+                    <TableHead>{vi.orderCount}</TableHead>
+                    <TableHead>{vi.totalSpent}</TableHead>
+                    <TableHead>{vi.lastOrder}</TableHead>
+                  </>
+                )}
                 <TableHead>{vi.verified}</TableHead>
                 <TableHead>{vi.joined}</TableHead>
                 <TableHead>{vi.status}</TableHead>
@@ -197,6 +226,24 @@ export function CustomersView({
                       )}
                     </select>
                   </TableCell>
+                  {!isStaffView && (
+                    <>
+                      <TableCell>
+                        <CustomerTierBadge totalSpent={Number(account.totalSpent || 0)} />
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-semibold text-gray-800">
+                          {Number(account.totalOrders || 0).toLocaleString('vi-VN')}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-semibold text-gray-900">
+                          {formatCurrency(Number(account.totalSpent || 0))}
+                        </span>
+                      </TableCell>
+                      <TableCell>{account.lastOrderAt ? formatDate(account.lastOrderAt) : '-'}</TableCell>
+                    </>
+                  )}
                   <TableCell>
                     <span className={`rounded-full px-2 py-1 text-xs ${account.isVerified ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                       {account.isVerified ? vi.verified : vi.unverified}
@@ -259,20 +306,40 @@ function MetricCard({
   tone = 'gray',
 }: {
   label: string;
-  value: number;
-  tone?: 'gray' | 'emerald' | 'red' | 'amber';
+  value: number | string;
+  tone?: 'gray' | 'emerald' | 'red' | 'amber' | 'blue' | 'orange';
 }) {
   const tones = {
     gray: 'text-gray-900',
     emerald: 'text-emerald-600',
     red: 'text-red-600',
     amber: 'text-amber-600',
+    blue: 'text-blue-600',
+    orange: 'text-orange-600',
   };
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <p className="text-sm text-gray-500">{label}</p>
-      <p className={`mt-2 text-3xl font-bold ${tones[tone]}`}>{value.toLocaleString('vi-VN')}</p>
+      <p className={`mt-2 text-3xl font-bold ${tones[tone]}`}>
+        {typeof value === 'number' ? value.toLocaleString('vi-VN') : value}
+      </p>
     </div>
   );
+}
+
+function CustomerTierBadge({ totalSpent }: { totalSpent: number }) {
+  if (totalSpent >= 5000000) {
+    return <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-semibold text-purple-700">VIP</span>;
+  }
+
+  if (totalSpent >= 1000000) {
+    return (
+      <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+        Th\u00e2n thi\u1ebft
+      </span>
+    );
+  }
+
+  return <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">M\u1edbi</span>;
 }

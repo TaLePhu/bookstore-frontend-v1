@@ -97,6 +97,9 @@ export interface AdminUser {
   isVerified: boolean;
   isLocked: boolean;
   createdAt: string;
+  totalOrders?: number;
+  totalSpent?: number;
+  lastOrderAt?: string | null;
 }
 
 export interface AdminCustomerSummary extends AdminUser {

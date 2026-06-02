@@ -2673,6 +2673,8 @@ export function AdminPage() {
               userVerifiedFilter={userVerifiedFilter}
               setUserVerifiedFilter={setUserVerifiedFilter}
               openCreateUserModal={openCreateUserModal}
+              openCustomerDetail={openCustomerDetail}
+              loadingCustomerSummaryId={loadingCustomerSummaryId}
               handleToggleUserLock={handleToggleUserLock}
               handleChangeUserRole={handleChangeUserRole}
               handleResetUserPassword={handleResetUserPassword}
@@ -2696,8 +2698,6 @@ export function AdminPage() {
               userVerifiedFilter={userVerifiedFilter}
               setUserVerifiedFilter={setUserVerifiedFilter}
               openCreateUserModal={openCreateUserModal}
-              openCustomerDetail={openCustomerDetail}
-              loadingCustomerSummaryId={loadingCustomerSummaryId}
               handleToggleUserLock={handleToggleUserLock}
               handleChangeUserRole={handleChangeUserRole}
               handleResetUserPassword={handleResetUserPassword}
