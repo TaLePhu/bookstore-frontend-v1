@@ -117,7 +117,7 @@ export function StaffDetailModal({ staff, onClose }: StaffDetailModalProps) {
                       <td className="px-5 py-4 text-gray-600">{formatDate(log.createdAt)}</td>
                       <td className="px-5 py-4 font-semibold text-gray-900">{log.orderCode || log.orderId.slice(0, 8)}</td>
                       <td className="px-5 py-4">
-                        {getOrderStatusText(log.fromStatus)} -> {getOrderStatusText(log.toStatus)}
+                        {getOrderStatusText(log.fromStatus)} {'->'} {getOrderStatusText(log.toStatus)}
                       </td>
                       <td className="px-5 py-4 text-gray-500">{log.note || '-'}</td>
                     </tr>
