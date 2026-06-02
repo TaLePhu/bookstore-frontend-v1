@@ -61,9 +61,11 @@ const vi = {
   search: 'T\u00ecm theo t\u00ean, username ho\u1eb7c email...',
   matched: 't\u00e0i kho\u1ea3n ph\u00f9 h\u1ee3p v\u1edbi b\u1ed9 l\u1ecdc hi\u1ec7n t\u1ea1i',
   account: 'T\u00e0i kho\u1ea3n',
+  contact: 'Li\u00ean h\u1ec7',
   role: 'Vai tr\u00f2',
   tier: 'H\u1ea1ng kh\u00e1ch',
   orderCount: 'S\u1ed1 \u0111\u01a1n',
+  purchaseSummary: 'T\u00f3m t\u1eaft mua h\u00e0ng',
   lastOrder: '\u0110\u01a1n g\u1ea7n nh\u1ea5t',
   joined: 'Ng\u00e0y tham gia',
   status: 'Tr\u1ea1ng th\u00e1i',
@@ -74,6 +76,7 @@ const vi = {
   detail: 'Chi ti\u1ebft',
   unlock: 'M\u1edf kh\u00f3a',
   lock: 'Kh\u00f3a',
+  noOrders: 'Ch\u01b0a c\u00f3 \u0111\u01a1n',
 };
 
 export function CustomersView({
@@ -176,92 +179,89 @@ export function CustomersView({
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className={`w-full ${isStaffView ? 'min-w-[980px]' : 'min-w-[1260px]'}`}>
+          <table className={`w-full ${isStaffView ? 'min-w-[980px]' : 'min-w-[920px]'}`}>
             <thead className="bg-gray-50">
-              <tr>
-                <TableHead>{vi.account}</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>{vi.role}</TableHead>
-                {!isStaffView && (
-                  <>
-                    <TableHead>{vi.tier}</TableHead>
-                    <TableHead>{vi.orderCount}</TableHead>
-                    <TableHead>{vi.totalSpent}</TableHead>
-                    <TableHead>{vi.lastOrder}</TableHead>
-                  </>
-                )}
-                <TableHead>{vi.verified}</TableHead>
-                <TableHead>{vi.joined}</TableHead>
-                <TableHead>{vi.status}</TableHead>
-                <TableHead align="right">{vi.actions}</TableHead>
-              </tr>
+              {isStaffView ? (
+                <tr>
+                  <TableHead>{vi.account}</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>{vi.role}</TableHead>
+                  <TableHead>{vi.verified}</TableHead>
+                  <TableHead>{vi.joined}</TableHead>
+                  <TableHead>{vi.status}</TableHead>
+                  <TableHead align="right">{vi.actions}</TableHead>
+                </tr>
+              ) : (
+                <tr>
+                  <TableHead>{vi.account}</TableHead>
+                  <TableHead>{vi.contact}</TableHead>
+                  <TableHead>{vi.purchaseSummary}</TableHead>
+                  <TableHead>{vi.status}</TableHead>
+                  <TableHead align="right">{vi.actions}</TableHead>
+                </tr>
+              )}
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredAccounts.map((account) => (
-                <tr key={account.id} className="hover:bg-gray-50">
+                <tr key={account.id} className="align-top hover:bg-orange-50/30">
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <img
                         src={`https://ui-avatars.com/api/?name=${encodeURIComponent(account.fullName || account.userName)}&background=F97316&color=fff`}
                         alt={account.fullName || account.userName}
-                        className="h-10 w-10 rounded-full"
+                        className="h-11 w-11 rounded-full"
                       />
                       <div>
-                        <p className="font-medium text-gray-800">{account.fullName || account.userName}</p>
-                        <p className="text-xs text-gray-500">@{account.userName}</p>
+                        <p className="font-semibold text-gray-900">{account.fullName || account.userName}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <p className="text-xs text-gray-500">@{account.userName}</p>
+                          {!isStaffView && <CustomerTierBadge totalSpent={Number(account.totalSpent || 0)} />}
+                        </div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{account.email}</TableCell>
-                  <TableCell>
-                    <select
-                      value={account.role}
-                      disabled={updatingUserId === account.id || account.id === currentUserId}
-                      onChange={(event) => handleChangeUserRole(account, event.target.value)}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
-                    >
-                      {isStaffView ? (
-                        <>
+                  {isStaffView ? (
+                    <>
+                      <TableCell>{account.email}</TableCell>
+                      <TableCell>
+                        <select
+                          value={account.role}
+                          disabled={updatingUserId === account.id || account.id === currentUserId}
+                          onChange={(event) => handleChangeUserRole(account, event.target.value)}
+                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+                        >
                           <option value="STAFF">{vi.staffRole}</option>
                           <option value="ADMIN">Admin</option>
-                        </>
-                      ) : (
-                        <>
-                          <option value="CUSTOMER">{vi.customerRole}</option>
-                          <option value="STAFF">{vi.staffRole}</option>
-                        </>
-                      )}
-                    </select>
-                  </TableCell>
-                  {!isStaffView && (
+                        </select>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`rounded-full px-2 py-1 text-xs ${account.isVerified ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {account.isVerified ? vi.verified : vi.unverified}
+                        </span>
+                      </TableCell>
+                      <TableCell>{formatDate(account.createdAt)}</TableCell>
+                      <TableCell>
+                        <span className={`rounded-full px-2 py-1 text-xs ${account.isLocked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                          {account.isLocked ? vi.locked : 'Ho\u1ea1t \u0111\u1ed9ng'}
+                        </span>
+                      </TableCell>
+                    </>
+                  ) : (
                     <>
                       <TableCell>
-                        <CustomerTierBadge totalSpent={Number(account.totalSpent || 0)} />
+                        <p className="font-medium text-gray-800">{account.email}</p>
+                        <p className="mt-1 text-xs text-gray-500">{account.isVerified ? vi.verified : vi.unverified}</p>
                       </TableCell>
                       <TableCell>
-                        <span className="font-semibold text-gray-800">
-                          {Number(account.totalOrders || 0).toLocaleString('vi-VN')}
-                        </span>
+                        <CustomerPurchaseSummary customer={account} noOrdersText={vi.noOrders} />
                       </TableCell>
                       <TableCell>
-                        <span className="font-semibold text-gray-900">
-                          {formatCurrency(Number(account.totalSpent || 0))}
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${account.isLocked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                          {account.isLocked ? vi.locked : 'Ho\u1ea1t \u0111\u1ed9ng'}
                         </span>
                       </TableCell>
-                      <TableCell>{account.lastOrderAt ? formatDate(account.lastOrderAt) : '-'}</TableCell>
                     </>
                   )}
-                  <TableCell>
-                    <span className={`rounded-full px-2 py-1 text-xs ${account.isVerified ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                      {account.isVerified ? vi.verified : vi.unverified}
-                    </span>
-                  </TableCell>
-                  <TableCell>{formatDate(account.createdAt)}</TableCell>
-                  <TableCell>
-                    <span className={`rounded-full px-2 py-1 text-xs ${account.isLocked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                      {account.isLocked ? vi.locked : 'Ho\u1ea1t \u0111\u1ed9ng'}
-                    </span>
-                  </TableCell>
                   <TableCell align="right">
                     <div className="flex flex-wrap justify-end gap-2">
                       {!isStaffView && openCustomerDetail && (
@@ -349,4 +349,29 @@ function CustomerTierBadge({ totalSpent }: { totalSpent: number }) {
   }
 
   return <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">M\u1edbi</span>;
+}
+
+function CustomerPurchaseSummary({
+  customer,
+  noOrdersText,
+}: {
+  customer: AdminUser;
+  noOrdersText: string;
+}) {
+  const totalOrders = Number(customer.totalOrders || 0);
+  const totalSpent = Number(customer.totalSpent || 0);
+
+  if (totalOrders <= 0) {
+    return <span className="text-sm text-gray-500">{noOrdersText}</span>;
+  }
+
+  return (
+    <div className="space-y-1">
+      <p className="font-semibold text-gray-900">{formatCurrency(totalSpent)}</p>
+      <p className="text-xs text-gray-500">
+        {totalOrders.toLocaleString('vi-VN')} \u0111\u01a1n
+        {customer.lastOrderAt ? ` \u00b7 ${formatDate(customer.lastOrderAt)}` : ''}
+      </p>
+    </div>
+  );
 }
