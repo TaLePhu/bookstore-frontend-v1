@@ -103,18 +103,40 @@ export interface AdminUser {
 }
 
 export type AdminMarketingPriority = 'high' | 'medium' | 'low';
-export type AdminMarketingCategory = 'inventory' | 'revenue' | 'customer' | 'alert';
+export type AdminMarketingDataQuality = 'starter' | 'enough' | 'rich';
 
-export interface AdminMarketingInsight {
+export interface AdminMarketingSummary {
+  dataQuality: AdminMarketingDataQuality;
+  totalBooks: number;
+  completedOrders: number;
+  activePromotions: number;
+  highStockBooks: number;
+  bestSellerBooks: number;
+  lowStockBooks: number;
+  newBooks: number;
+  vipCustomers: number;
+  cancelRate: number;
+}
+
+export interface AdminMarketingProgram {
   id: string;
-  category: AdminMarketingCategory;
   title: string;
-  reason: string;
-  impact: string;
+  problem: string;
+  recommendation: string;
+  target: string;
+  discountPercent: number;
+  durationDays: number;
   priority: AdminMarketingPriority;
   actionType: 'create_promotion' | 'view_books' | 'view_customers' | 'view_orders';
-  suggestedBookIds: string[];
-  metrics: Record<string, number | string>;
+  bookIds: string[];
+  reason: string;
+  expectedImpact: string;
+}
+
+export interface AdminMarketingPlan {
+  summary: AdminMarketingSummary;
+  recommendedPrograms: AdminMarketingProgram[];
+  dataNotes: string[];
 }
 
 export interface AdminMarketingCampaignDraft {
@@ -297,7 +319,7 @@ export const getAdminDashboard = async (): Promise<AdminDashboardResponse> => {
   return res.data.data;
 };
 
-export const getAdminMarketingInsights = async (): Promise<AdminMarketingInsight[]> => {
+export const getAdminMarketingInsights = async (): Promise<AdminMarketingPlan> => {
   const res = await api.get('/admin/marketing/insights');
   return res.data.data;
 };

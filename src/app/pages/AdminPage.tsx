@@ -72,7 +72,8 @@ import {
   type AdminCustomerSummary,
   type AdminStaffSummary,
   type AdminDashboardResponse,
-  type AdminMarketingInsight,
+  type AdminMarketingPlan,
+  type AdminMarketingProgram,
   type AdminOrder,
   type AdminOrderDetail,
   type AdminPaymentMethod,
@@ -191,7 +192,7 @@ export function AdminPage() {
   const [cancelDecisionDialog, setCancelDecisionDialog] = useState<CancelDecisionDialog>(null);
   const [cancelDecisionNote, setCancelDecisionNote] = useState('');
   const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(null);
-  const [marketingInsights, setMarketingInsights] = useState<AdminMarketingInsight[]>([]);
+  const [marketingPlan, setMarketingPlan] = useState<AdminMarketingPlan | null>(null);
   const [creatingDraftInsightId, setCreatingDraftInsightId] = useState<string | null>(null);
   const [books, setBooks] = useState<ApiBook[]>([]);
   const [promotions, setPromotions] = useState<AdminPromotion[]>([]);
@@ -336,7 +337,7 @@ export function AdminPage() {
         ]);
 
         setDashboard(null);
-        setMarketingInsights([]);
+        setMarketingPlan(null);
         setBooks(booksData.data);
         setPromotions(
           (promotionsData.programs || []).map((program) => ({
@@ -362,7 +363,7 @@ export function AdminPage() {
         return;
       }
 
-      const [dashboardData, booksData, promotionsData, categoriesData, ordersData, reportOrdersData, customersData, marketingInsightsData] = await Promise.all([
+      const [dashboardData, booksData, promotionsData, categoriesData, ordersData, reportOrdersData, customersData, marketingPlanData] = await Promise.all([
         getAdminDashboard(),
         getAdminBooks({
           limit: 50,
@@ -383,7 +384,7 @@ export function AdminPage() {
       );
 
       setDashboard(dashboardData);
-      setMarketingInsights(marketingInsightsData);
+      setMarketingPlan(marketingPlanData);
       setBooks(booksData.data);
       setPromotions(promotionsData);
       setCategories(categoriesData);
@@ -1647,10 +1648,10 @@ export function AdminPage() {
     setPromotionModalMode('create');
   };
 
-  const openCreatePromotionFromMarketing = async (insight: AdminMarketingInsight) => {
+  const openCreatePromotionFromMarketing = async (program: AdminMarketingProgram) => {
     try {
-      setCreatingDraftInsightId(insight.id);
-      const draft = await generateAdminMarketingCampaignDraft(insight.id);
+      setCreatingDraftInsightId(program.id);
+      const draft = await generateAdminMarketingCampaignDraft(program.id);
       resetPromotionForm();
       setPromotionForm({
         name: draft.name,
@@ -2619,7 +2620,8 @@ export function AdminPage() {
 
           {currentView === 'marketing' && (
             <MarketingView
-              insights={marketingInsights}
+              plan={marketingPlan}
+              promotions={promotions}
               isLoading={isLoading}
               creatingDraftInsightId={creatingDraftInsightId}
               goToBooks={goToBooksView}
