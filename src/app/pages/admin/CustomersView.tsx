@@ -77,6 +77,7 @@ const vi = {
   unlock: 'M\u1edf kh\u00f3a',
   lock: 'Kh\u00f3a',
   noOrders: 'Ch\u01b0a c\u00f3 \u0111\u01a1n',
+  orderUnit: '\u0111\u01a1n',
 };
 
 export function CustomersView({
@@ -369,7 +370,7 @@ function CustomerPurchaseSummary({
     <div className="space-y-1">
       <p className="font-semibold text-gray-900">{formatCurrency(totalSpent)}</p>
       <p className="text-xs text-gray-500">
-        {totalOrders.toLocaleString('vi-VN')} \u0111\u01a1n
+        {totalOrders.toLocaleString('vi-VN')} {vi.orderUnit}
         {customer.lastOrderAt ? ` \u00b7 ${formatDate(customer.lastOrderAt)}` : ''}
       </p>
     </div>
