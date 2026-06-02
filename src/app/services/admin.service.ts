@@ -117,6 +117,18 @@ export interface AdminCustomerSummary extends AdminUser {
     paymentMethod?: AdminPaymentMethod | null;
     paymentStatus?: AdminPaymentStatus | null;
     createdAt: string;
+    items?: Array<{
+      id: string;
+      quantity: number;
+      price: number;
+      subTotal: number;
+      book?: {
+        id: string;
+        title: string;
+        author: string;
+        isbn: string;
+      } | null;
+    }>;
   }>;
 }
 

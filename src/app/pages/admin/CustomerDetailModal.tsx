@@ -1,4 +1,5 @@
-import { Save, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Save, X } from 'lucide-react';
+import { Fragment, useState } from 'react';
 import type { AdminCustomerSummary } from '../../services/admin.service';
 import { formatCurrency, formatDate, getOrderStatusText, getPaymentMethodText } from './utils';
 
@@ -34,11 +35,19 @@ const vi = {
   saveNote: 'L\u01b0u ghi ch\u00fa',
   notePlaceholder: 'V\u00ed d\u1ee5: kh\u00e1ch VIP, \u01b0u ti\u00ean g\u1ecdi x\u00e1c nh\u1eadn tr\u01b0\u1edbc khi giao...',
   orderHistory: 'L\u1ecbch s\u1eed \u0111\u01a1n h\u00e0ng',
-  orderHistoryHelp: 'Hi\u1ec3n th\u1ecb t\u1ed1i \u0111a 8 \u0111\u01a1n g\u1ea7n nh\u1ea5t.',
+  orderHistoryHelp: '\u01afu ti\u00ean hi\u1ec3n th\u1ecb 8 \u0111\u01a1n g\u1ea7n nh\u1ea5t, c\u00f3 th\u1ec3 xem t\u1ea5t c\u1ea3 khi c\u1ea7n.',
   orderCode: 'M\u00e3 \u0111\u01a1n',
   orderDate: 'Ng\u00e0y \u0111\u1eb7t',
   totalAmount: 'T\u1ed5ng ti\u1ec1n',
   payment: 'Thanh to\u00e1n',
+  products: 'S\u1ea3n ph\u1ea9m',
+  quantity: 'SL',
+  unitPrice: '\u0110\u01a1n gi\u00e1',
+  showProducts: 'Xem s\u1ea3n ph\u1ea9m',
+  hideProducts: '\u1ea8n s\u1ea3n ph\u1ea9m',
+  showAllOrders: 'Xem t\u1ea5t c\u1ea3 \u0111\u01a1n',
+  showRecentOrders: 'Ch\u1ec9 xem 8 \u0111\u01a1n g\u1ea7n nh\u1ea5t',
+  unknownBook: 'S\u00e1ch kh\u00f4ng c\u00f2n t\u1ed3n t\u1ea1i',
   noOrders: 'Kh\u00e1ch h\u00e0ng ch\u01b0a c\u00f3 \u0111\u01a1n h\u00e0ng.',
 };
 
@@ -62,6 +71,16 @@ export function CustomerDetailModal({
 }: CustomerDetailModalProps) {
   const totalSpent = Number(customer.totalSpent || 0);
   const tier = getCustomerTier(totalSpent);
+  const [showAllOrders, setShowAllOrders] = useState(false);
+  const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
+  const visibleOrders = showAllOrders ? customer.recentOrders : customer.recentOrders.slice(0, 8);
+  const hasMoreOrders = customer.recentOrders.length > 8;
+
+  const toggleOrderProducts = (orderId: string) => {
+    setExpandedOrderIds((prev) =>
+      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
@@ -143,12 +162,23 @@ export function CustomerDetailModal({
           </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-200">
-            <div className="border-b border-gray-100 px-5 py-4">
-              <h4 className="font-bold text-gray-900">{vi.orderHistory}</h4>
-              <p className="text-sm text-gray-500">{vi.orderHistoryHelp}</p>
+            <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h4 className="font-bold text-gray-900">{vi.orderHistory}</h4>
+                <p className="text-sm text-gray-500">{vi.orderHistoryHelp}</p>
+              </div>
+              {hasMoreOrders && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllOrders((prev) => !prev)}
+                  className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200"
+                >
+                  {showAllOrders ? vi.showRecentOrders : vi.showAllOrders}
+                </button>
+              )}
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px]">
+              <table className="w-full min-w-[840px]">
                 <thead className="bg-gray-50">
                   <tr className="text-left text-xs font-semibold uppercase text-gray-500">
                     <th className="px-5 py-3">{vi.orderCode}</th>
@@ -156,18 +186,41 @@ export function CustomerDetailModal({
                     <th className="px-5 py-3">{vi.totalAmount}</th>
                     <th className="px-5 py-3">{vi.payment}</th>
                     <th className="px-5 py-3">{vi.status}</th>
+                    <th className="px-5 py-3 text-right">{vi.products}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {customer.recentOrders.map((order) => (
-                    <tr key={order.id} className="text-sm text-gray-700">
-                      <td className="px-5 py-4 font-semibold text-gray-900">{order.orderCode || order.id.slice(0, 8)}</td>
-                      <td className="px-5 py-4">{formatDate(order.createdAt)}</td>
-                      <td className="px-5 py-4">{formatCurrency(order.totalAmount)}</td>
-                      <td className="px-5 py-4">{getPaymentMethodText(order.paymentMethod || undefined)}</td>
-                      <td className="px-5 py-4">{getOrderStatusText(order.status)}</td>
-                    </tr>
-                  ))}
+                  {visibleOrders.map((order) => {
+                    const isExpanded = expandedOrderIds.includes(order.id);
+                    return (
+                      <Fragment key={order.id}>
+                        <tr className="text-sm text-gray-700">
+                          <td className="px-5 py-4 font-semibold text-gray-900">{order.orderCode || order.id.slice(0, 8)}</td>
+                          <td className="px-5 py-4">{formatDate(order.createdAt)}</td>
+                          <td className="px-5 py-4 font-semibold text-gray-900">{formatCurrency(order.totalAmount)}</td>
+                          <td className="px-5 py-4">{getPaymentMethodText(order.paymentMethod || undefined)}</td>
+                          <td className="px-5 py-4">{getOrderStatusText(order.status)}</td>
+                          <td className="px-5 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => toggleOrderProducts(order.id)}
+                              className="inline-flex items-center gap-1 rounded-lg bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-100"
+                            >
+                              {isExpanded ? vi.hideProducts : vi.showProducts}
+                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </button>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="bg-gray-50/70">
+                            <td colSpan={6} className="px-5 py-4">
+                              <OrderItemsTable items={order.items || []} />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -177,6 +230,51 @@ export function CustomerDetailModal({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function OrderItemsTable({
+  items,
+}: {
+  items: NonNullable<AdminCustomerSummary['recentOrders'][number]['items']>;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <table className="w-full">
+        <thead className="bg-gray-50">
+          <tr className="text-left text-xs font-semibold uppercase text-gray-500">
+            <th className="px-4 py-3">{vi.products}</th>
+            <th className="px-4 py-3 text-right">{vi.quantity}</th>
+            <th className="px-4 py-3 text-right">{vi.unitPrice}</th>
+            <th className="px-4 py-3 text-right">{vi.totalAmount}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {items.map((item) => (
+            <tr key={item.id} className="text-sm text-gray-700">
+              <td className="px-4 py-3">
+                <p className="font-semibold text-gray-900">{item.book?.title || vi.unknownBook}</p>
+                {item.book && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {item.book.author} - ISBN: {item.book.isbn}
+                  </p>
+                )}
+              </td>
+              <td className="px-4 py-3 text-right">{Number(item.quantity || 0).toLocaleString('vi-VN')}</td>
+              <td className="px-4 py-3 text-right">{formatCurrency(item.price)}</td>
+              <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatCurrency(item.subTotal)}</td>
+            </tr>
+          ))}
+          {items.length === 0 && (
+            <tr>
+              <td colSpan={4} className="px-4 py-5 text-center text-sm text-gray-500">
+                {vi.none}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
