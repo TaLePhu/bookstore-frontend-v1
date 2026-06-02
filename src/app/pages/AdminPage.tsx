@@ -52,6 +52,7 @@ import {
   updateAdminCategory,
   updateAdminBook,
   updateAdminPromotion,
+  updateAdminPromotionStatus,
   updateAdminUserRole,
   updateAdminUserStatus,
   updateAdminOrderStatus,
@@ -229,6 +230,7 @@ export function AdminPage() {
   const [selectedPromotion, setSelectedPromotion] = useState<AdminPromotion | null>(null);
   const [savingPromotion, setSavingPromotion] = useState(false);
   const [deletingPromotionId, setDeletingPromotionId] = useState<string | null>(null);
+  const [updatingPromotionStatusId, setUpdatingPromotionStatusId] = useState<string | null>(null);
   const [promotionBannerPreview, setPromotionBannerPreview] = useState('');
   const [promotionFormError, setPromotionFormError] = useState('');
   const [promotionBookSearch, setPromotionBookSearch] = useState('');
@@ -1791,6 +1793,27 @@ export function AdminPage() {
     }
   };
 
+  const handleTogglePromotionStatus = async (promotion: AdminPromotion) => {
+    const nextStatus = promotion.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    try {
+      setUpdatingPromotionStatusId(promotion.id);
+      await updateAdminPromotionStatus(promotion.id, nextStatus);
+      await loadData();
+      showPopup({
+        type: 'success',
+        text: nextStatus === 'ACTIVE'
+          ? 'ÄÃ£ báº­t chÆ°Æ¡ng trÃ¬nh khuyáº¿n mÃ£i. ChÆ°Æ¡ng trÃ¬nh sáº½ tá»± Ã¡p dá»¥ng theo ngÃ y.'
+          : 'ÄÃ£ táº¯t chÆ°Æ¡ng trÃ¬nh khuyáº¿n mÃ£i vÃ  tráº£ sÃ¡ch vá» giÃ¡ hiá»‡n hÃ nh.',
+      });
+    } catch (err: any) {
+      const message = getPromotionApiErrorMessage(err);
+      setError(message);
+      showPopup({ type: 'error', text: message });
+    } finally {
+      setUpdatingPromotionStatusId(null);
+    }
+  };
+
   const handleDeletePromotionProgram = (promotion: AdminPromotion) => {
     setConfirmDialog({
       title: 'Xóa chương trình khuyến mãi?',
@@ -2430,8 +2453,10 @@ export function AdminPage() {
               openCreatePromotion={openCreatePromotion}
               openEditPromotion={openEditPromotion}
               openClonePromotion={openClonePromotion}
+              handleTogglePromotionStatus={handleTogglePromotionStatus}
               handleDeletePromotionProgram={handleDeletePromotionProgram}
               deletingPromotionId={deletingPromotionId}
+              updatingPromotionStatusId={updatingPromotionStatusId}
               onViewPromotionsPage={() => navigate('/promotions')}
             />
           )}

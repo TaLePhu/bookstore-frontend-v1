@@ -410,6 +410,14 @@ export const updateAdminPromotion = async (
   return res.data.data;
 };
 
+export const updateAdminPromotionStatus = async (
+  id: string,
+  status: AdminPromotionStatus
+): Promise<AdminPromotion> => {
+  const res = await api.patch(`/admin/promotions/${id}/status`, { status });
+  return res.data.data;
+};
+
 export const deleteAdminPromotion = async (id: string): Promise<void> => {
   await api.delete(`/admin/promotions/${id}`);
 };

@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Copy, Edit, Eye, Plus, Tag, Trash2 } from 'lucide-react';
+import { Copy, Edit, Eye, Plus, Tag, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 import type { AdminPromotion } from '../../services/admin.service';
 import { getBookImage } from '../../utils/book-display';
 import { EmptyState, SearchBox } from './components';
@@ -19,8 +19,10 @@ type PromotionsViewProps = {
   openCreatePromotion: () => void;
   openEditPromotion: (promotion: AdminPromotion) => void;
   openClonePromotion: (promotion: AdminPromotion) => void;
+  handleTogglePromotionStatus: (promotion: AdminPromotion) => void;
   handleDeletePromotionProgram: (promotion: AdminPromotion) => void;
   deletingPromotionId: string | null;
+  updatingPromotionStatusId: string | null;
   onViewPromotionsPage: () => void;
 };
 
@@ -46,8 +48,10 @@ export function PromotionsView({
   openCreatePromotion,
   openEditPromotion,
   openClonePromotion,
+  handleTogglePromotionStatus,
   handleDeletePromotionProgram,
   deletingPromotionId,
+  updatingPromotionStatusId,
   onViewPromotionsPage,
 }: PromotionsViewProps) {
   const runningCount = promotions.filter((promotion) =>
@@ -164,6 +168,14 @@ export function PromotionsView({
 
                 {isAdmin ? (
                   <div className="flex shrink-0 gap-2 lg:flex-col">
+                    <IconAction
+                      title={promotion.status === 'ACTIVE' ? 'Tắt chương trình' : 'Bật chương trình'}
+                      tone={promotion.status === 'ACTIVE' ? 'emerald' : 'gray'}
+                      onClick={() => handleTogglePromotionStatus(promotion)}
+                      disabled={updatingPromotionStatusId === promotion.id}
+                    >
+                      {promotion.status === 'ACTIVE' ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
+                    </IconAction>
                     <IconAction title="Sửa chương trình" tone="blue" onClick={() => openEditPromotion(promotion)}>
                       <Edit className="h-4 w-4" />
                     </IconAction>
@@ -236,12 +248,14 @@ function IconAction({
   title: string;
   onClick: () => void;
   disabled?: boolean;
-  tone: 'blue' | 'orange' | 'red';
+  tone: 'blue' | 'orange' | 'red' | 'emerald' | 'gray';
 }) {
   const tones = {
     blue: 'bg-blue-50 text-blue-700 ring-blue-100 hover:bg-blue-100',
     orange: 'bg-orange-50 text-orange-700 ring-orange-100 hover:bg-orange-100',
     red: 'bg-red-50 text-red-700 ring-red-100 hover:bg-red-100',
+    emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100 hover:bg-emerald-100',
+    gray: 'bg-gray-50 text-gray-600 ring-gray-100 hover:bg-gray-100',
   };
 
   return (
