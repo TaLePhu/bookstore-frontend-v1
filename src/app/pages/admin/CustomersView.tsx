@@ -20,18 +20,13 @@ type CustomersViewProps = {
   userVerifiedFilter: UserVerifiedFilter;
   setUserVerifiedFilter: (value: UserVerifiedFilter) => void;
   openCreateUserModal: (role?: 'CUSTOMER' | 'STAFF') => void;
+  openCustomerDetail?: (customer: AdminUser) => void;
+  loadingCustomerSummaryId?: string | null;
   handleToggleUserLock: (customer: AdminUser) => Promise<void>;
   handleChangeUserRole: (customer: AdminUser, role: string) => Promise<void>;
   handleResetUserPassword: (customer: AdminUser) => Promise<void>;
   updatingUserId: string | null;
   currentUserId?: string;
-};
-
-const roleLabel: Record<string, string> = {
-  CUSTOMER: 'Khách hàng',
-  STAFF: 'Nhân viên',
-  ADMIN: 'Admin',
-  GUEST: 'Khách vãng lai',
 };
 
 export function CustomersView({
@@ -48,6 +43,8 @@ export function CustomersView({
   userVerifiedFilter,
   setUserVerifiedFilter,
   openCreateUserModal,
+  openCustomerDetail,
+  loadingCustomerSummaryId,
   handleToggleUserLock,
   handleChangeUserRole,
   handleResetUserPassword,
@@ -151,21 +148,24 @@ export function CustomersView({
                   </TableCell>
                   <TableCell>{account.email}</TableCell>
                   <TableCell>
-                    {isStaffView ? (
-                      <select
-                        value={account.role}
-                        disabled={updatingUserId === account.id || account.id === currentUserId}
-                        onChange={(event) => handleChangeUserRole(account, event.target.value)}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
-                      >
-                        <option value="STAFF">Nhân viên</option>
-                        <option value="ADMIN">Admin</option>
-                      </select>
-                    ) : (
-                      <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-                        {roleLabel[account.role] || account.role}
-                      </span>
-                    )}
+                    <select
+                      value={account.role}
+                      disabled={updatingUserId === account.id || account.id === currentUserId}
+                      onChange={(event) => handleChangeUserRole(account, event.target.value)}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+                    >
+                      {isStaffView ? (
+                        <>
+                          <option value="STAFF">Nhân viên</option>
+                          <option value="ADMIN">Admin</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="CUSTOMER">Khách hàng</option>
+                          <option value="STAFF">Nhân viên</option>
+                        </>
+                      )}
+                    </select>
                   </TableCell>
                   <TableCell>
                     <span className={`rounded-full px-2 py-1 text-xs ${account.isVerified ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -180,6 +180,16 @@ export function CustomersView({
                   </TableCell>
                   <TableCell align="right">
                     <div className="flex flex-wrap justify-end gap-2">
+                      {!isStaffView && openCustomerDetail && (
+                        <button
+                          type="button"
+                          disabled={loadingCustomerSummaryId === account.id}
+                          onClick={() => openCustomerDetail(account)}
+                          className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50"
+                        >
+                          {loadingCustomerSummaryId === account.id ? 'Đang tải...' : 'Chi tiết'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={updatingUserId === account.id || account.id === currentUserId}

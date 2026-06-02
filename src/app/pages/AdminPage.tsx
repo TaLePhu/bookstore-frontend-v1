@@ -36,6 +36,7 @@ import {
   getAdminBooks,
   getAdminBookDetail,
   getAdminCategories,
+  getAdminCustomerSummary,
   getAdminCustomers,
   getAdminDashboard,
   getAdminOrderDetail,
@@ -57,11 +58,13 @@ import {
   updateAdminUserRole,
   updateAdminUserStatus,
   updateAdminOrderStatus,
+  updateAdminCustomerNote,
   type AdminBookPayload,
   type AdminBookImportPayload,
   type AdminBookImportResult,
   type AdminCategory,
   type AdminCategoryPayload,
+  type AdminCustomerSummary,
   type AdminDashboardResponse,
   type AdminOrder,
   type AdminOrderDetail,
@@ -106,6 +109,7 @@ import { UserCreateModal } from './admin/UserCreateModal';
 import { CategoryModal } from './admin/CategoryModal';
 import { CancelDecisionModal, ConfirmDialogModal } from './admin/AdminDialogs';
 import { DashboardView } from './admin/DashboardView';
+import { CustomerDetailModal } from './admin/CustomerDetailModal';
 import {
   buildOrderPrintHtml,
   formatCurrency,
@@ -185,6 +189,10 @@ export function AdminPage() {
   const [orderTotal, setOrderTotal] = useState(0);
   const [orderStatusTotals, setOrderStatusTotals] = useState<Record<AdminOrderStatus, number>>(EMPTY_ORDER_STATUS_TOTALS);
   const [customers, setCustomers] = useState<AdminUser[]>([]);
+  const [selectedCustomerSummary, setSelectedCustomerSummary] = useState<AdminCustomerSummary | null>(null);
+  const [customerNoteDraft, setCustomerNoteDraft] = useState('');
+  const [loadingCustomerSummaryId, setLoadingCustomerSummaryId] = useState<string | null>(null);
+  const [savingCustomerNote, setSavingCustomerNote] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [userForm, setUserForm] = useState<AdminUserPayload>(emptyUserForm);
   const [savingUser, setSavingUser] = useState(false);
@@ -2259,6 +2267,38 @@ export function AdminPage() {
     setSearchQuery('');
   };
 
+  const openCustomerDetail = async (customer: AdminUser) => {
+    try {
+      setLoadingCustomerSummaryId(customer.id);
+      const summary = await getAdminCustomerSummary(customer.id);
+      setSelectedCustomerSummary(summary);
+      setCustomerNoteDraft(summary.adminNote || '');
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Không thể tải chi tiết khách hàng.';
+      setError(message);
+      showPopup({ type: 'error', text: message });
+    } finally {
+      setLoadingCustomerSummaryId(null);
+    }
+  };
+
+  const handleSaveCustomerNote = async () => {
+    if (!selectedCustomerSummary) return;
+    try {
+      setSavingCustomerNote(true);
+      const summary = await updateAdminCustomerNote(selectedCustomerSummary.id, customerNoteDraft);
+      setSelectedCustomerSummary(summary);
+      setCustomerNoteDraft(summary.adminNote || '');
+      showPopup({ type: 'success', text: 'Đã cập nhật ghi chú khách hàng.' });
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Không thể cập nhật ghi chú khách hàng.';
+      setError(message);
+      showPopup({ type: 'error', text: message });
+    } finally {
+      setSavingCustomerNote(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col lg:flex-row">
       <aside className="w-full border-b border-gray-200 bg-white lg:min-h-screen lg:w-64 lg:border-b-0 lg:border-r lg:flex-shrink-0 flex flex-col">
@@ -2656,6 +2696,8 @@ export function AdminPage() {
               userVerifiedFilter={userVerifiedFilter}
               setUserVerifiedFilter={setUserVerifiedFilter}
               openCreateUserModal={openCreateUserModal}
+              openCustomerDetail={openCustomerDetail}
+              loadingCustomerSummaryId={loadingCustomerSummaryId}
               handleToggleUserLock={handleToggleUserLock}
               handleChangeUserRole={handleChangeUserRole}
               handleResetUserPassword={handleResetUserPassword}
@@ -2764,6 +2806,20 @@ export function AdminPage() {
           handleCopyText={handleCopyText}
           getOrderActions={getOrderActions}
           renderOrderActionButton={renderOrderActionButton}
+        />
+      )}
+
+      {selectedCustomerSummary && (
+        <CustomerDetailModal
+          customer={selectedCustomerSummary}
+          noteDraft={customerNoteDraft}
+          setNoteDraft={setCustomerNoteDraft}
+          savingNote={savingCustomerNote}
+          onSaveNote={handleSaveCustomerNote}
+          onClose={() => {
+            setSelectedCustomerSummary(null);
+            setCustomerNoteDraft('');
+          }}
         />
       )}
     </div>

@@ -99,6 +99,24 @@ export interface AdminUser {
   createdAt: string;
 }
 
+export interface AdminCustomerSummary extends AdminUser {
+  phone?: string | null;
+  avatar?: string | null;
+  adminNote?: string | null;
+  totalOrders: number;
+  totalSpent: number;
+  lastOrderAt?: string | null;
+  recentOrders: Array<{
+    id: string;
+    orderCode?: string | null;
+    status: AdminOrderStatus;
+    totalAmount: number;
+    paymentMethod?: AdminPaymentMethod | null;
+    paymentStatus?: AdminPaymentStatus | null;
+    createdAt: string;
+  }>;
+}
+
 export interface AdminUserPayload {
   userName: string;
   fullName?: string;
@@ -500,6 +518,19 @@ export const getAdminCustomers = async (params?: {
     data: payload.users,
     total: payload.total,
   };
+};
+
+export const getAdminCustomerSummary = async (id: string): Promise<AdminCustomerSummary> => {
+  const res = await api.get(`/admin/customers/${id}/summary`);
+  return res.data.data;
+};
+
+export const updateAdminCustomerNote = async (
+  id: string,
+  note: string
+): Promise<AdminCustomerSummary> => {
+  const res = await api.patch(`/admin/customers/${id}/note`, { note });
+  return res.data.data;
 };
 
 export const createAdminUser = async (payload: AdminUserPayload): Promise<AdminUser> => {
