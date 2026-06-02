@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import {
   AlertCircle,
   ArchiveX,
+  BarChart3,
   BookOpen,
   CheckCircle2,
   DollarSign,
@@ -111,6 +112,7 @@ import { UserCreateModal } from './admin/UserCreateModal';
 import { CategoryModal } from './admin/CategoryModal';
 import { CancelDecisionModal, ConfirmDialogModal } from './admin/AdminDialogs';
 import { DashboardView } from './admin/DashboardView';
+import { ReportsView } from './admin/ReportsView';
 import { CustomerDetailModal } from './admin/CustomerDetailModal';
 import { StaffDetailModal } from './admin/StaffDetailModal';
 import {
@@ -188,6 +190,7 @@ export function AdminPage() {
   const [promotions, setPromotions] = useState<AdminPromotion[]>([]);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [reportOrders, setReportOrders] = useState<AdminOrder[]>([]);
   const [orderCurrentPage, setOrderCurrentPage] = useState(1);
   const [orderTotal, setOrderTotal] = useState(0);
   const [orderStatusTotals, setOrderStatusTotals] = useState<Record<AdminOrderStatus, number>>(EMPTY_ORDER_STATUS_TOTALS);
@@ -262,6 +265,7 @@ export function AdminPage() {
 
   const menuItems = [
     { id: 'dashboard' as const, label: isAdmin ? 'Dashboard' : 'Bảng làm việc', icon: LayoutDashboard },
+    { id: 'reports' as const, label: 'B\u00e1o c\u00e1o', icon: BarChart3 },
     { id: 'promotions' as const, label: 'Khuyến mãi', icon: Percent },
     { id: 'categories' as const, label: 'Danh mục', icon: FolderTree },
     { id: 'books' as const, label: 'Quản lý sách', icon: BookOpen },
@@ -277,13 +281,14 @@ export function AdminPage() {
       : menuItems.filter((item) => ['dashboard', 'books', 'orders', 'promotions'].includes(item.id));
     const order: Record<AdminView, number> = {
       dashboard: 0,
-      promotions: 1,
-      categories: 2,
-      books: 3,
-      orders: 4,
-      customers: 5,
-      staff: 6,
-      settings: 7,
+      reports: 1,
+      promotions: 2,
+      categories: 3,
+      books: 4,
+      orders: 5,
+      customers: 6,
+      staff: 7,
+      settings: 8,
     };
     return [...items].sort((left, right) => order[left.id] - order[right.id]);
   }, [isAdmin]);
@@ -347,7 +352,7 @@ export function AdminPage() {
         return;
       }
 
-      const [dashboardData, booksData, promotionsData, categoriesData, ordersData, customersData] = await Promise.all([
+      const [dashboardData, booksData, promotionsData, categoriesData, ordersData, reportOrdersData, customersData] = await Promise.all([
         getAdminDashboard(),
         getAdminBooks({
           limit: 50,
@@ -357,6 +362,7 @@ export function AdminPage() {
         getAdminPromotions(),
         getAdminCategories({ includeDeleted: true }),
         getAdminOrders(orderRequestParams),
+        getAdminOrders({ limit: 500 }),
         getAdminCustomers({
           limit: 500,
         }),
@@ -370,6 +376,7 @@ export function AdminPage() {
       setPromotions(promotionsData);
       setCategories(categoriesData);
       setOrders(ordersData.data);
+      setReportOrders(reportOrdersData.data);
       setOrderTotal(ordersData.total);
       setOrderStatusTotals(
         ORDER_STATUS_OPTIONS.reduce(
@@ -2539,6 +2546,14 @@ export function AdminPage() {
               bookCurrentPage={bookCurrentPage}
               totalBookPages={totalBookPages}
               setBookCurrentPage={setBookCurrentPage}
+            />
+          )}
+
+          {currentView === 'reports' && (
+            <ReportsView
+              orders={reportOrders}
+              books={books}
+              customers={customers}
             />
           )}
 
