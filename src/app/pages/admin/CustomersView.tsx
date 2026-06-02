@@ -29,6 +29,40 @@ type CustomersViewProps = {
   currentUserId?: string;
 };
 
+const vi = {
+  customerTitle: 'Qu\u1ea3n l\u00fd kh\u00e1ch h\u00e0ng',
+  staffTitle: 'Qu\u1ea3n l\u00fd nh\u00e2n vi\u00ean',
+  createCustomer: 'T\u1ea1o kh\u00e1ch h\u00e0ng',
+  createStaff: 'T\u1ea1o nh\u00e2n vi\u00ean',
+  customerList: 'Danh s\u00e1ch kh\u00e1ch h\u00e0ng',
+  staffList: 'Danh s\u00e1ch nh\u00e2n vi\u00ean',
+  noCustomers: 'Kh\u00f4ng c\u00f3 kh\u00e1ch h\u00e0ng ph\u00f9 h\u1ee3p.',
+  noStaff: 'Kh\u00f4ng c\u00f3 nh\u00e2n vi\u00ean ph\u00f9 h\u1ee3p.',
+  staffHelp: 'Theo d\u00f5i t\u00e0i kho\u1ea3n nh\u00e2n vi\u00ean, tr\u1ea1ng th\u00e1i truy c\u1eadp v\u00e0 quy\u1ec1n s\u1eed d\u1ee5ng h\u1ec7 th\u1ed1ng.',
+  customerHelp: 'Theo d\u00f5i t\u00e0i kho\u1ea3n kh\u00e1ch h\u00e0ng, tr\u1ea1ng th\u00e1i x\u00e1c th\u1ef1c v\u00e0 t\u00ecnh tr\u1ea1ng kh\u00f3a t\u00e0i kho\u1ea3n.',
+  totalCustomers: 'T\u1ed5ng kh\u00e1ch h\u00e0ng',
+  totalStaff: 'T\u1ed5ng nh\u00e2n vi\u00ean',
+  active: '\u0110ang ho\u1ea1t \u0111\u1ed9ng',
+  locked: '\u0110\u00e3 kh\u00f3a',
+  unverified: 'Ch\u01b0a x\u00e1c th\u1ef1c',
+  allStatus: 'T\u1ea5t c\u1ea3 tr\u1ea1ng th\u00e1i',
+  allVerified: 'T\u1ea5t c\u1ea3 x\u00e1c th\u1ef1c',
+  verified: '\u0110\u00e3 x\u00e1c th\u1ef1c',
+  search: 'T\u00ecm theo t\u00ean, username ho\u1eb7c email...',
+  matched: 't\u00e0i kho\u1ea3n ph\u00f9 h\u1ee3p v\u1edbi b\u1ed9 l\u1ecdc hi\u1ec7n t\u1ea1i',
+  account: 'T\u00e0i kho\u1ea3n',
+  role: 'Vai tr\u00f2',
+  joined: 'Ng\u00e0y tham gia',
+  status: 'Tr\u1ea1ng th\u00e1i',
+  actions: 'Thao t\u00e1c',
+  customerRole: 'Kh\u00e1ch h\u00e0ng',
+  staffRole: 'Nh\u00e2n vi\u00ean',
+  loading: '\u0110ang t\u1ea3i...',
+  detail: 'Chi ti\u1ebft',
+  unlock: 'M\u1edf kh\u00f3a',
+  lock: 'Kh\u00f3a',
+};
+
 export function CustomersView({
   mode,
   searchQuery,
@@ -52,29 +86,25 @@ export function CustomersView({
   currentUserId,
 }: CustomersViewProps) {
   const isStaffView = mode === 'staff';
-  const title = isStaffView ? 'Quản lý nhân viên' : 'Quản lý khách hàng';
-  const createLabel = isStaffView ? 'Tạo nhân viên' : 'Tạo khách hàng';
+  const title = isStaffView ? vi.staffTitle : vi.customerTitle;
+  const createLabel = isStaffView ? vi.createStaff : vi.createCustomer;
   const createRole = isStaffView ? 'STAFF' : 'CUSTOMER';
-  const listTitle = isStaffView ? 'Danh sách nhân viên' : 'Danh sách khách hàng';
-  const emptyText = isStaffView ? 'Không có nhân viên phù hợp.' : 'Không có khách hàng phù hợp.';
+  const listTitle = isStaffView ? vi.staffList : vi.customerList;
+  const emptyText = isStaffView ? vi.noStaff : vi.noCustomers;
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-4">
-        <MetricCard label={isStaffView ? 'Tổng nhân viên' : 'Tổng khách hàng'} value={accounts.length} />
-        <MetricCard label="Đang hoạt động" value={activeUsers.length} tone="emerald" />
-        <MetricCard label="Đã khóa" value={lockedUsers.length} tone="red" />
-        <MetricCard label="Chưa xác thực" value={unverifiedUsers.length} tone="amber" />
+        <MetricCard label={isStaffView ? vi.totalStaff : vi.totalCustomers} value={accounts.length} />
+        <MetricCard label={vi.active} value={activeUsers.length} tone="emerald" />
+        <MetricCard label={vi.locked} value={lockedUsers.length} tone="red" />
+        <MetricCard label={vi.unverified} value={unverifiedUsers.length} tone="amber" />
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-bold text-gray-900">{title}</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            {isStaffView
-              ? 'Theo dõi tài khoản nhân viên, trạng thái truy cập và quyền sử dụng hệ thống.'
-              : 'Theo dõi tài khoản khách hàng, trạng thái xác thực và tình trạng khóa tài khoản.'}
-          </p>
+          <p className="mt-1 text-sm text-gray-500">{isStaffView ? vi.staffHelp : vi.customerHelp}</p>
         </div>
         <button
           type="button"
@@ -88,24 +118,24 @@ export function CustomersView({
 
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="grid gap-3 lg:grid-cols-[1fr_180px_180px]">
-          <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder="Tìm theo tên, username hoặc email..." />
+          <SearchBox value={searchQuery} onChange={setSearchQuery} placeholder={vi.search} />
           <select
             value={userLockFilter}
             onChange={(event) => setUserLockFilter(event.target.value as UserLockFilter)}
             className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
           >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="active">Đang hoạt động</option>
-            <option value="locked">Đã khóa</option>
+            <option value="all">{vi.allStatus}</option>
+            <option value="active">{vi.active}</option>
+            <option value="locked">{vi.locked}</option>
           </select>
           <select
             value={userVerifiedFilter}
             onChange={(event) => setUserVerifiedFilter(event.target.value as UserVerifiedFilter)}
             className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
           >
-            <option value="all">Tất cả xác thực</option>
-            <option value="verified">Đã xác thực</option>
-            <option value="unverified">Chưa xác thực</option>
+            <option value="all">{vi.allVerified}</option>
+            <option value="verified">{vi.verified}</option>
+            <option value="unverified">{vi.unverified}</option>
           </select>
         </div>
       </div>
@@ -114,20 +144,20 @@ export function CustomersView({
         <div className="border-b border-gray-100 px-5 py-4">
           <h3 className="text-lg font-semibold text-gray-900">{listTitle}</h3>
           <p className="text-sm text-gray-500">
-            {filteredAccounts.length.toLocaleString('vi-VN')} tài khoản phù hợp với bộ lọc hiện tại
+            {filteredAccounts.length.toLocaleString('vi-VN')} {vi.matched}
           </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px]">
             <thead className="bg-gray-50">
               <tr>
-                <TableHead>Tài khoản</TableHead>
+                <TableHead>{vi.account}</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Vai trò</TableHead>
-                <TableHead>Xác thực</TableHead>
-                <TableHead>Ngày tham gia</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead align="right">Thao tác</TableHead>
+                <TableHead>{vi.role}</TableHead>
+                <TableHead>{vi.verified}</TableHead>
+                <TableHead>{vi.joined}</TableHead>
+                <TableHead>{vi.status}</TableHead>
+                <TableHead align="right">{vi.actions}</TableHead>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -156,26 +186,26 @@ export function CustomersView({
                     >
                       {isStaffView ? (
                         <>
-                          <option value="STAFF">Nhân viên</option>
+                          <option value="STAFF">{vi.staffRole}</option>
                           <option value="ADMIN">Admin</option>
                         </>
                       ) : (
                         <>
-                          <option value="CUSTOMER">Khách hàng</option>
-                          <option value="STAFF">Nhân viên</option>
+                          <option value="CUSTOMER">{vi.customerRole}</option>
+                          <option value="STAFF">{vi.staffRole}</option>
                         </>
                       )}
                     </select>
                   </TableCell>
                   <TableCell>
                     <span className={`rounded-full px-2 py-1 text-xs ${account.isVerified ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                      {account.isVerified ? 'Đã xác thực' : 'Chưa xác thực'}
+                      {account.isVerified ? vi.verified : vi.unverified}
                     </span>
                   </TableCell>
                   <TableCell>{formatDate(account.createdAt)}</TableCell>
                   <TableCell>
                     <span className={`rounded-full px-2 py-1 text-xs ${account.isLocked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                      {account.isLocked ? 'Đã khóa' : 'Hoạt động'}
+                      {account.isLocked ? vi.locked : 'Ho\u1ea1t \u0111\u1ed9ng'}
                     </span>
                   </TableCell>
                   <TableCell align="right">
@@ -187,7 +217,7 @@ export function CustomersView({
                           onClick={() => openCustomerDetail(account)}
                           className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50"
                         >
-                          {loadingCustomerSummaryId === account.id ? 'Đang tải...' : 'Chi tiết'}
+                          {loadingCustomerSummaryId === account.id ? vi.loading : vi.detail}
                         </button>
                       )}
                       <button
@@ -200,7 +230,7 @@ export function CustomersView({
                             : 'bg-red-50 text-red-700 hover:bg-red-100'
                         }`}
                       >
-                        {account.isLocked ? 'Mở khóa' : 'Khóa'}
+                        {account.isLocked ? vi.unlock : vi.lock}
                       </button>
                       <button
                         type="button"
