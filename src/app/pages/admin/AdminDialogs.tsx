@@ -16,6 +16,19 @@ export function ConfirmDialogModal({
   closeConfirmDialog,
   handleConfirmDialog,
 }: ConfirmDialogModalProps) {
+  const normalizeText = (text: string) => {
+    const replacements: Array<[string, string]> = [
+      ['XÃ³a chÆ°Æ¡ng trÃ¬nh khuyáº¿n mÃ£i?', 'Xóa chương trình khuyến mãi?'],
+      ['ChÆ°Æ¡ng trÃ¬nh', 'Chương trình'],
+      ['sáº½ bá»‹ xÃ³a', 'sẽ bị xóa'],
+      ['cÃ¡c sÃ¡ch trong chÆ°Æ¡ng trÃ¬nh sáº½ Ä‘Æ°á»£c tráº£ vá» giÃ¡ gá»‘c', 'các sách trong chương trình sẽ được trả về giá gốc'],
+      ['XÃ³a chÆ°Æ¡ng trÃ¬nh', 'Xóa chương trình'],
+      ['Há»§y', 'Hủy'],
+      ['Äang xá»­ lÃ½...', 'Đang xử lý...'],
+    ];
+    return replacements.reduce((result, [source, target]) => result.replaceAll(source, target), text);
+  };
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
@@ -24,8 +37,8 @@ export function ConfirmDialogModal({
             <AlertCircle className="h-6 w-6" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-bold text-gray-900">{confirmDialog.title}</h3>
-            <p className="mt-2 text-sm leading-6 text-gray-600">{confirmDialog.message}</p>
+            <h3 className="text-lg font-bold text-gray-900">{normalizeText(confirmDialog.title)}</h3>
+            <p className="mt-2 text-sm leading-6 text-gray-600">{normalizeText(confirmDialog.message)}</p>
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-3">

@@ -4,7 +4,7 @@ import type { AdminPromotion } from '../../services/admin.service';
 import { getBookImage } from '../../utils/book-display';
 import { EmptyState, SearchBox } from './components';
 import type { PromotionEffectiveStatus } from './types';
-import { formatDate, getPromotionEffectiveMeta, getPromotionEffectiveStatus } from './utils';
+import { formatDate, getPromotionEffectiveStatus } from './utils';
 
 type PromotionsViewProps = {
   isAdmin: boolean;
@@ -34,6 +34,15 @@ const promotionStatusFilters: Array<{ value: PromotionEffectiveStatus; label: st
   { value: 'expired', label: 'Đã hết hạn' },
   { value: 'inactive', label: 'Tạm tắt' },
 ];
+
+const promotionStatusMeta: Record<PromotionEffectiveStatus, { label: string; className: string }> = {
+  all: { label: 'Tất cả', className: 'bg-gray-50 text-gray-700 ring-gray-100' },
+  running: { label: 'Đang chạy', className: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
+  upcoming: { label: 'Sắp diễn ra', className: 'bg-blue-50 text-blue-700 ring-blue-100' },
+  ending_soon: { label: 'Sắp hết hạn', className: 'bg-amber-50 text-amber-700 ring-amber-100' },
+  expired: { label: 'Đã hết hạn', className: 'bg-rose-50 text-rose-700 ring-rose-100' },
+  inactive: { label: 'Tạm tắt', className: 'bg-gray-50 text-gray-600 ring-gray-100' },
+};
 
 export function PromotionsView({
   isAdmin,
@@ -118,7 +127,7 @@ export function PromotionsView({
 
       <div className="grid gap-4">
         {filteredPromotions.map((promotion) => {
-          const meta = getPromotionEffectiveMeta(promotion);
+          const meta = promotionStatusMeta[getPromotionEffectiveStatus(promotion)];
           const books = promotion.books || [];
           const bookCount = promotion.bookCount || books.length || 0;
 

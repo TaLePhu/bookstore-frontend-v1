@@ -1005,8 +1005,25 @@ export function AdminPage() {
     showSelectedPromotionBooksOnly,
   ]);
 
+  const normalizeAdminMessage = (text: string) => {
+    if (!text) return text;
+    const promotionMessageBySignal: Array<[string, string]> = [
+      ['Kh', 'Kh\u00f4ng th\u1ec3 l\u01b0u ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i.'],
+      ['Vui l', 'Vui l\u00f2ng ki\u1ec3m tra th\u00f4ng tin ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i.'],
+    ];
+    if (text.includes('chÆ°Æ¡ng trÃ¬nh khuyáº¿n mÃ£i') || text.includes('khuyáº¿n mÃ£i')) {
+      if (text.includes('báº­t')) return '\u0110\u00e3 b\u1eadt ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i. Ch\u01b0\u01a1ng tr\u00ecnh s\u1ebd t\u1ef1 \u00e1p d\u1ee5ng theo ng\u00e0y.';
+      if (text.includes('táº¯t')) return '\u0110\u00e3 t\u1eaft ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i v\u00e0 tr\u1ea3 s\u00e1ch v\u1ec1 gi\u00e1 hi\u1ec7n h\u00e0nh.';
+      if (text.includes('cáº­p nháº­t')) return '\u0110\u00e3 c\u1eadp nh\u1eadt ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i.';
+      if (text.includes('táº¡o')) return '\u0110\u00e3 t\u1ea1o ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i.';
+      if (text.includes('thuá»™c')) return 'M\u1ed9t s\u1ed1 s\u00e1ch \u0111\u00e3 thu\u1ed9c ch\u01b0\u01a1ng tr\u00ecnh khuy\u1ebfn m\u00e3i kh\u00e1c. Vui l\u00f2ng b\u1ecf c\u00e1c s\u00e1ch n\u00e0y ho\u1eb7c ch\u1ec9nh ch\u01b0\u01a1ng tr\u00ecnh hi\u1ec7n c\u00f3.';
+      return promotionMessageBySignal.find(([signal]) => text.includes(signal))?.[1] || text;
+    }
+    return text;
+  };
+
   const showPopup = (message: Exclude<PopupMessage, null>) => {
-    setPopupMessage(message);
+    setPopupMessage({ ...message, text: normalizeAdminMessage(message.text) });
     window.setTimeout(() => setPopupMessage(null), 3200);
   };
 
@@ -1636,8 +1653,9 @@ export function AdminPage() {
   };
 
   const showPromotionFormError = (message: string) => {
-    setPromotionFormError(message);
-    showPopup({ type: 'error', text: message });
+    const normalizedMessage = normalizeAdminMessage(message);
+    setPromotionFormError(normalizedMessage);
+    showPopup({ type: 'error', text: normalizedMessage });
   };
 
   const parseDateInput = (value?: string) => {
@@ -1802,8 +1820,8 @@ export function AdminPage() {
       showPopup({
         type: 'success',
         text: nextStatus === 'ACTIVE'
-          ? 'ÄÃ£ báº­t chÆ°Æ¡ng trÃ¬nh khuyáº¿n mÃ£i. ChÆ°Æ¡ng trÃ¬nh sáº½ tá»± Ã¡p dá»¥ng theo ngÃ y.'
-          : 'ÄÃ£ táº¯t chÆ°Æ¡ng trÃ¬nh khuyáº¿n mÃ£i vÃ  tráº£ sÃ¡ch vá» giÃ¡ hiá»‡n hÃ nh.',
+          ? 'Đã bật chương trình khuyến mãi. Chương trình sẽ tự áp dụng theo ngày.'
+          : 'Đã tắt chương trình khuyến mãi và trả sách về giá hiện hành.',
       });
     } catch (err: any) {
       const message = getPromotionApiErrorMessage(err);
@@ -2364,7 +2382,7 @@ export function AdminPage() {
           {error && (
             <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 mt-0.5" />
-              <div className="flex-1">{error}</div>
+              <div className="flex-1">{normalizeAdminMessage(error)}</div>
               <button onClick={() => setError('')} className="text-red-500 hover:text-red-700">
                 <X className="w-4 h-4" />
               </button>

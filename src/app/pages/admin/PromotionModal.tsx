@@ -136,11 +136,11 @@ export function PromotionModal({
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">Mô tả</label>
             <textarea
-              rows={3}
               value={promotionForm.description || ''}
               onChange={(event) => handlePromotionFormInput('description', event.target.value)}
-              className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Ghi chú ngắn về chương trình"
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              placeholder="Nội dung ngắn hiển thị trên trang khuyến mãi"
             />
           </div>
 
@@ -153,9 +153,9 @@ export function PromotionModal({
                 <button
                   type="button"
                   onClick={clearPromotionBanner}
-                  className="text-xs font-medium text-orange-600 hover:text-orange-700"
+                  className="text-sm font-semibold text-red-600 hover:text-red-700"
                 >
-                  Bỏ chọn ảnh
+                  Xóa banner
                 </button>
               )}
             </div>
@@ -164,8 +164,8 @@ export function PromotionModal({
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={(event) => {
-                const isValid = handlePromotionBannerChange(event.target.files);
-                if (!isValid) event.currentTarget.value = '';
+                const accepted = handlePromotionBannerChange(event.target.files);
+                if (!accepted && promotionBannerInputRef.current) promotionBannerInputRef.current.value = '';
               }}
               className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
@@ -188,55 +188,47 @@ export function PromotionModal({
             )}
           </div>
 
-          <div className="rounded-xl border border-gray-200">
-            <div className="border-b border-gray-100 px-4 py-3">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <h4 className="font-semibold text-gray-900">Sách áp dụng</h4>
-                <span className="text-sm text-gray-500">
-                  Đang hiện {filteredPromotionModalBooks.length} / {promotionBooks.length} sách
-                </span>
-              </div>
-              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1.3fr_0.9fr_0.9fr_auto]">
-                <input
-                  value={promotionBookSearch}
-                  onChange={(event) => setPromotionBookSearch(event.target.value)}
-                  placeholder="Tìm theo tên sách, tác giả, ISBN..."
-                  className="rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-                <select
-                  value={promotionCategoryFilter}
-                  onChange={(event) => setPromotionCategoryFilter(event.target.value)}
-                  className="rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="all">Tất cả danh mục</option>
-                  {activeCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={promotionStockFilter}
-                  onChange={(event) => setPromotionStockFilter(event.target.value as PromotionBookStockFilter)}
-                  className="rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="all">Tất cả tồn kho</option>
-                  <option value="in_stock">Còn hàng</option>
-                  <option value="low_stock">Sắp hết hàng</option>
-                  <option value="out_of_stock">Hết hàng</option>
-                </select>
-                <label className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={showSelectedPromotionBooksOnly}
-                    onChange={(event) => setShowSelectedPromotionBooksOnly(event.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                  />
-                  Đã chọn
-                </label>
-              </div>
+          <div className="rounded-xl border border-gray-200 p-4">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row">
+              <input
+                value={promotionBookSearch}
+                onChange={(event) => setPromotionBookSearch(event.target.value)}
+                placeholder="Tìm sách trong chương trình..."
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+              <select
+                value={promotionCategoryFilter}
+                onChange={(event) => setPromotionCategoryFilter(event.target.value)}
+                className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="all">Tất cả danh mục</option>
+                {activeCategories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+              <select
+                value={promotionStockFilter}
+                onChange={(event) => setPromotionStockFilter(event.target.value as PromotionBookStockFilter)}
+                className="rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="all">Tất cả tồn kho</option>
+                <option value="in_stock">Còn hàng</option>
+                <option value="low_stock">Sắp hết hàng</option>
+                <option value="out_of_stock">Hết hàng</option>
+              </select>
             </div>
-            <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto p-4 md:grid-cols-2">
+
+            <label className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-700">
+              <input
+                type="checkbox"
+                checked={showSelectedPromotionBooksOnly}
+                onChange={(event) => setShowSelectedPromotionBooksOnly(event.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+              />
+              Chỉ xem sách đã chọn
+            </label>
+
+            <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
               {filteredPromotionModalBooks.map((book) => {
                 const checked = promotionForm.bookIds.includes(book.id);
                 return (
@@ -253,17 +245,21 @@ export function PromotionModal({
                       className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
                     />
                     <img src={getBookImage(book)} alt={book.title} className="h-14 w-10 rounded object-cover ring-1 ring-gray-200" />
-                    <div className="min-w-0">
-                      <p className="line-clamp-1 text-sm font-semibold text-gray-900">{book.title}</p>
-                      <p className="text-xs text-gray-500">{book.author}</p>
-                      <p className="text-xs text-gray-400">{formatCurrency(book.price)}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 font-semibold text-gray-900">{book.title}</p>
+                      <p className="text-sm text-gray-500">{book.author}</p>
+                      <p className="text-xs text-gray-400">{book.category?.name || 'Chưa phân loại'} · Tồn: {book.stock}</p>
+                    </div>
+                    <div className="text-right text-sm">
+                      <p className="font-semibold text-gray-900">{formatCurrency(book.price)}</p>
+                      {checked && <CheckCircle2 className="ml-auto mt-1 h-4 w-4 text-orange-500" />}
                     </div>
                   </label>
                 );
               })}
               {filteredPromotionModalBooks.length === 0 && (
-                <div className="col-span-full rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-                  Không có sách phù hợp với bộ lọc.
+                <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+                  Không có sách phù hợp.
                 </div>
               )}
             </div>
@@ -284,8 +280,7 @@ export function PromotionModal({
             disabled={savingPromotion}
             className="flex items-center gap-2 rounded-lg bg-orange-500 px-6 py-3 text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
           >
-            <CheckCircle2 className="h-5 w-5" />
-            {savingPromotion ? 'Đang lưu...' : 'Lưu chương trình'}
+            {savingPromotion ? 'Đang lưu...' : promotionModalMode === 'edit' ? 'Lưu thay đổi' : 'Tạo chương trình'}
           </button>
         </div>
       </div>
