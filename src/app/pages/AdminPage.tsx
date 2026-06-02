@@ -35,6 +35,7 @@ import {
   deleteAdminBook,
   deleteAdminCategory,
   deleteAdminPromotion,
+  generateAdminMarketingCampaignDraft,
   getAdminBooks,
   getAdminBookDetail,
   getAdminCategories,
@@ -42,6 +43,7 @@ import {
   getAdminStaffSummary,
   getAdminCustomers,
   getAdminDashboard,
+  getAdminMarketingInsights,
   getAdminOrderDetail,
   getAdminOrders,
   getAdminPromotions,
@@ -70,6 +72,7 @@ import {
   type AdminCustomerSummary,
   type AdminStaffSummary,
   type AdminDashboardResponse,
+  type AdminMarketingInsight,
   type AdminOrder,
   type AdminOrderDetail,
   type AdminPaymentMethod,
@@ -188,6 +191,8 @@ export function AdminPage() {
   const [cancelDecisionDialog, setCancelDecisionDialog] = useState<CancelDecisionDialog>(null);
   const [cancelDecisionNote, setCancelDecisionNote] = useState('');
   const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(null);
+  const [marketingInsights, setMarketingInsights] = useState<AdminMarketingInsight[]>([]);
+  const [creatingDraftInsightId, setCreatingDraftInsightId] = useState<string | null>(null);
   const [books, setBooks] = useState<ApiBook[]>([]);
   const [promotions, setPromotions] = useState<AdminPromotion[]>([]);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
@@ -331,6 +336,7 @@ export function AdminPage() {
         ]);
 
         setDashboard(null);
+        setMarketingInsights([]);
         setBooks(booksData.data);
         setPromotions(
           (promotionsData.programs || []).map((program) => ({
@@ -356,7 +362,7 @@ export function AdminPage() {
         return;
       }
 
-      const [dashboardData, booksData, promotionsData, categoriesData, ordersData, reportOrdersData, customersData] = await Promise.all([
+      const [dashboardData, booksData, promotionsData, categoriesData, ordersData, reportOrdersData, customersData, marketingInsightsData] = await Promise.all([
         getAdminDashboard(),
         getAdminBooks({
           limit: 50,
@@ -370,12 +376,14 @@ export function AdminPage() {
         getAdminCustomers({
           limit: 500,
         }),
+        getAdminMarketingInsights(),
       ]);
       const orderStatusResults = await Promise.all(
         ORDER_STATUS_OPTIONS.map((status) => getAdminOrders({ limit: 1, status }))
       );
 
       setDashboard(dashboardData);
+      setMarketingInsights(marketingInsightsData);
       setBooks(booksData.data);
       setPromotions(promotionsData);
       setCategories(categoriesData);
@@ -1639,6 +1647,39 @@ export function AdminPage() {
     setPromotionModalMode('create');
   };
 
+  const openCreatePromotionFromMarketing = async (insight: AdminMarketingInsight) => {
+    try {
+      setCreatingDraftInsightId(insight.id);
+      const draft = await generateAdminMarketingCampaignDraft(insight.id);
+      resetPromotionForm();
+      setPromotionForm({
+        name: draft.name,
+        description: draft.description,
+        bannerImageUrl: draft.bannerImageUrl,
+        discountPercent: String(draft.discountPercent),
+        startsAt: draft.startsAt,
+        endsAt: draft.endsAt,
+        status: draft.status,
+        bookIds: draft.bookIds,
+        bannerImage: null,
+      });
+      setShowSelectedPromotionBooksOnly(true);
+      setPromotionModalMode('create');
+      showPopup({
+        type: 'success',
+        text: draft.aiGenerated
+          ? 'AI đã tạo bản nháp chiến dịch. Vui lòng kiểm tra trước khi lưu.'
+          : 'Đã tạo bản nháp chiến dịch theo dữ liệu hiện có. Vui lòng kiểm tra trước khi lưu.',
+      });
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Không thể tạo bản nháp chiến dịch marketing.';
+      setError(message);
+      showPopup({ type: 'error', text: message });
+    } finally {
+      setCreatingDraftInsightId(null);
+    }
+  };
+
   const openEditPromotion = (promotion: AdminPromotion) => {
     setSelectedPromotion(promotion);
     setPromotionForm({
@@ -2578,14 +2619,14 @@ export function AdminPage() {
 
           {currentView === 'marketing' && (
             <MarketingView
-              orders={reportOrders}
-              books={books}
-              customers={customers}
-              promotions={promotions}
+              insights={marketingInsights}
+              isLoading={isLoading}
+              creatingDraftInsightId={creatingDraftInsightId}
               goToBooks={goToBooksView}
               goToPromotions={goToPromotionsView}
               goToCustomers={goToCustomersView}
               goToOrders={() => goToOrders()}
+              onCreateCampaignDraft={openCreatePromotionFromMarketing}
             />
           )}
 

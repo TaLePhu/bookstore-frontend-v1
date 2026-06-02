@@ -102,6 +102,34 @@ export interface AdminUser {
   lastOrderAt?: string | null;
 }
 
+export type AdminMarketingPriority = 'high' | 'medium' | 'low';
+export type AdminMarketingCategory = 'inventory' | 'revenue' | 'customer' | 'alert';
+
+export interface AdminMarketingInsight {
+  id: string;
+  category: AdminMarketingCategory;
+  title: string;
+  reason: string;
+  impact: string;
+  priority: AdminMarketingPriority;
+  actionType: 'create_promotion' | 'view_books' | 'view_customers' | 'view_orders';
+  suggestedBookIds: string[];
+  metrics: Record<string, number | string>;
+}
+
+export interface AdminMarketingCampaignDraft {
+  insightId: string;
+  name: string;
+  description: string;
+  discountPercent: number;
+  startsAt: string;
+  endsAt: string;
+  status: AdminPromotionStatus;
+  bookIds: string[];
+  bannerImageUrl: string;
+  aiGenerated: boolean;
+}
+
 export interface AdminCustomerSummary extends AdminUser {
   phone?: string | null;
   avatar?: string | null;
@@ -266,6 +294,18 @@ export interface AdminBookImportResult {
 
 export const getAdminDashboard = async (): Promise<AdminDashboardResponse> => {
   const res = await api.get('/admin/dashboard');
+  return res.data.data;
+};
+
+export const getAdminMarketingInsights = async (): Promise<AdminMarketingInsight[]> => {
+  const res = await api.get('/admin/marketing/insights');
+  return res.data.data;
+};
+
+export const generateAdminMarketingCampaignDraft = async (
+  insightId: string
+): Promise<AdminMarketingCampaignDraft> => {
+  const res = await api.post('/admin/marketing/campaign-draft', { insightId });
   return res.data.data;
 };
 
