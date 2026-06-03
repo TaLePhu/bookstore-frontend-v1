@@ -112,6 +112,11 @@ export function DashboardView({
   renderOrderActionButton,
   getPromotionRemainingText,
 }: DashboardViewProps) {
+  const revenueChartData = (dashboard?.revenueData || []).map((item) => ({
+    ...item,
+    revenueMillions: Number(item.revenue || 0) / 1_000_000,
+  }));
+
   return (
     <div className="space-y-6">
       {!isAdmin && (
@@ -297,13 +302,13 @@ export function DashboardView({
                 <p className="mt-1 text-sm text-gray-500">Đơn vị: triệu đồng, chỉ tính đơn hoàn thành.</p>
                 <div className="mt-6">
                   <ResponsiveContainer width="100%" height={290}>
-                    <LineChart data={dashboard?.revenueData || []}>
+                    <LineChart data={revenueChartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis dataKey="month" stroke="#9CA3AF" />
-                      <YAxis stroke="#9CA3AF" />
-                      <Tooltip formatter={(value) => [`${value} triệu đồng`, 'Doanh thu']} />
+                      <YAxis stroke="#9CA3AF" tickFormatter={(value) => `${Number(value).toLocaleString('vi-VN')}`} />
+                      <Tooltip formatter={(value) => [formatCurrency(Number(value) * 1_000_000), 'Doanh thu']} />
                       <Legend />
-                      <Line type="monotone" dataKey="revenue" stroke="#F97316" strokeWidth={3} name="Doanh thu" />
+                      <Line type="monotone" dataKey="revenueMillions" stroke="#F97316" strokeWidth={3} name="Doanh thu" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>

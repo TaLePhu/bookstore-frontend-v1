@@ -422,6 +422,21 @@ export function AdminPage() {
   ]);
 
   useEffect(() => {
+    if (!isAdmin || currentView !== 'dashboard') return;
+
+    const intervalId = window.setInterval(async () => {
+      try {
+        const dashboardData = await getAdminDashboard();
+        setDashboard(dashboardData);
+      } catch (err) {
+        console.warn('Refresh admin dashboard failed:', err);
+      }
+    }, 30000);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentView, isAdmin]);
+
+  useEffect(() => {
     setPromotionDrafts((prev) => {
       const next: Record<string, PromotionDraft> = {};
       books.forEach((book) => {
@@ -894,7 +909,7 @@ export function AdminPage() {
       return left - right;
     });
   const latestRevenuePoint = dashboard?.revenueData?.[(dashboard?.revenueData?.length || 1) - 1];
-  const currentMonthRevenue = Number(latestRevenuePoint?.revenue || 0) * 1_000_000;
+  const currentMonthRevenue = Number(latestRevenuePoint?.revenue || 0);
   const completedOrderTotal = orderStatusTotals.COMPLETED || 0;
   const cancelledOrderTotal = orderStatusTotals.CANCELLED || 0;
   const allOrderTotal = ORDER_STATUS_OPTIONS.reduce((sum, status) => sum + (orderStatusTotals[status] || 0), 0);
