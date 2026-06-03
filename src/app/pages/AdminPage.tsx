@@ -99,7 +99,6 @@ import {
 } from './admin/constants';
 import {
   EmptyState,
-  InfoBlock,
   SearchBox,
   TableCell,
   TableHead,
@@ -2612,18 +2611,6 @@ export function AdminPage() {
 
           {currentView === 'promotions' && (
             <div className="space-y-6">
-              {isAdmin && (
-                <MarketingView
-                  plan={marketingPlan}
-                  promotions={promotions}
-                  isLoading={isLoading}
-                  creatingDraftInsightId={creatingDraftInsightId}
-                  goToBooks={goToBooksView}
-                  goToCustomers={goToCustomersView}
-                  goToOrders={() => goToOrders()}
-                  onCreateCampaignDraft={openCreatePromotionFromMarketing}
-                />
-              )}
               <PromotionsView
                 isAdmin={isAdmin}
                 searchQuery={searchQuery}
@@ -2643,6 +2630,17 @@ export function AdminPage() {
                 updatingPromotionStatusId={updatingPromotionStatusId}
                 onViewPromotionsPage={() => navigate('/promotions')}
               />
+              {isAdmin && (
+                <MarketingView
+                  plan={marketingPlan}
+                  isLoading={isLoading}
+                  creatingDraftInsightId={creatingDraftInsightId}
+                  goToBooks={goToBooksView}
+                  goToCustomers={goToCustomersView}
+                  goToOrders={() => goToOrders()}
+                  onCreateCampaignDraft={openCreatePromotionFromMarketing}
+                />
+              )}
             </div>
           )}
 
