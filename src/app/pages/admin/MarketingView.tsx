@@ -7,7 +7,6 @@ type MarketingViewProps = {
   isLoading?: boolean;
   creatingDraftInsightId?: string | null;
   goToBooks: () => void;
-  goToPromotions: () => void;
   goToCustomers: () => void;
   goToOrders: () => void;
   onCreateCampaignDraft: (program: AdminMarketingProgram) => void;
@@ -23,7 +22,6 @@ const vi = {
   viewBooks: 'Xem sách',
   viewCustomers: 'Xem khách hàng',
   viewOrders: 'Xem đơn hàng',
-  viewPromotions: 'Xem khuyến mãi',
   high: 'Cao',
   medium: 'Trung bình',
   low: 'Thấp',
@@ -35,7 +33,6 @@ export function MarketingView({
   isLoading,
   creatingDraftInsightId,
   goToBooks,
-  goToPromotions,
   goToCustomers,
   goToOrders,
   onCreateCampaignDraft,
@@ -67,14 +64,6 @@ export function MarketingView({
               <p className="mt-1 max-w-3xl text-sm text-gray-500">{vi.helper}</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={goToPromotions}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-700 transition-colors hover:bg-orange-100"
-          >
-            <Megaphone className="h-4 w-4" />
-            {vi.viewPromotions}
-          </button>
         </div>
       </div>
 
@@ -93,13 +82,6 @@ export function MarketingView({
                 <CalendarDays className="h-5 w-5 text-orange-500" />
                 <h4 className="font-bold text-gray-900">{vi.runningCampaigns}</h4>
               </div>
-              <button
-                type="button"
-                onClick={goToPromotions}
-                className="text-sm font-semibold text-orange-600 hover:text-orange-700"
-              >
-                Quản lý khuyến mãi
-              </button>
             </div>
             <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
               {runningPromotions.map((promotion) => (
