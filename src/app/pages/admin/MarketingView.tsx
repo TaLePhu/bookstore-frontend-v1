@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, CalendarDays, CheckCircle2, Loader2, Megaphone, Package, Percent, Sparkles, TrendingUp, Users } from 'lucide-react';
+import { Bot, CalendarDays, Loader2, Megaphone, Package, Percent, Sparkles, TrendingUp, Users } from 'lucide-react';
 import type { AdminMarketingPlan, AdminMarketingProgram, AdminPromotion } from '../../services/admin.service';
 
 type MarketingViewProps = {
@@ -16,11 +16,9 @@ type MarketingViewProps = {
 const vi = {
   title: 'Marketing Intelligence',
   helper: 'Trung tâm đề xuất chương trình hành động cho admin: chọn vấn đề cần xử lý, tạo bản nháp chiến dịch, rồi kiểm duyệt trước khi lưu.',
-  priorityToday: 'Ưu tiên hôm nay',
   runningCampaigns: 'Chiến dịch đang chạy',
   programTypes: 'Loại chương trình có thể triển khai',
   recommendedPrograms: 'Chương trình nên thực hiện',
-  dataSignals: 'Tín hiệu dữ liệu',
   createDraft: 'Tạo bản nháp bằng AI',
   viewBooks: 'Xem sách',
   viewCustomers: 'Xem khách hàng',
@@ -43,7 +41,6 @@ export function MarketingView({
   onCreateCampaignDraft,
 }: MarketingViewProps) {
   const programs = plan?.recommendedPrograms || [];
-  const topPrograms = programs.slice(0, 3);
   const runningPromotions = promotions.filter(isPromotionRunning).slice(0, 4);
   const recommendedProgramIds = new Set(programs.map((program) => program.id));
 
@@ -116,23 +113,6 @@ export function MarketingView({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-3">
-              <TrendingUp className="h-5 w-5 text-orange-500" />
-              <h4 className="font-bold text-gray-900">{vi.priorityToday}</h4>
-            </div>
-            <div className="grid gap-3 lg:grid-cols-3">
-              {topPrograms.map((program) => (
-                <PriorityCard key={program.id} program={program} />
-              ))}
-              {topPrograms.length === 0 && (
-                <div className="rounded-xl border border-dashed border-gray-300 p-5 text-sm text-gray-500 lg:col-span-3">
-                  Chưa có chương trình đủ điều kiện tự động. Hãy kiểm tra tồn kho sách và đơn hàng trước.
-                </div>
-              )}
-            </div>
-          </section>
-
           <section className="space-y-4">
             <div className="flex items-center gap-3">
               <Megaphone className="h-5 w-5 text-orange-500" />
@@ -190,8 +170,6 @@ export function MarketingView({
               ))}
             </div>
           </section>
-
-          <DataNotes notes={plan?.dataNotes || []} />
         </>
       )}
     </div>
@@ -329,14 +307,7 @@ function formatPromotionDate(value?: string | null) {
 
 function SummaryStrip({ plan }: { plan: AdminMarketingPlan | null }) {
   const summary = plan?.summary;
-  const qualityLabel = {
-    starter: 'Khởi động',
-    enough: 'Đủ dùng',
-    rich: 'Dữ liệu tốt',
-  }[summary?.dataQuality || 'starter'];
-
   const items = [
-    { label: 'Chất lượng dữ liệu', value: qualityLabel, icon: CheckCircle2 },
     { label: 'Sách trong kho', value: summary?.totalBooks ?? 0, icon: Package },
     { label: 'Đơn hoàn thành', value: summary?.completedOrders ?? 0, icon: TrendingUp },
     { label: 'Khuyến mãi chạy', value: summary?.activePromotions ?? 0, icon: Megaphone },
@@ -345,7 +316,7 @@ function SummaryStrip({ plan }: { plan: AdminMarketingPlan | null }) {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-5">
       {items.map((item) => {
         const Icon = item.icon;
         return (
@@ -363,18 +334,6 @@ function SummaryStrip({ plan }: { plan: AdminMarketingPlan | null }) {
         );
       })}
     </div>
-  );
-}
-
-function PriorityCard({ program }: { program: AdminMarketingProgram }) {
-  return (
-    <article className="rounded-xl border border-orange-100 bg-orange-50/70 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <h5 className="font-bold text-gray-900">{program.title}</h5>
-        <PriorityBadge priority={program.priority} />
-      </div>
-      <p className="mt-2 line-clamp-3 text-sm text-gray-600">{program.problem}</p>
-    </article>
   );
 }
 
@@ -459,24 +418,4 @@ function PriorityBadge({ priority }: { priority: AdminMarketingProgram['priority
   const priorityLabel = { high: vi.high, medium: vi.medium, low: vi.low }[priority];
 
   return <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${priorityStyle}`}>{priorityLabel}</span>;
-}
-
-function DataNotes({ notes }: { notes: string[] }) {
-  if (notes.length === 0) return null;
-
-  return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-3 flex items-center gap-3">
-        <AlertTriangle className="h-5 w-5 text-amber-500" />
-        <h4 className="font-bold text-gray-900">{vi.dataSignals}</h4>
-      </div>
-      <div className="space-y-2">
-        {notes.map((note) => (
-          <p key={note} className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            {note}
-          </p>
-        ))}
-      </div>
-    </section>
-  );
 }
