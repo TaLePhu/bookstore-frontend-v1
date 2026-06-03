@@ -373,7 +373,10 @@ export function AdminPage() {
         getAdminCustomers({
           limit: 500,
         }),
-        getAdminMarketingInsights(),
+        getAdminMarketingInsights().catch((err) => {
+          console.warn('Load marketing insights failed:', err);
+          return null;
+        }),
       ]);
       const orderStatusResults = await Promise.all(
         ORDER_STATUS_OPTIONS.map((status) => getAdminOrders({ limit: 1, status }))
