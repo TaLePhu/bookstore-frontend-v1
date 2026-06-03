@@ -1,4 +1,4 @@
-import { Bot, Loader2, Sparkles } from 'lucide-react';
+import { Bot, CalendarDays, Loader2, Sparkles } from 'lucide-react';
 import type { AdminMarketingPlan, AdminMarketingProgram } from '../../services/admin.service';
 
 type MarketingViewProps = {
@@ -13,7 +13,7 @@ type MarketingViewProps = {
 
 const vi = {
   title: 'Gợi ý tạo khuyến mãi',
-  helper: 'Đề xuất nhanh dựa trên tồn kho, đơn hàng và nhóm sách nổi bật. Tạo bản nháp rồi kiểm duyệt trước khi lưu.',
+  helper: 'Đề xuất nhanh dựa trên tồn kho, đơn hàng, nhóm sách nổi bật và các ngày đặc biệt trong tháng.',
   createDraft: 'Tạo bản nháp bằng AI',
   viewBooks: 'Xem sách',
   viewCustomers: 'Xem khách hàng',
@@ -122,6 +122,7 @@ function ProgramCard({
     view_orders: vi.viewOrders,
   }[program.actionType];
   const canCreateDraft = program.actionType === 'create_promotion';
+  const isOccasion = program.id.startsWith('occasion-');
 
   return (
     <article className="rounded-xl border border-orange-100 bg-white p-4">
@@ -130,8 +131,19 @@ function ProgramCard({
           <div className="flex flex-wrap items-center gap-2">
             <h5 className="font-bold text-gray-900">{program.title}</h5>
             <PriorityBadge priority={program.priority} />
+            {isOccasion && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold text-pink-700 ring-1 ring-pink-100">
+                <CalendarDays className="h-3.5 w-3.5" />
+                Dịp đặc biệt
+              </span>
+            )}
           </div>
-          <p className="mt-2 text-sm text-gray-700">{program.recommendation}</p>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+            <SuggestionInfo label="Lý do gợi ý" value={program.reason || program.problem} />
+            <SuggestionInfo label="Mô tả khuyến mãi" value={program.recommendation} />
+            <SuggestionInfo label="Áp dụng cho" value={program.target} />
+            <SuggestionInfo label="Kỳ vọng" value={program.expectedImpact} />
+          </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
             {program.discountPercent > 0 && (
               <span className="rounded-full bg-orange-50 px-3 py-1 text-orange-700 ring-1 ring-orange-100">
@@ -161,6 +173,15 @@ function ProgramCard({
         </button>
       </div>
     </article>
+  );
+}
+
+function SuggestionInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase text-gray-400">{label}</p>
+      <p className="mt-1 text-sm text-gray-700">{value}</p>
+    </div>
   );
 }
 
